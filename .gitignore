@@ -215,6 +215,7 @@ __marimo__/
 .venv/
 __pycache__/
 *.pyc
+dash/
 
 # Ignore logs
 logs/
@@ -222,3 +223,4 @@ logs/
 
 # Ignore OS files
 .DS_Store
+
