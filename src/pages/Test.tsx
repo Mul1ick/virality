@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 function Test() {
   const [selectedPlatforms, setSelectedPlatforms] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     projectName: "",
     email: "",
     dateRange: "30",
   });
+  const navigate = useNavigate();
 
   const togglePlatform = (platform) => {
     setSelectedPlatforms((prev) =>
@@ -17,18 +21,31 @@ function Test() {
     );
   };
 
-  const handleSubmit = () => {
-    if (selectedPlatforms.length === 0) {
-      alert("Please select at least one platform");
-      return;
-    }
-  };
-
   const handleInputChange = (e: any) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    try {
+      window.location.href = "http://127.0.0.1:8000/google/login";
+    } catch (error) {
+      console.error("Error fetching Google login URL:", error);
+    }
+  };
+
+  const handleMetaLogin = async () => {
+    setIsLoading(true);
+    try {
+      // const response = await axios.get("http://127.0.0.1:8000/meta/login");
+      // also a get request, but its an AJAX call (stays on same page) -> not ideal for oauth
+      window.location.href = "http://127.0.0.1:8000/meta/login";
+    } catch (error) {
+      console.error("Error fetching Meta login URL:", error);
+    }
   };
 
   return (
@@ -106,96 +123,35 @@ function Test() {
             <div className="grid grid-cols-2 gap-4">
               <button
                 type="button"
-                onClick={() => togglePlatform("Meta")}
-                className={`p-6 rounded-lg border-2 transition-all ${
-                  selectedPlatforms.includes("Meta")
-                    ? "border-blue-500 bg-blue-50 shadow-md"
-                    : "border-gray-300 bg-white hover:border-gray-400"
-                }`}
+                onClick={() => {
+                  handleMetaLogin();
+                }}
+                className={`p-6 rounded-lg border-2 transition-all`}
               >
                 <div className="flex flex-col items-center">
-                  <div
-                    className={`text-4xl mb-2 ${
-                      selectedPlatforms.includes("Meta")
-                        ? "opacity-100"
-                        : "opacity-60"
-                    }`}
-                  >
-                    📘
-                  </div>
-                  <span
-                    className={`font-semibold ${
-                      selectedPlatforms.includes("Meta")
-                        ? "text-blue-700"
-                        : "text-gray-700"
-                    }`}
-                  >
-                    Meta Ads
-                  </span>
-                  {selectedPlatforms.includes("Meta") && (
-                    <span className="text-xs text-blue-600 mt-1">
-                      ✓ Selected
-                    </span>
-                  )}
+                  <div className={`text-4xl mb-2`}>📘</div>
+                  <span className={`font-semibold`}>Meta Ads</span>
                 </div>
               </button>
 
               <button
                 type="button"
-                onClick={() => togglePlatform("Google")}
-                className={`p-6 rounded-lg border-2 transition-all ${
-                  selectedPlatforms.includes("Google")
-                    ? "border-blue-500 bg-blue-50 shadow-md"
-                    : "border-gray-300 bg-white hover:border-gray-400"
-                }`}
+                onClick={() => {
+                  handleGoogleLogin();
+                }}
+                className={`p-6 rounded-lg border-2 transition-all`}
               >
                 <div className="flex flex-col items-center">
-                  <div
-                    className={`text-4xl mb-2 ${
-                      selectedPlatforms.includes("Google")
-                        ? "opacity-100"
-                        : "opacity-60"
-                    }`}
-                  >
-                    🔍
-                  </div>
-                  <span
-                    className={`font-semibold ${
-                      selectedPlatforms.includes("Google")
-                        ? "text-blue-700"
-                        : "text-gray-700"
-                    }`}
-                  >
-                    Google Ads
-                  </span>
-                  {selectedPlatforms.includes("Google") && (
-                    <span className="text-xs  text-blue-600 mt-1">
-                      ✓ Selected
-                    </span>
-                  )}
+                  <div className={`text-4xl mb-2`}>🔍</div>
+                  <span className={`font-semibold`}>Google Ads</span>
                 </div>
               </button>
             </div>
-            {selectedPlatforms.length === 0 && (
-              <p className="text-sm text-red-600 mt-2">
-                Please select at least one platform
-              </p>
-            )}
-          </div>
-          {/* Submit Button */}
-          <div className="pt-4">
-            <Button
-              onClick={handleSubmit}
-              disabled={selectedPlatforms.length === 0}
-              className="w-full py-6 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Submit
-            </Button>
           </div>
         </div>
 
         <div className="mt-6 text-center text-sm text-gray-500">
-          Your API credentials will be requested in the next step
+          Your login credentials will be requested in the next step
         </div>
       </div>
     </div>
