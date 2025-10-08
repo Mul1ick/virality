@@ -3,6 +3,8 @@ import requests
 import urllib.parse
 from app.utils.logger import get_logger
 from app.config import settings
+from app.utils.token_store import save_google_tokens, get_google_access_token
+from app.utils.google_api import list_accessible_customers
 
 router = APIRouter(prefix="/google", tags=["Google Ads"])
 logger = get_logger()
@@ -37,5 +39,29 @@ def google_callback(code: str = Query(..., description="Authorization code from 
     }
     resp = requests.post(token_url, data=data)
     tokens = resp.json()
-    logger.info("Received tokens from Google")
+    save_google_tokens(tokens)
+    logger.info("Received tokens and saved to memory")
     return tokens
+
+
+
+@router.get("/accounts")
+def google_accounts():
+    access_token = get_google_access_token()
+    if not access_token:
+        return {"error": "No access token found. Please login again."}
+
+    resp = list_accessible_customers(access_token)
+    logger.info(f"[Google Ads] Response status: {resp.status_code}")
+
+    try:
+        data = resp.json()
+        logger.info("[Google Ads] Successfully decoded JSON.")
+        return data
+    except Exception:
+        logger.error(f"[Google Ads] Non-JSON response received: {resp.text[:300]}")
+        return {
+            "error": "Invalid response from Google Ads API.",
+            "status_code": resp.status_code,
+            "raw_response": resp.text[:300],
+        }
