@@ -12,5 +12,8 @@ class Settings:
     META_APP_SECRET = os.getenv("META_APP_SECRET")
     META_REDIRECT_URI = os.getenv("META_REDIRECT_URI", "http://localhost:8000/meta/callback")
 
+    MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+    DB_NAME = "ads_project_db"
+
 
 settings = Settings()
