@@ -5,7 +5,7 @@ import urllib.parse
 from app.utils.logger import get_logger
 from app.config import settings
 # Import your database functions
-from app.database import save_or_update_user_token, save_campaigns
+from app.database import save_or_update_user_token, save_campaigns,get_user_token
 
 router = APIRouter(prefix="/meta", tags=["Meta Ads"])
 logger = get_logger()
@@ -48,12 +48,36 @@ def meta_callback(code: str = Query(..., description="Authorization code from Me
 @router.get("/campaigns/{user_id}")
 def get_and_save_campaigns(user_id: str):
     """Fetches campaigns for a user, saves them to the DB, and returns them."""
-    # NOTE: In a real app, you'd fetch the token from the DB using the user_id
-    # For now, we'll assume the most recent token in the DB is the one to use.
-    # This part will need to be improved later.
+    # 1. Get the user's token from the database
+    user_data = get_user_token(user_id)
+    if not user_data or "access_token" not in user_data:
+        raise HTTPException(status_code=404, detail="User or token not found. Please log in again.")
     
-    # A real implementation would look like:
-    # token_data = get_user_token_from_db(user_id)
-    # access_token = token_data['access_token']
-    # This is a placeholder for now:
-    return {"message": "Endpoint to fetch and save campaigns for a user."}
+    access_token = user_data["access_token"]
+    
+    # 2. Fetch ad accounts
+    ad_accounts_url = f"https://graph.facebook.com/v19.0/me/adaccounts"
+    acc_params = {"access_token": access_token}
+    ad_accounts_resp = requests.get(ad_accounts_url, params=acc_params)
+    ad_accounts = ad_accounts_resp.json()
+
+    if "error" in ad_accounts:
+        raise HTTPException(status_code=400, detail=ad_accounts["error"]["message"])
+    if not ad_accounts.get("data"):
+        return {"data": [], "message": "No ad accounts found for this user."}
+
+    first_ad_account_id = ad_accounts["data"][0]["id"]
+    
+    # 3. Fetch campaigns
+    campaigns_url = f"https://graph.facebook.com/v19.0/{first_ad_account_id}/campaigns"
+    campaign_params = {"access_token": access_token, "fields": "name,status,objective"}
+    campaigns_resp = requests.get(campaigns_url, params=campaign_params)
+    campaigns = campaigns_resp.json()
+
+    # 4. Save the fetched campaigns to the database
+    if campaigns.get("data"):
+        save_campaigns(first_ad_account_id, campaigns["data"])
+    
+    # 5. Return the campaign data
+    return campaigns
+
