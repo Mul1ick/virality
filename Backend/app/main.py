@@ -1,9 +1,24 @@
 from fastapi import FastAPI
 from app.utils.logger import get_logger
 from app.controllers import google_controller,meta_controller 
+from fastapi.middleware.cors import CORSMiddleware
+
 
 logger = get_logger()
 app = FastAPI(title="Ads Integration Backend")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost:3000",  # Add other ports if needed
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allows all headers
+)
 
 # Register routers
 app.include_router(google_controller.router)
