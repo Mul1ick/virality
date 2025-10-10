@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 # Load .env from the app directory
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = BASE_DIR / '.env'
 
 load_dotenv(ENV_PATH)
@@ -16,5 +16,9 @@ class Settings:
     META_APP_ID = os.getenv("META_APP_ID")
     META_APP_SECRET = os.getenv("META_APP_SECRET")
     META_REDIRECT_URI = os.getenv("META_REDIRECT_URI", "http://localhost:8000/meta/callback")
+
+    MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+    DB_NAME = "ads_project_db"
+
 
 settings = Settings()

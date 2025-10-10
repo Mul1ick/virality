@@ -223,3 +223,9 @@ logs/
 # Ignore OS files
 .DS_Store
 node_modules
+
+/dash
+/node_modules
+
+Backend/dash/
+Frontend/node_modules/
