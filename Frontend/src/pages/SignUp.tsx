@@ -11,6 +11,7 @@ function SignUp() {
     password: "",
   });
   const navigate = useNavigate();
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   const togglePlatform = (platform) => {
     setSelectedPlatforms((prev) =>
@@ -30,7 +31,7 @@ function SignUp() {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
-      window.location.href = "http://127.0.0.1:8000/google/login";
+      window.location.href = `${backendUrl}/google/login`;
     } catch (error) {
       console.error("Error fetching Google login URL:", error);
     }
@@ -41,7 +42,7 @@ function SignUp() {
     try {
       // const response = await axios.get("http://127.0.0.1:8000/meta/login");
       // also a get request, but its an AJAX call (stays on same page) -> not ideal for oauth
-      window.location.href = "http://127.0.0.1:8000/meta/login";
+      window.location.href = `${backendUrl}/meta/login`;
     } catch (error) {
       console.error("Error fetching Meta login URL:", error);
     }

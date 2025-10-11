@@ -5,8 +5,60 @@ import { CampaignTable } from "@/components/dashboard/CampaignTable";
 import { CreativeGallery } from "@/components/dashboard/CreativeGallery";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
 import { BarChart3, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import axios from "axios";
+//dhavit
 
 const Index = () => {
+  const [campaigns, setCampaigns] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState(null);
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+  useEffect(() => {
+    const fetchCampaigns = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get("user_id");
+
+      if (!userId) {
+        console.log("No user_id found - user hasn't connected Meta");
+        return;
+      }
+      try {
+        setLoading(true);
+        console.log(`Fetching campaigns for user: ${userId}`);
+
+        const response = await axios.get(
+          `${backendUrl}/meta/campaigns/${userId}`
+        );
+
+        setCampaigns(response.data.data || []);
+        setError(null);
+        setSuccess(true);
+      } catch (e) {
+        console.log(e);
+        setError(e.response?.data?.detail || "Failed to fetch campaigns");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCampaigns();
+  }, []);
+
+  useEffect(() => {
+    if (loading || error || success) {
+      const timer = setTimeout(() => {
+        setLoading(false);
+        setError(null);
+        setSuccess(false);
+      }, 2000); // 2 seconds (change to 1000 if you want 1s)
+
+      return () => clearTimeout(timer);
+    }
+  }, [loading, error, success]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -31,6 +83,26 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
+        {loading && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <p className="text-blue-700">Loading campaigns...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-red-700">{error}</p>
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <p className="text-green-700">
+              ✅ {campaigns.length} campaigns loaded successfully!
+            </p>
+          </div>
+        )}
+
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview" className="gap-2">
@@ -83,7 +155,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="creatives">
-            <CreativeGallery />
+            <CreativeGallery campaigns={campaigns} />
           </TabsContent>
         </Tabs>
       </main>

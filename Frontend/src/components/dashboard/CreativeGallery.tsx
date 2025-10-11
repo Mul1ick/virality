@@ -1,99 +1,45 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ImageIcon, TrendingUp, TrendingDown } from "lucide-react";
+import { ImageIcon } from "lucide-react";
 
 interface Creative {
   id: string;
   name: string;
-  platform: "Meta" | "Google";
-  type: "Image" | "Video" | "Carousel";
-  spend: number;
-  revenue: number;
-  roas: number;
-  impressions: number;
-  ctr: number;
+  objective: string;
+  status: string;
 }
 
-const creatives: Creative[] = [
-  {
-    id: "1",
-    name: "Product Hero Shot A",
-    platform: "Meta",
-    type: "Image",
-    spend: 850,
-    revenue: 3400,
-    roas: 4.0,
-    impressions: 45000,
-    ctr: 3.2,
-  },
-  {
-    id: "2",
-    name: "Testimonial Video",
-    platform: "Meta",
-    type: "Video",
-    spend: 1200,
-    revenue: 3200,
-    roas: 2.67,
-    impressions: 85000,
-    ctr: 2.1,
-  },
-  {
-    id: "3",
-    name: "Collection Showcase",
-    platform: "Meta",
-    type: "Carousel",
-    spend: 950,
-    revenue: 3800,
-    roas: 4.0,
-    impressions: 52000,
-    ctr: 3.5,
-  },
-  {
-    id: "4",
-    name: "Product Features B",
-    platform: "Google",
-    type: "Image",
-    spend: 720,
-    revenue: 1850,
-    roas: 2.57,
-    impressions: 38000,
-    ctr: 2.8,
-  },
-  {
-    id: "5",
-    name: "Brand Story Video",
-    platform: "Meta",
-    type: "Video",
-    spend: 1450,
-    revenue: 5200,
-    roas: 3.59,
-    impressions: 125000,
-    ctr: 2.4,
-  },
-  {
-    id: "6",
-    name: "Limited Offer Banner",
-    platform: "Google",
-    type: "Image",
-    spend: 680,
-    revenue: 2720,
-    roas: 4.0,
-    impressions: 32000,
-    ctr: 3.8,
-  },
-];
+interface CreativeGalleryProps {
+  campaigns: Creative[];
+}
 
-export const CreativeGallery = () => {
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    }).format(value);
+export const CreativeGallery = ({ campaigns }: CreativeGalleryProps) => {
+  // Get custom status styling
+  const getStatusStyle = (status: string) => {
+    const statusUpper = status.toUpperCase();
+
+    if (statusUpper === "ACTIVE") {
+      return "bg-green-500/10 text-green-700 border-green-500/20 hover:bg-green-500/20";
+    } else if (statusUpper === "PAUSED") {
+      return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20 hover:bg-yellow-500/20";
+    } else if (statusUpper === "ARCHIVED" || statusUpper === "DELETED") {
+      return "bg-red-500/10 text-red-700 border-red-500/20 hover:bg-red-500/20";
+    }
+    return "bg-gray-500/10 text-gray-700 border-gray-500/20";
   };
 
-  const formatNumber = (value: number) => {
-    return new Intl.NumberFormat("en-US").format(value);
+  // Format objective text (remove OUTCOME_ prefix and capitalize)
+  const formatObjective = (objective: string) => {
+    return objective
+      .replace("OUTCOME_", "")
+      .split("_")
+      .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
+      .join(" ");
+  };
+
+  // Format status text
+  const formatStatus = (status: string) => {
+    return status.charAt(0) + status.slice(1).toLowerCase();
   };
 
   return (
@@ -102,66 +48,55 @@ export const CreativeGallery = () => {
         <div>
           <h3 className="text-lg font-semibold">Creative Performance</h3>
           <p className="text-sm text-muted-foreground">
-            Identify top-performing ad creatives
+            View all active campaigns
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {creatives.map((creative) => (
-            <Card
-              key={creative.id}
-              className="p-4 hover:border-primary/50 transition-all duration-300 hover:shadow-lg"
-            >
-              <div className="space-y-3">
-                <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                  <ImageIcon className="h-12 w-12 text-muted-foreground" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-sm truncate">{creative.name}</h4>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline" className="text-xs">
-                      {creative.type}
-                    </Badge>
-                    <Badge
-                      variant={creative.platform === "Meta" ? "default" : "secondary"}
-                      className="text-xs"
-                    >
-                      {creative.platform}
-                    </Badge>
+
+        {campaigns.length === 0 ? (
+          <div className="text-center py-12">
+            <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">No campaigns found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {campaigns.map((campaign) => (
+              <Card
+                key={campaign.id}
+                className="p-4 hover:border-primary/50 transition-all duration-300 hover:shadow-lg"
+              >
+                <div className="space-y-3">
+                  {/* Campaign Icon Placeholder */}
+                  <div className="aspect-video bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center">
+                    <ImageIcon className="h-12 w-12 text-primary/40" />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">ROAS</span>
-                    <span className="font-semibold flex items-center gap-1">
-                      {creative.roas >= 3.5 ? (
-                        <TrendingUp className="h-3 w-3 text-success" />
-                      ) : creative.roas < 2.8 ? (
-                        <TrendingDown className="h-3 w-3 text-destructive" />
-                      ) : null}
-                      <span className={creative.roas >= 3.5 ? "text-success" : ""}>
-                        {creative.roas.toFixed(2)}x
+
+                  {/* Campaign Details */}
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm line-clamp-2 min-h-[2.5rem]">
+                      {campaign.name}
+                    </h4>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Status Badge with custom colors */}
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(
+                          campaign.status
+                        )}`}
+                      >
+                        {formatStatus(campaign.status)}
                       </span>
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Revenue</span>
-                    <span className="font-semibold">{formatCurrency(creative.revenue)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Impressions</span>
-                    <span>{formatNumber(creative.impressions)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">CTR</span>
-                    <span className={creative.ctr >= 3 ? "text-success font-semibold" : ""}>
-                      {creative.ctr.toFixed(1)}%
-                    </span>
+
+                      {/* Objective Badge */}
+                      <Badge variant="outline" className="text-xs">
+                        {formatObjective(campaign.objective)}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </Card>
   );
