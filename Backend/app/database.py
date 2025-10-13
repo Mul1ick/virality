@@ -7,18 +7,18 @@ db = client[settings.DB_NAME]
 users_collection = db["users"]
 campaigns_collection = db["campaigns"]
 
-def save_or_update_user_token(user_id: str, token_data: dict):
-    # ... (this function is correct, no changes needed)
+def save_or_update_user_token(user_id: str, token_data: dict, source: str):
     users_collection.update_one(
-        {"user_id": user_id},
+        {"user_id": user_id, "source": source},  # 👈 composite key
         {"$set": {
             "access_token": token_data["access_token"],
+            "refresh_token": token_data.get("refresh_token"),
             "token_type": token_data.get("token_type"),
             "expires_in": token_data.get("expires_in")
         }},
         upsert=True
     )
-    print(f"Token saved for user {user_id}")
+
 
 # ADD THIS NEW FUNCTION
 def get_user_token(user_id: str):

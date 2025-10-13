@@ -1,34 +1,38 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
+from fastapi.responses import RedirectResponse
 import requests
 import urllib.parse
 from app.utils.logger import get_logger
 from app.config import settings
-from app.utils.token_store import save_google_tokens, get_google_access_token
-from app.utils.google_api import list_accessible_customers
+from app.database import save_or_update_user_token
 
 router = APIRouter(prefix="/google", tags=["Google Ads"])
 logger = get_logger()
 
+# OAuth scopes for Google Ads
+SCOPES = "https://www.googleapis.com/auth/adwords"
+
 @router.get("/login")
 def google_login():
-    """Build the Google OAuth login URL"""
+    """Step 1️⃣: Redirect user to Google OAuth consent screen."""
     auth_url = (
         "https://accounts.google.com/o/oauth2/v2/auth?"
         + urllib.parse.urlencode({
             "client_id": settings.CLIENT_ID,
             "redirect_uri": settings.REDIRECT_URI,
             "response_type": "code",
-            "scope": "https://www.googleapis.com/auth/adwords",
-            "access_type": "offline",
-            "prompt": "consent"
+            "scope": SCOPES,
+            "access_type": "offline",   # Required for refresh token
+            "prompt": "consent"         # Always ask for account choice
         })
     )
-    logger.info("Generated Google login URL")
-    return {"auth_url": auth_url}
+    logger.info("[Google OAuth] Redirecting to consent screen...")
+    return RedirectResponse(url=auth_url)
+
 
 @router.get("/callback")
 def google_callback(code: str = Query(..., description="Authorization code from Google")):
-    """Exchange code for access/refresh tokens"""
+    """Step 2️⃣: Exchange code for tokens and save them in MongoDB."""
     token_url = "https://oauth2.googleapis.com/token"
     data = {
         "code": code,
@@ -37,31 +41,27 @@ def google_callback(code: str = Query(..., description="Authorization code from 
         "redirect_uri": settings.REDIRECT_URI,
         "grant_type": "authorization_code",
     }
+
     resp = requests.post(token_url, data=data)
     tokens = resp.json()
-    save_google_tokens(tokens)
-    logger.info("Received tokens and saved to memory")
-    return tokens
 
+    if "error" in tokens:
+        logger.error(f"[Google OAuth] Token exchange failed: {tokens}")
+        raise HTTPException(status_code=400, detail=tokens.get("error_description", "Token exchange failed"))
 
+    access_token = tokens.get("access_token")
 
-@router.get("/accounts")
-def google_accounts():
-    access_token = get_google_access_token()
-    if not access_token:
-        return {"error": "No access token found. Please login again."}
+    # Get basic user info for identification
+    user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    user_resp = requests.get(user_info_url, headers=headers)
+    user_data = user_resp.json()
+    user_id = user_data.get("id", "unknown_user")
 
-    resp = list_accessible_customers(access_token)
-    logger.info(f"[Google Ads] Response status: {resp.status_code}")
+    # Save token in MongoDB
+    save_or_update_user_token(user_id, tokens, source="google")
 
-    try:
-        data = resp.json()
-        logger.info("[Google Ads] Successfully decoded JSON.")
-        return data
-    except Exception:
-        logger.error(f"[Google Ads] Non-JSON response received: {resp.text[:300]}")
-        return {
-            "error": "Invalid response from Google Ads API.",
-            "status_code": resp.status_code,
-            "raw_response": resp.text[:300],
-        }
+    logger.info(f"✅ [Google OAuth] Tokens saved for user {user_id}")
+
+    # Redirect to frontend dashboard
+    return RedirectResponse(url=f"http://localhost:8080/?user_id={user_id}")

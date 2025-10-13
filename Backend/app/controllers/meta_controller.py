@@ -39,7 +39,7 @@ def meta_callback(code: str = Query(..., description="Authorization code from Me
     user_info_resp = requests.get(user_info_url)
     user_id = user_info_resp.json().get("id", "unknown_user") # Use .get for safety
     
-    save_or_update_user_token(user_id, long_lived_token_data)
+    save_or_update_user_token(user_id, long_lived_token_data, source="meta")
     
     # Redirect to the frontend dashboard after successful login
     return RedirectResponse(url=f"http://localhost:8080/?user_id={user_id}")
