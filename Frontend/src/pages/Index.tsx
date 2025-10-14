@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 
 const Index = () => {
+  const [dateRange, setDateRange] = useState("30days");
   const [metaCampaigns, setMetaCampaigns] = useState([]);
   const [googleCampaigns, setGoogleCampaigns] = useState([]);
   const [shopifyData, setShopifyData] = useState([]);
@@ -176,7 +177,7 @@ const Index = () => {
                 </p>
               </div>
             </div>
-            <DateRangeSelector />
+            <DateRangeSelector date={dateRange} onChange={setDateRange} />
           </div>
         </div>
       </header>
@@ -321,7 +322,7 @@ const Index = () => {
             </div>
 
             {/* Trend Chart */}
-            <TrendChart />
+            <TrendChart dateRange={dateRange} />
           </TabsContent>
 
           <TabsContent value="meta" className="space-y-6">
