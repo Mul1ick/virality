@@ -6,6 +6,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = BASE_DIR / '.env'
 
+print(f"Loading environment from: {ENV_PATH}") 
 load_dotenv(ENV_PATH)
 
 class Settings:

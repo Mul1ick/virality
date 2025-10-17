@@ -3,13 +3,12 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-function SignUp() {
+function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    confirmPassword: "",
   });
   const navigate = useNavigate();
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -22,22 +21,12 @@ function SignUp() {
     setError(""); // Clear error when user types
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
-    if (!formData.email || !formData.password || !formData.confirmPassword) {
-      setError("All fields are required");
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters");
+    if (!formData.email || !formData.password) {
+      setError("Please enter both email and password");
       return;
     }
 
@@ -45,24 +34,32 @@ function SignUp() {
     setError("");
 
     try {
-      const response = await axios.post(`${backendUrl}/auth/register`, {
+      const response = await axios.post(`${backendUrl}/auth/login`, {
         email: formData.email,
         password: formData.password,
       });
 
-      console.log("Sign up successful:", response.data);
+      console.log("Sign in successful:", response.data);
 
-      // Redirect to sign in page after successful registration
-      navigate("/signin");
+      // Store JWT token in localStorage
+      if (response.data.access_token) {
+        localStorage.setItem("access_token", response.data.access_token);
+        localStorage.setItem("user_id", response.data.user_id);
+      }
+
+      // Redirect to dashboard
+      navigate("/");
     } catch (err: any) {
-      console.error("Sign up error:", err);
-      setError(
-        err.response?.data?.detail ||
-          "Failed to create account. Please try again."
-      );
+      console.error("Sign in error:", err);
+      setError(err.response?.data?.detail || "Invalid email or password");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleForgotPassword = () => {
+    // TODO: Implement forgot password flow
+    alert("Forgot password functionality coming soon!");
   };
 
   return (
@@ -70,14 +67,12 @@ function SignUp() {
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Create Account
+            Welcome Back
           </h2>
-          <p className="text-gray-600">
-            Sign up to start tracking your ad performance
-          </p>
+          <p className="text-gray-600">Sign in to your analytics dashboard</p>
         </div>
 
-        <form onSubmit={handleSignUp} className="space-y-6">
+        <form onSubmit={handleSignIn} className="space-y-6">
           {/* Email Input */}
           <div>
             <label
@@ -100,12 +95,21 @@ function SignUp() {
 
           {/* Password Input */}
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
             <input
               type="password"
               id="password"
@@ -113,27 +117,7 @@ function SignUp() {
               value={formData.password}
               onChange={handleInputChange}
               className="w-full px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Min. 8 characters"
-              required
-            />
-          </div>
-
-          {/* Confirm Password Input */}
-          <div>
-            <label
-              htmlFor="confirmPassword"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Confirm Password
-            </label>
-            <input
-              type="password"
-              id="confirmPassword"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleInputChange}
-              className="w-full px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Re-enter your password"
+              placeholder="Enter your password"
               required
             />
           </div>
@@ -145,35 +129,35 @@ function SignUp() {
             </div>
           )}
 
-          {/* Sign Up Button */}
+          {/* Sign In Button */}
           <Button
             type="submit"
             disabled={isLoading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 text-base font-semibold"
           >
-            {isLoading ? "Creating Account..." : "Sign Up"}
+            {isLoading ? "Signing In..." : "Sign In"}
           </Button>
         </form>
 
-        {/* Sign In Link */}
+        {/* Sign Up Link */}
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            Already have an account?{" "}
+            Don't have an account?{" "}
             <button
-              onClick={() => navigate("/signin")}
+              onClick={() => navigate("/signup")}
               className="text-blue-600 hover:text-blue-700 font-semibold hover:underline"
             >
-              Sign In
+              Sign Up
             </button>
           </p>
         </div>
 
         <div className="mt-6 text-center text-xs text-gray-500">
-          Connect your ad platforms after signing up
+          Secure authentication powered by JWT
         </div>
       </div>
     </div>
   );
 }
 
-export default SignUp;
+export default SignIn;

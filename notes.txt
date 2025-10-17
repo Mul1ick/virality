@@ -1,0 +1,191 @@
+run on terminal to ensure teh code takes the path for libs installed in the venv
+export PATH="/Users/amanmehra/Desktop/ads_project/virality/Backend/.venv/bin:$PATH"
+
+
+Perfect ✅ — here’s your **finalized team-wide architecture note** complete with a visual diagram and ready to drop into your project docs or Notion “Backend Setup” section:
+
+---
+
+# 🧭 Unified Ads Integration Backend — Team Design Blueprint
+
+### **Goal**
+
+We’re building a backend that lets a single user:
+
+* Sign up or log in once.
+* Connect **multiple ad platforms** (Google Ads, Meta Ads, Shopify, etc.) through OAuth.
+* View and sync their campaigns across platforms via one dashboard.
+
+The architecture must be:
+✅ Modular ✅ Secure ✅ Extensible ✅ Easy to maintain
+
+---
+
+## 🧱 Database Structure Overview
+
+### **1. `users` Collection**
+
+Stores **only user identity + OAuth credentials** (no business data).
+
+```json
+{
+  "_id": "user_12345",
+  "email": "aman@example.com",
+  "password_hash": "bcrypt$2a$...",
+  "oauth": {
+    "google": {
+      "access_token": "ya29...",
+      "refresh_token": "1//0g123...",
+      "expiry": "2025-10-13T07:00:00Z"
+    },
+    "meta": {
+      "access_token": "EAA12345...",
+      "expires_in": 5184000
+    },
+    "shopify": null
+  },
+  "created_at": "2025-10-12T18:00:00Z"
+}
+```
+
+📌 **Purpose:**
+Authenticate users, store tokens per platform, and track connected integrations.
+
+---
+
+### **2. Campaign Collections (Data Layer)**
+
+Each ad platform has its own collection:
+
+* `google_campaigns`
+* `meta_campaigns`
+* `shopify_campaigns`
+
+#### Example — Google Campaigns
+
+```json
+{
+  "_id": "ad_001",
+  "user_id": "user_12345",
+  "account_id": "9554344066",
+  "campaign_id": "789456123",
+  "name": "Search Campaign Q4",
+  "status": "ENABLED",
+  "budget": 1500,
+  "clicks": 123,
+  "impressions": 5400,
+  "last_synced": "2025-10-12T22:00:00Z"
+}
+```
+
+📌 **Purpose:**
+Store fetched data from APIs (campaigns, ads, analytics) linked via `user_id`.
+
+---
+
+## ⚙️ Folder Structure Convention
+
+```
+Backend/
+│
+├── app/
+│   ├── controllers/
+│   │   ├── google_controller.py
+│   │   ├── meta_controller.py
+│   │   └── shopify_controller.py
+│   │
+│   ├── database/
+│   │   ├── user_repository.py
+│   │   ├── google_campaigns_repo.py
+│   │   ├── meta_campaigns_repo.py
+│   │   └── shopify_repo.py
+│   │
+│   └── utils/
+│       ├── logger.py
+│       ├── encryption.py
+│       └── token_refresh.py
+│
+└── main.py
+```
+
+---
+
+## 🔐 Design Principles
+
+| Principle                  | Why It Matters                                             |
+| -------------------------- | ---------------------------------------------------------- |
+| **Separation of Concerns** | Tokens and campaigns live in separate collections.         |
+| **Scalability**            | Each platform’s data scales independently.                 |
+| **Security**               | Passwords hashed (bcrypt); tokens encrypted before saving. |
+| **Extensibility**          | Adding new APIs = add one controller + one repo file.      |
+| **Maintainability**        | Controller-based modular layout.                           |
+| **Future-Proof**           | Supports token refresh jobs + new integrations later.      |
+
+---
+
+## 🧩 Architecture Diagram
+
+```
+             ┌──────────────────────────┐
+             │         Frontend         │
+             │  React + Vite Dashboard  │
+             └────────────┬─────────────┘
+                          │
+                          ▼
+                 ┌────────────────┐
+                 │   FastAPI App  │
+                 │ (Controllers)  │
+                 └────────────────┘
+                      │     │
+       ┌──────────────┘     └───────────────┐
+       ▼                                    ▼
+┌───────────────────┐             ┌───────────────────┐
+│ Google Controller │             │  Meta Controller  │
+│ /google/login     │             │ /meta/login       │
+│ /google/callback  │             │ /meta/callback    │
+└───────────────────┘             └───────────────────┘
+       │                                    │
+       ▼                                    ▼
+┌──────────────────┐              ┌──────────────────┐
+│ google_campaigns │              │ meta_campaigns   │
+└──────────────────┘              └──────────────────┘
+       │                                    │
+       └──────────────┬──────────────┬──────┘
+                      ▼
+             ┌──────────────────────────┐
+             │         users DB         │
+             │ (email, password, oauth) │
+             └──────────────────────────┘
+```
+
+---
+
+## 🚀 Development Guidelines
+
+1. **When building controllers:**
+
+   * Never store campaign data in the `users` collection.
+   * Always use `user_id` as the link key.
+2. **When adding a new platform (e.g. LinkedIn Ads):**
+
+   * Create `linkedin_controller.py` and `linkedin_repo.py`.
+   * Add a new `oauth.linkedin` field under the user model.
+   * Maintain similar flow as Google/Meta.
+3. **When syncing data:**
+
+   * Use background tasks or scheduler to refresh tokens periodically.
+   * Keep campaign sync logic separate from login logic.
+
+---
+
+## ✅ TL;DR
+
+* **Users = Credentials only**
+* **Platform collections = Campaign data**
+* **Everything connected by `user_id`**
+* **Same flow for Google, Meta, Shopify, etc.**
+
+---
+
+Would you like me to give a short **Mongo schema + sample helper functions** (like `save_or_update_user_token()`, `get_user_by_id()`, and `save_campaigns()`)?
+That’ll make your database layer instantly usable for both your and your teammate’s controllers.
