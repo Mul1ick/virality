@@ -23,3 +23,5 @@ class Settings:
 
 
 settings = Settings()
+
+print(f"Loaded META_APP_ID: {settings.META_APP_ID}")
