@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.utils.logger import get_logger
-from app.controllers import google_controller,meta_controller 
+from app.controllers import google_controller,meta_controller,auth_controller
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -21,6 +21,7 @@ app.add_middleware(
 )
 
 # Register routers
+app.include_router(auth_controller.router) # 👈 Add this line first
 app.include_router(google_controller.router)
 app.include_router(meta_controller.router) # <-- Add this line
 

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { BarChart3, TrendingUp, Target, CheckCircle } from "lucide-react";
+import axios from "axios"; // 👈 Import axios
+
 
 function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
@@ -9,6 +11,8 @@ function SignIn() {
   const [email, setEmail] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+
 
   // Get success message from navigation state
   const successMessage = location.state?.message;
@@ -23,13 +27,11 @@ function SignIn() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    // Your existing validation logic
     if (!email) {
       setError("Please enter your email");
       return;
     }
-
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setError("Please enter a valid email address");
@@ -39,25 +41,12 @@ function SignIn() {
     setIsLoading(true);
     setError("");
 
-    // Simulate sending OTP - redirect to OTP page after 1 second
-    setTimeout(() => {
-      console.log("OTP sent to:", email);
-
-      // Redirect to OTP verification with email
-      navigate("/verify-otp", {
-        state: { email: email },
-      });
-
-      setIsLoading(false);
-    }, 1000);
-
-    /* Uncomment when backend is ready:
+    // ✅ UNCOMMENT THIS BLOCK
     try {
-      // Send OTP to email
-      const response = await axios.post(`${backendUrl}/auth/send-otp`, {
+      // This endpoint now sends the OTP
+      const response = await axios.post(`${backendUrl}/auth/login`, {
         email: email,
       });
-
       console.log("OTP sent:", response.data);
 
       // Redirect to OTP verification
@@ -74,7 +63,6 @@ function SignIn() {
     } finally {
       setIsLoading(false);
     }
-    */
   };
 
   return (

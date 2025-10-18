@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import axios from "axios"; // 👈 Import axios
+
 
 function VerifyOTP() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -14,6 +16,8 @@ function VerifyOTP() {
   const navigate = useNavigate();
   const location = useLocation();
   const hasAutoFocused = useRef(false);
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+
 
   const email = location.state?.email || "";
 
@@ -76,9 +80,8 @@ function VerifyOTP() {
     inputRefs.current[lastFilledIndex]?.focus();
   };
 
-  const handleVerify = async (e) => {
+const handleVerify = async (e) => {
     e.preventDefault();
-
     const otpCode = otp.join("");
     if (otpCode.length !== 6) {
       setError("Please enter all 6 digits");
@@ -88,29 +91,17 @@ function VerifyOTP() {
     setIsLoading(true);
     setError("");
 
-    // Simulate OTP verification - redirect to signin after 1 second
-    setTimeout(() => {
-      console.log("OTP verified (simulated):", otpCode);
-
-      navigate("/signin", {
-        state: { message: "Email verified successfully! Please sign in." },
-      });
-
-      setIsLoading(false);
-    }, 1000);
-
-    /* Uncomment when backend is ready:
+    // ✅ UNCOMMENT THIS BLOCK
     try {
       const response = await axios.post(`${backendUrl}/auth/verify-otp`, {
         email: email,
         otp: otpCode,
       });
-
       console.log("OTP verification successful:", response.data);
 
-      navigate("/signin", {
-        state: { message: "Email verified successfully! Please sign in." },
-      });
+      // After successful verification, navigate to the profile page
+      navigate("/profile"); 
+
     } catch (err) {
       console.error("OTP verification error:", err);
       setError(err.response?.data?.detail || "Invalid OTP. Please try again.");
@@ -119,31 +110,20 @@ function VerifyOTP() {
     } finally {
       setIsLoading(false);
     }
-    */
   };
+
 
   const handleResendOTP = async () => {
     setResendLoading(true);
     setResendSuccess(false);
     setError("");
 
-    // Simulate resend - show success after 1 second
-    setTimeout(() => {
-      setResendSuccess(true);
-      setTimer(60); // Reset timer
-      setResendLoading(false);
-
-      setTimeout(() => {
-        setResendSuccess(false);
-      }, 3000);
-    }, 1000);
-
-    /* Uncomment when backend is ready:
+    // ✅ UNCOMMENT THIS BLOCK
     try {
-      await axios.post(`${backendUrl}/auth/resend-otp`, {
+      // Re-trigger the login flow to send a new OTP
+      await axios.post(`${backendUrl}/auth/login`, {
         email: email,
       });
-
       setResendSuccess(true);
       setTimer(60);
 
@@ -156,7 +136,6 @@ function VerifyOTP() {
     } finally {
       setResendLoading(false);
     }
-    */
   };
 
   return (
