@@ -2,62 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
 All colors MUST be HSL.
 */
-
 @layer base {
   :root {
-    --background: 222.2 47.4% 17.2%;
-    --foreground: 210 40% 98%;
+    /* Light, fresh backgrounds with cyan influence */
+    --background: 184 35% 89%;
+    --foreground: 220 15% 15%;
 
-    --card: 217.2 32.6% 22.5%;
-    --card-foreground: 210 40% 98%;
+    /* Card colors - white with subtle warmth */
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 15%;
 
-    --popover: 217.2 32.6% 17.5%;
-    --popover-foreground: 210 40% 98%;
+    /* Popover colors */
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 15%;
 
-    --primary: 262.1 83.3% 57.8%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary brand color - VIBRANT CYAN/TURQUOISE (Virality Media brand) */
+    --primary: 184 45% 65%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217.2 32.6% 22.5%;
-    --secondary-foreground: 210 40% 98%;
+    /* Secondary - light gray for subtle elements */
+    --secondary: 210 15% 92%;
+    --secondary-foreground: 220 15% 15%;
 
-    --muted: 217.2 32.6% 20.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    /* Muted colors - soft gray */
+    --muted: 210 15% 90%;
+    --muted-foreground: 220 10% 45%;
 
-    --accent: 262.1 83.3% 57.8%;
-    --accent-foreground: 210 40% 98%;
+    /* Accent - vibrant cyan for CTAs and highlights */
+    --accent: 184 45% 65%;
+    --accent-foreground: 0 0% 100%;
 
+    /* Destructive - keeping red */
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 142.1 76.2% 36.3%;
-    --success-foreground: 210 40% 98%;
+    /* Success - vibrant green */
+    --success: 142.1 70% 45%;
+    --success-foreground: 0 0% 100%;
 
+    /* Warning - keeping orange */
     --warning: 38 92% 50%;
-    --warning-foreground: 222.2 47.4% 11.2%;
+    --warning-foreground: 220 15% 15%;
 
-    --border: 217.2 32.6% 25.5%;
-    --input: 217.2 32.6% 25.5%;
-    --ring: 262.1 83.3% 57.8%;
+    /* Border and input colors - soft, subtle */
+    --border: 220 13% 85%;
+    --input: 220 13% 85%;
+
+    /* Ring color - cyan for focus states */
+    --ring: 184 45% 65%;
 
     --radius: 0.75rem;
 
-    --chart-1: 262.1 83.3% 57.8%;
+    /* Chart colors - vibrant and varied */
+    --chart-1: 184 45% 65%;
     --chart-2: 198.6 88.7% 48.4%;
-    --chart-3: 142.1 76.2% 36.3%;
+    --chart-3: 142.1 70% 45%;
     --chart-4: 38 92% 50%;
     --chart-5: 346.8 77.2% 49.8%;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground;
   }
 }

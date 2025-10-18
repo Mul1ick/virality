@@ -1,7 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { TrendChart } from "@/components/dashboard/TrendChart";
-import { CampaignTable } from "@/components/dashboard/CampaignTable";
+import { MetaCampaignsTable } from "@/components/dashboard/MetaCampaignsTable";
 import { CreativeGallery } from "@/components/dashboard/CreativeGallery";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
 import {
@@ -36,7 +36,7 @@ const Index = () => {
   });
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
-  // Fetch Meta campaigns
+  // Fetch Meta campaigns WITH INSIGHTS
   useEffect(() => {
     const fetchMetaCampaigns = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -46,15 +46,53 @@ const Index = () => {
         console.log("No user_id found - user hasn't connected Meta");
         return;
       }
+
       try {
         setLoading((prev) => ({ ...prev, meta: true }));
-        console.log(`Fetching Meta campaigns for user: ${userId}`);
-
-        const response = await axios.get(
-          `${backendUrl}/meta/campaigns/${userId}`
+        console.log(
+          `Fetching Meta campaigns with insights for user: ${userId}`
         );
 
-        setMetaCampaigns(response.data.data || []);
+        // ✅ Call insights endpoint instead of basic campaigns
+        const response = await axios.get(
+          `${backendUrl}/meta/campaigns/insights/${userId}`
+        );
+
+        console.log("Meta campaigns with insights fetched:", response.data);
+
+        // ✅ Process the nested insights data structure
+        const processedCampaigns =
+          response.data.data?.map((campaign) => {
+            return {
+              id: campaign.id,
+              name: campaign.name,
+              status: campaign.status,
+              objective: campaign.objective,
+              insights: campaign.insights?.data?.[0]
+                ? {
+                    spend: parseFloat(campaign.insights.data[0].spend || 0),
+                    impressions: parseInt(
+                      campaign.insights.data[0].impressions || 0
+                    ),
+                    reach: parseInt(campaign.insights.data[0].reach || 0),
+                    clicks: parseInt(
+                      campaign.insights.data[0].inline_link_clicks || 0
+                    ),
+                    ctr: parseFloat(campaign.insights.data[0].ctr || 0),
+                    cpm: parseFloat(campaign.insights.data[0].cpm || 0),
+                    cpc:
+                      campaign.insights.data[0].inline_link_clicks > 0
+                        ? parseFloat(campaign.insights.data[0].spend || 0) /
+                          parseInt(
+                            campaign.insights.data[0].inline_link_clicks || 1
+                          )
+                        : 0,
+                  }
+                : null,
+            };
+          }) || [];
+
+        setMetaCampaigns(processedCampaigns);
         setError((prev) => ({ ...prev, meta: null }));
         setSuccess((prev) => ({ ...prev, meta: true }));
       } catch (e) {
@@ -69,7 +107,7 @@ const Index = () => {
     };
 
     fetchMetaCampaigns();
-  }, []);
+  }, [dateRange]);
 
   // Fetch Google campaigns
   useEffect(() => {
@@ -183,9 +221,10 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-6 py-4">
         {/* Notifications */}
         <div className="space-y-3 mb-6">
+          {/* Loading States */}
           {loading.meta && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -211,6 +250,7 @@ const Index = () => {
             </div>
           )}
 
+          {/* Error States */}
           {error.meta && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -236,6 +276,7 @@ const Index = () => {
             </div>
           )}
 
+          {/* Success States */}
           {success.meta && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -276,7 +317,7 @@ const Index = () => {
             </TabsTrigger>
             <TabsTrigger value="meta" className="gap-2">
               <Facebook className="h-4 w-4" />
-              Meta
+              Meta {metaCampaigns.length > 0 && `(${metaCampaigns.length})`}
             </TabsTrigger>
             <TabsTrigger value="google" className="gap-2">
               <Search className="h-4 w-4" />
@@ -325,28 +366,15 @@ const Index = () => {
             <TrendChart dateRange={dateRange} />
           </TabsContent>
 
+          {/* ✅ META TAB - NOW WITH TABLE */}
           <TabsContent value="meta" className="space-y-6">
-            <div className="bg-card rounded-lg border p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Facebook className="h-6 w-6 text-blue-600" />
-                <h2 className="text-2xl font-bold">Meta Campaigns</h2>
-              </div>
-              {metaCampaigns.length > 0 ? (
-                <>
-                  <p className="text-muted-foreground mb-4">
-                    {metaCampaigns.length} campaigns found
-                  </p>
-                  <CreativeGallery campaigns={metaCampaigns} />
-                </>
-              ) : (
-                <p className="text-muted-foreground">
-                  No Meta campaigns loaded. Connect your Meta account in the
-                  Profile page.
-                </p>
-              )}
-            </div>
+            <MetaCampaignsTable
+              campaigns={metaCampaigns}
+              isLoading={loading.meta}
+            />
           </TabsContent>
 
+          {/* GOOGLE TAB - Keep existing */}
           <TabsContent value="google" className="space-y-6">
             <div className="bg-card rounded-lg border p-6">
               <div className="flex items-center gap-3 mb-4">
@@ -369,6 +397,7 @@ const Index = () => {
             </div>
           </TabsContent>
 
+          {/* SHOPIFY TAB - Keep existing */}
           <TabsContent value="shopify" className="space-y-6">
             <div className="bg-card rounded-lg border p-6">
               <div className="flex items-center gap-3 mb-4">
