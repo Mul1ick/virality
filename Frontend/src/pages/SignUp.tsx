@@ -6,53 +6,67 @@ import { BarChart3, TrendingUp, Target } from "lucide-react";
 function SignUp() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
+  const [email, setEmail] = useState("");
   const navigate = useNavigate();
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-    setError("");
-  };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.email || !formData.password || !formData.confirmPassword) {
-      setError("All fields are required");
+    if (!email) {
+      setError("Email is required");
       return;
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters");
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address");
       return;
     }
 
     setIsLoading(true);
     setError("");
 
-    // Simulate signup - redirect to OTP after 1 second
+    // Simulate checking email uniqueness - redirect to signin after 1 second
     setTimeout(() => {
-      console.log("Sign up (simulated):", formData.email);
+      console.log("Email registered (simulated):", email);
 
-      // Redirect to OTP verification page with email
-      navigate("/verify-otp", {
-        state: { email: formData.email },
+      // Redirect to sign in page with success message
+      navigate("/signin", {
+        state: {
+          message: "Account created! Please sign in to continue.",
+          email: email,
+        },
       });
 
       setIsLoading(false);
     }, 1000);
+
+    /* Uncomment when backend is ready:
+    try {
+      const response = await axios.post(`${backendUrl}/auth/register`, {
+        email: email,
+      });
+
+      console.log("Sign up successful:", response.data);
+      
+      navigate("/signin", {
+        state: { 
+          message: "Account created! Please sign in to continue.",
+          email: email 
+        }
+      });
+    } catch (err: any) {
+      console.error("Sign up error:", err);
+      if (err.response?.status === 409) {
+        setError("This email is already registered. Please sign in instead.");
+      } else {
+        setError(err.response?.data?.detail || "Failed to create account. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+    */
   };
 
   return (
@@ -177,7 +191,7 @@ function SignUp() {
               Create Your Account
             </h2>
             <p className="text-muted-foreground">
-              Start tracking your ad performance across all platforms
+              Enter your email to get started with analytics
             </p>
           </div>
 
@@ -194,50 +208,13 @@ function SignUp() {
                 type="email"
                 id="email"
                 name="email"
-                value={formData.email}
-                onChange={handleInputChange}
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError("");
+                }}
                 className="w-full px-4 py-3 bg-card text-foreground border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 placeholder="you@company.com"
-                required
-              />
-            </div>
-
-            {/* Password Input */}
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-foreground mb-2"
-              >
-                Password
-              </label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-card text-foreground border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                placeholder="Minimum 8 characters"
-                required
-              />
-            </div>
-
-            {/* Confirm Password Input */}
-            <div>
-              <label
-                htmlFor="confirmPassword"
-                className="block text-sm font-medium text-foreground mb-2"
-              >
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                id="confirmPassword"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-card text-foreground border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                placeholder="Re-enter your password"
                 required
               />
             </div>
@@ -249,13 +226,20 @@ function SignUp() {
               </div>
             )}
 
+            {/* Info Message */}
+            {/* <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+              <p className="text-sm text-primary">
+                You'll set your password on the next step
+              </p>
+            </div> */}
+
             {/* Sign Up Button */}
             <Button
               type="submit"
               disabled={isLoading}
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-base font-semibold shadow-lg hover:shadow-xl transition-all"
             >
-              {isLoading ? "Creating Account..." : "Create Account"}
+              {isLoading ? "Creating Account..." : "Continue"}
             </Button>
           </form>
 
@@ -286,7 +270,7 @@ function SignUp() {
                   clipRule="evenodd"
                 />
               </svg>
-              <span>Trusted by India's leading skincare brands</span>
+              <span>Secure and privacy-focused</span>
             </div>
           </div>
         </div>

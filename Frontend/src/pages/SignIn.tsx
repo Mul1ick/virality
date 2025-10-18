@@ -1,75 +1,91 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { BarChart3, TrendingUp, Target, Zap } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { BarChart3, TrendingUp, Target, CheckCircle } from "lucide-react";
 
 function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
+  const [email, setEmail] = useState("");
   const navigate = useNavigate();
-  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+  const location = useLocation();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-    setError("");
-  };
+  // Get success message from navigation state
+  const successMessage = location.state?.message;
+  const prefilledEmail = location.state?.email;
+
+  useEffect(() => {
+    // Prefill email if coming from signup
+    if (prefilledEmail) {
+      setEmail(prefilledEmail);
+    }
+  }, [prefilledEmail]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.email || !formData.password) {
-      setError("Please enter both email and password");
+    if (!email) {
+      setError("Please enter your email");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address");
       return;
     }
 
     setIsLoading(true);
     setError("");
 
-    try {
-      const response = await axios.post(`${backendUrl}/auth/login`, {
-        email: formData.email,
-        password: formData.password,
+    // Simulate sending OTP - redirect to OTP page after 1 second
+    setTimeout(() => {
+      console.log("OTP sent to:", email);
+
+      // Redirect to OTP verification with email
+      navigate("/verify-otp", {
+        state: { email: email },
       });
 
-      console.log("Sign in successful:", response.data);
+      setIsLoading(false);
+    }, 1000);
 
-      if (response.data.access_token) {
-        localStorage.setItem("access_token", response.data.access_token);
-        localStorage.setItem("user_id", response.data.user_id);
-      }
+    /* Uncomment when backend is ready:
+    try {
+      // Send OTP to email
+      const response = await axios.post(`${backendUrl}/auth/send-otp`, {
+        email: email,
+      });
 
-      navigate("/");
+      console.log("OTP sent:", response.data);
+
+      // Redirect to OTP verification
+      navigate("/verify-otp", {
+        state: { email: email }
+      });
     } catch (err: any) {
-      console.error("Sign in error:", err);
-      setError(err.response?.data?.detail || "Invalid email or password");
+      console.error("Send OTP error:", err);
+      if (err.response?.status === 404) {
+        setError("Email not found. Please sign up first.");
+      } else {
+        setError(err.response?.data?.detail || "Failed to send OTP. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleForgotPassword = () => {
-    alert("Forgot password functionality coming soon!");
+    */
   };
 
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left Side - Branding & Features */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-primary/90 to-primary/80 p-12 flex-col justify-between relative overflow-hidden">
-        {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl"></div>
           <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl"></div>
         </div>
 
-        {/* Logo */}
         <div className="relative z-10">
           <div className="flex items-center space-x-3 mb-8">
             <div className="w-12 h-12 bg-foreground rounded-full flex items-center justify-center">
@@ -89,7 +105,6 @@ function SignIn() {
           </div>
         </div>
 
-        {/* Value Props */}
         <div className="relative z-10 space-y-8">
           <div>
             <h1 className="text-4xl font-bold text-white mb-4 leading-tight">
@@ -145,7 +160,6 @@ function SignIn() {
           </div>
         </div>
 
-        {/* Platforms */}
         <div className="relative z-10 grid grid-cols-3 gap-6">
           <div className="text-center">
             <div className="text-lg font-semibold text-white mb-1">Meta</div>
@@ -165,7 +179,6 @@ function SignIn() {
       {/* Right Side - Sign In Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center space-x-3 mb-8">
             <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
               <BarChart3 className="w-6 h-6 text-white" />
@@ -184,8 +197,17 @@ function SignIn() {
             </p>
           </div>
 
+          {/* Success Message */}
+          {successMessage && (
+            <div className="mb-6 bg-success/10 border border-success/30 rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-success" />
+                <p className="text-sm text-success">{successMessage}</p>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSignIn} className="space-y-5">
-            {/* Email Input */}
             <div>
               <label
                 htmlFor="email"
@@ -197,61 +219,39 @@ function SignIn() {
                 type="email"
                 id="email"
                 name="email"
-                value={formData.email}
-                onChange={handleInputChange}
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError("");
+                }}
                 className="w-full px-4 py-3 bg-card text-foreground border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 placeholder="you@company.com"
                 required
               />
             </div>
 
-            {/* Password Input */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-foreground"
-                >
-                  Password
-                </label>
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  className="text-sm text-primary hover:text-primary/80 hover:underline transition-colors"
-                >
-                  Forgot password?
-                </button>
-              </div>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-card text-foreground border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                placeholder="Enter your password"
-                required
-              />
-            </div>
-
-            {/* Error Message */}
             {error && (
               <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
                 <p className="text-sm text-destructive">{error}</p>
               </div>
             )}
 
-            {/* Sign In Button */}
+            {/* Info Message */}
+            <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+              <p className="text-sm text-foreground font-medium">
+                We'll send a verification code to your email
+              </p>
+            </div>
+
             <Button
               type="submit"
               disabled={isLoading}
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-base font-semibold shadow-lg hover:shadow-xl transition-all"
             >
-              {isLoading ? "Signing In..." : "Sign In"}
+              {isLoading ? "Sending Code..." : "Continue with Email"}
             </Button>
           </form>
 
-          {/* Sign Up Link */}
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               Don't have an account?{" "}
@@ -264,17 +264,16 @@ function SignIn() {
             </p>
           </div>
 
-          {/* Security Badge */}
           <div className="mt-8 pt-6 border-t border-border">
             <div className="flex items-center justify-center space-x-2 text-xs text-muted-foreground">
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fillRule="evenodd"
-                  d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                  d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
                   clipRule="evenodd"
                 />
               </svg>
-              <span>Secure authentication with JWT tokens</span>
+              <span>Passwordless authentication with OTP</span>
             </div>
           </div>
         </div>

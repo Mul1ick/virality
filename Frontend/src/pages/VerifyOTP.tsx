@@ -210,7 +210,7 @@ function VerifyOTP() {
               className="flex items-center text-muted-foreground hover:text-foreground mb-6 transition-colors"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Sign Up
+              Back to Sign In
             </button>
             <h2 className="text-3xl font-bold text-foreground mb-2">
               Enter Verification Code
@@ -300,7 +300,7 @@ function VerifyOTP() {
               className="flex items-center justify-center w-full text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Sign Up
+              Back to Sign In
             </button>
           </div>
         </div>
