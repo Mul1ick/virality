@@ -4,3 +4,4 @@ python-dotenv==1.1.1
 requests==2.31.0
 pymongo==4.5.0
 python-jose[cryptography]==3.3.0
+apscheduler==3.10.4

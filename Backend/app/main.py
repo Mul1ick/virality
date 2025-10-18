@@ -2,10 +2,13 @@ from fastapi import FastAPI
 from app.utils.logger import get_logger
 from app.controllers import google_controller,meta_controller,auth_controller
 from fastapi.middleware.cors import CORSMiddleware
+from apscheduler.schedulers.asyncio import AsyncIOScheduler # 👈 Import scheduler
+from app.scheduler import sync_all_meta_data # 👈 Import your job
 
 
 logger = get_logger()
 app = FastAPI(title="Ads Integration Backend")
+scheduler = AsyncIOScheduler()
 
 # Add CORS middleware
 app.add_middleware(
@@ -29,6 +32,10 @@ app.include_router(meta_controller.router) # <-- Add this line
 @app.on_event("startup")
 async def startup_event():
     logger.info("🚀 FastAPI app started")
+    scheduler.add_job(sync_all_meta_data, "interval", minutes=5)
+    scheduler.start()
+    logger.info("Scheduler started, Meta sync job scheduled.")
+
 
 @app.get("/")
 def root():
