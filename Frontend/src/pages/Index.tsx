@@ -2,39 +2,71 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { MetaCampaignsTable } from "@/components/dashboard/MetaCampaignsTable";
+import { MetaAdSetsTable } from "@/components/dashboard/MetaAdSetsTable";
+import { MetaAdsTable } from "@/components/dashboard/MetaAdsTable";
 import { CreativeGallery } from "@/components/dashboard/CreativeGallery";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   BarChart3,
   TrendingUp,
   Facebook,
   Search,
   ShoppingCart,
+  User,
+  Settings,
+  LogOut,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const Index = () => {
   const [dateRange, setDateRange] = useState("30days");
   const [metaCampaigns, setMetaCampaigns] = useState([]);
+  const [metaAdSets, setMetaAdSets] = useState([]);
+  const [metaAds, setMetaAds] = useState([]);
   const [googleCampaigns, setGoogleCampaigns] = useState([]);
   const [shopifyData, setShopifyData] = useState([]);
   const [loading, setLoading] = useState({
     meta: false,
+    metaAdSets: false,
+    metaAds: false,
     google: false,
     shopify: false,
   });
   const [success, setSuccess] = useState({
     meta: false,
+    metaAdSets: false,
+    metaAds: false,
     google: false,
     shopify: false,
   });
   const [error, setError] = useState({
     meta: null,
+    metaAdSets: null,
+    metaAds: null,
     google: null,
     shopify: null,
   });
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
+  const navigate = useNavigate();
+
+  // Mock user data - replace with actual user data from your auth context
+  const user = {
+    name: "Alex Johnson",
+    email: "alex.johnson@example.com",
+    avatarUrl: "https://placehold.co/100x100/A0BFFF/FFFFFF?text=AJ",
+  };
 
   // Fetch Meta campaigns WITH INSIGHTS
   useEffect(() => {
@@ -53,14 +85,12 @@ const Index = () => {
           `Fetching Meta campaigns with insights for user: ${userId}`
         );
 
-        // ✅ Call insights endpoint instead of basic campaigns
         const response = await axios.get(
           `${backendUrl}/meta/campaigns/insights/${userId}`
         );
 
         console.log("Meta campaigns with insights fetched:", response.data);
 
-        // ✅ Process the nested insights data structure
         const processedCampaigns =
           response.data.data?.map((campaign) => {
             return {
@@ -80,6 +110,9 @@ const Index = () => {
                     ),
                     ctr: parseFloat(campaign.insights.data[0].ctr || 0),
                     cpm: parseFloat(campaign.insights.data[0].cpm || 0),
+                    frequency: parseFloat(
+                      campaign.insights.data[0].frequency || 0
+                    ),
                     cpc:
                       campaign.insights.data[0].inline_link_clicks > 0
                         ? parseFloat(campaign.insights.data[0].spend || 0) /
@@ -107,6 +140,147 @@ const Index = () => {
     };
 
     fetchMetaCampaigns();
+  }, [dateRange]);
+
+  // Fetch Meta Ad Sets WITH INSIGHTS
+  useEffect(() => {
+    const fetchMetaAdSets = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get("user_id");
+
+      if (!userId) {
+        console.log("No user_id found - user hasn't connected Meta");
+        return;
+      }
+
+      try {
+        setLoading((prev) => ({ ...prev, metaAdSets: true }));
+        console.log(`Fetching Meta ad sets with insights for user: ${userId}`);
+
+        const response = await axios.get(
+          `${backendUrl}/meta/adsets/insights/${userId}`
+        );
+
+        console.log("Meta ad sets with insights fetched:", response.data);
+
+        const processedAdSets =
+          response.data.data?.map((adset) => {
+            return {
+              id: adset.id,
+              name: adset.name,
+              status: adset.status,
+              daily_budget: adset.daily_budget,
+              campaign_id: adset.campaign_id,
+              insights: adset.insights?.data?.[0]
+                ? {
+                    spend: parseFloat(adset.insights.data[0].spend || 0),
+                    impressions: parseInt(
+                      adset.insights.data[0].impressions || 0
+                    ),
+                    reach: parseInt(adset.insights.data[0].reach || 0),
+                    clicks: parseInt(
+                      adset.insights.data[0].inline_link_clicks || 0
+                    ),
+                    ctr: parseFloat(adset.insights.data[0].ctr || 0),
+                    cpm: parseFloat(adset.insights.data[0].cpm || 0),
+                    frequency: parseFloat(
+                      adset.insights.data[0].frequency || 0
+                    ),
+                    cpc:
+                      adset.insights.data[0].inline_link_clicks > 0
+                        ? parseFloat(adset.insights.data[0].spend || 0) /
+                          parseInt(
+                            adset.insights.data[0].inline_link_clicks || 1
+                          )
+                        : 0,
+                  }
+                : null,
+            };
+          }) || [];
+
+        setMetaAdSets(processedAdSets);
+        setError((prev) => ({ ...prev, metaAdSets: null }));
+        setSuccess((prev) => ({ ...prev, metaAdSets: true }));
+      } catch (e) {
+        console.log(e);
+        setError((prev) => ({
+          ...prev,
+          metaAdSets:
+            e.response?.data?.detail || "Failed to fetch Meta ad sets",
+        }));
+      } finally {
+        setLoading((prev) => ({ ...prev, metaAdSets: false }));
+      }
+    };
+
+    fetchMetaAdSets();
+  }, [dateRange]);
+
+  // Fetch Meta Ads WITH INSIGHTS
+  useEffect(() => {
+    const fetchMetaAds = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get("user_id");
+
+      if (!userId) {
+        console.log("No user_id found - user hasn't connected Meta");
+        return;
+      }
+
+      try {
+        setLoading((prev) => ({ ...prev, metaAds: true }));
+        console.log(`Fetching Meta ads with insights for user: ${userId}`);
+
+        const response = await axios.get(
+          `${backendUrl}/meta/ads/insights/${userId}`
+        );
+
+        console.log("Meta ads with insights fetched:", response.data);
+
+        const processedAds =
+          response.data.data?.map((ad) => {
+            return {
+              id: ad.id,
+              name: ad.name,
+              status: ad.status,
+              adset_id: ad.adset_id,
+              creative: ad.creative,
+              insights: ad.insights?.data?.[0]
+                ? {
+                    spend: parseFloat(ad.insights.data[0].spend || 0),
+                    impressions: parseInt(ad.insights.data[0].impressions || 0),
+                    reach: parseInt(ad.insights.data[0].reach || 0),
+                    clicks: parseInt(
+                      ad.insights.data[0].inline_link_clicks || 0
+                    ),
+                    ctr: parseFloat(ad.insights.data[0].ctr || 0),
+                    cpm: parseFloat(ad.insights.data[0].cpm || 0),
+                    frequency: parseFloat(ad.insights.data[0].frequency || 0),
+                    cpc:
+                      ad.insights.data[0].inline_link_clicks > 0
+                        ? parseFloat(ad.insights.data[0].spend || 0) /
+                          parseInt(ad.insights.data[0].inline_link_clicks || 1)
+                        : 0,
+                  }
+                : null,
+            };
+          }) || [];
+
+        setMetaAds(processedAds);
+        setError((prev) => ({ ...prev, metaAds: null }));
+        setSuccess((prev) => ({ ...prev, metaAds: true }));
+      } catch (e) {
+        console.log(e);
+        setError((prev) => ({
+          ...prev,
+          metaAds: e.response?.data?.detail || "Failed to fetch Meta ads",
+        }));
+      } finally {
+        setLoading((prev) => ({ ...prev, metaAds: false }));
+      }
+    };
+
+    fetchMetaAds();
   }, [dateRange]);
 
   // Fetch Google campaigns
@@ -189,14 +363,37 @@ const Index = () => {
 
     if (hasAnyNotification) {
       const timer = setTimeout(() => {
-        setLoading({ meta: false, google: false, shopify: false });
-        setError({ meta: null, google: null, shopify: null });
-        setSuccess({ meta: false, google: false, shopify: false });
+        setLoading({
+          meta: false,
+          metaAdSets: false,
+          metaAds: false,
+          google: false,
+          shopify: false,
+        });
+        setError({
+          meta: null,
+          metaAdSets: null,
+          metaAds: null,
+          google: null,
+          shopify: null,
+        });
+        setSuccess({
+          meta: false,
+          metaAdSets: false,
+          metaAds: false,
+          google: false,
+          shopify: false,
+        });
       }, 2000);
 
       return () => clearTimeout(timer);
     }
   }, [loading, error, success]);
+
+  const handleSignOut = () => {
+    localStorage.clear();
+    navigate("/signin");
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -215,7 +412,59 @@ const Index = () => {
                 </p>
               </div>
             </div>
-            <DateRangeSelector date={dateRange} onChange={setDateRange} />
+
+            <div className="flex items-center gap-4">
+              <DateRangeSelector date={dateRange} onChange={setDateRange} />
+
+              {/* Profile Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="relative h-10 w-10 rounded-full"
+                  >
+                    <Avatar className="h-10 w-10 border-2 border-primary/20">
+                      <AvatarImage src={user.avatarUrl} alt={user.name} />
+                      <AvatarFallback className="bg-primary/20 text-primary font-semibold">
+                        {user.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">
+                        {user.name}
+                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/profile")}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile & Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/profile")}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Connect Platforms</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="text-destructive"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sign Out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </header>
@@ -224,12 +473,12 @@ const Index = () => {
       <main className="container mx-auto px-6 py-4">
         {/* Notifications */}
         <div className="space-y-3 mb-6">
-          {/* Loading States */}
-          {loading.meta && (
+          {/* Loading States - Consolidated Meta */}
+          {(loading.meta || loading.metaAdSets || loading.metaAds) && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <Facebook className="h-4 w-4 text-blue-600" />
-                <p className="text-blue-700">Loading Meta campaigns...</p>
+                <p className="text-blue-700">Loading Meta data...</p>
               </div>
             </div>
           )}
@@ -251,11 +500,13 @@ const Index = () => {
           )}
 
           {/* Error States */}
-          {error.meta && (
+          {(error.meta || error.metaAdSets || error.metaAds) && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <Facebook className="h-4 w-4 text-red-600" />
-                <p className="text-red-700">Meta: {error.meta}</p>
+                <p className="text-red-700">
+                  Meta: {error.meta || error.metaAdSets || error.metaAds}
+                </p>
               </div>
             </div>
           )}
@@ -276,13 +527,14 @@ const Index = () => {
             </div>
           )}
 
-          {/* Success States */}
-          {success.meta && (
+          {/* Success States - Consolidated Meta */}
+          {(success.meta || success.metaAdSets || success.metaAds) && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <Facebook className="h-4 w-4 text-green-600" />
                 <p className="text-green-700">
-                  ✅ {metaCampaigns.length} Meta campaigns loaded!
+                  ✅ Meta data loaded! {metaCampaigns.length} campaigns,{" "}
+                  {metaAdSets.length} ad sets, {metaAds.length} ads
                 </p>
               </div>
             </div>
@@ -366,15 +618,58 @@ const Index = () => {
             <TrendChart dateRange={dateRange} />
           </TabsContent>
 
-          {/* ✅ META TAB - NOW WITH TABLE */}
+          {/* META TAB WITH NESTED TABS */}
           <TabsContent value="meta" className="space-y-6">
-            <MetaCampaignsTable
-              campaigns={metaCampaigns}
-              isLoading={loading.meta}
-            />
+            <div className="bg-card rounded-lg border p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Facebook className="h-6 w-6 text-blue-600" />
+                <h2 className="text-2xl font-bold">Meta Campaigns & Ads</h2>
+              </div>
+              {metaCampaigns.length > 0 ||
+              metaAdSets.length > 0 ||
+              metaAds.length > 0 ? (
+                <Tabs defaultValue="campaigns" className="w-full">
+                  <TabsList className="mb-6">
+                    <TabsTrigger value="campaigns">
+                      Campaigns{" "}
+                      {metaCampaigns.length > 0 && `(${metaCampaigns.length})`}
+                    </TabsTrigger>
+                    <TabsTrigger value="adsets">
+                      Ad Sets{" "}
+                      {metaAdSets.length > 0 && `(${metaAdSets.length})`}
+                    </TabsTrigger>
+                    <TabsTrigger value="ads">
+                      Ads {metaAds.length > 0 && `(${metaAds.length})`}
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="campaigns">
+                    <MetaCampaignsTable
+                      campaigns={metaCampaigns}
+                      isLoading={loading.meta}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="adsets">
+                    <MetaAdSetsTable
+                      adsets={metaAdSets}
+                      isLoading={loading.metaAdSets}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="ads">
+                    <MetaAdsTable ads={metaAds} isLoading={loading.metaAds} />
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <p className="text-muted-foreground">
+                  No Meta data loaded. Connect your Meta account in the Profile
+                  page.
+                </p>
+              )}
+            </div>
           </TabsContent>
 
-          {/* GOOGLE TAB - Keep existing */}
           <TabsContent value="google" className="space-y-6">
             <div className="bg-card rounded-lg border p-6">
               <div className="flex items-center gap-3 mb-4">
@@ -397,7 +692,6 @@ const Index = () => {
             </div>
           </TabsContent>
 
-          {/* SHOPIFY TAB - Keep existing */}
           <TabsContent value="shopify" className="space-y-6">
             <div className="bg-card rounded-lg border p-6">
               <div className="flex items-center gap-3 mb-4">

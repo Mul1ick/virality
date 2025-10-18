@@ -8,44 +8,49 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 
-interface CampaignInsights {
+interface AdSetInsights {
   spend: number;
   impressions: number;
   reach: number;
   clicks: number;
   ctr: number;
   cpm: number;
-  cpc: number;
   frequency: number;
+  cpc: number;
 }
 
-interface Campaign {
+interface AdSet {
   id: string;
   name: string;
   status: string;
-  objective: string;
-  insights: CampaignInsights | null;
+  daily_budget: string;
+  campaign_id: string;
+  insights: AdSetInsights | null;
 }
 
-interface MetaCampaignsTableProps {
-  campaigns: Campaign[];
+interface MetaAdSetsTableProps {
+  adsets: AdSet[];
   isLoading?: boolean;
 }
 
-export const MetaCampaignsTable = ({
-  campaigns,
+export const MetaAdSetsTable = ({
+  adsets,
   isLoading = false,
-}: MetaCampaignsTableProps) => {
+}: MetaAdSetsTableProps) => {
   // Format currency
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("en-IN", {
       style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      currency: "INR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(value);
+  };
+
+  // Format budget (comes in cents from Meta)
+  const formatBudget = (budgetCents: string) => {
+    return formatCurrency(parseInt(budgetCents) / 100);
   };
 
   // Format large numbers
@@ -65,19 +70,8 @@ export const MetaCampaignsTable = ({
       return "bg-green-500/10 text-green-700 border-green-500/20";
     } else if (statusUpper === "PAUSED") {
       return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20";
-    } else if (statusUpper === "ARCHIVED" || statusUpper === "DELETED") {
-      return "bg-red-500/10 text-red-700 border-red-500/20";
     }
     return "bg-gray-500/10 text-gray-700 border-gray-500/20";
-  };
-
-  // Format objective text
-  const formatObjective = (objective: string) => {
-    return objective
-      .replace("OUTCOME_", "")
-      .split("_")
-      .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
-      .join(" ");
   };
 
   // Format status text
@@ -90,18 +84,18 @@ export const MetaCampaignsTable = ({
       <Card className="p-6">
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading campaigns...</p>
+          <p className="text-muted-foreground">Loading ad sets...</p>
         </div>
       </Card>
     );
   }
 
-  if (campaigns.length === 0) {
+  if (adsets.length === 0) {
     return (
       <Card className="p-6">
         <div className="text-center py-12">
           <p className="text-muted-foreground">
-            No campaigns found. Connect your Meta account to view campaigns.
+            No ad sets found. Connect your Meta account to view ad sets.
           </p>
         </div>
       </Card>
@@ -113,9 +107,9 @@ export const MetaCampaignsTable = ({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold">Meta Campaigns</h3>
+            <h3 className="text-lg font-semibold">Meta Ad Sets</h3>
             <p className="text-sm text-muted-foreground">
-              {campaigns.length} campaigns • Last 30 days
+              {adsets.length} ad sets • Last 30 days
             </p>
           </div>
         </div>
@@ -125,10 +119,12 @@ export const MetaCampaignsTable = ({
             <TableHeader>
               <TableRow className="bg-muted/50">
                 <TableHead className="font-semibold min-w-[200px]">
-                  Campaign Name
+                  Ad Set Name
                 </TableHead>
                 <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="font-semibold">Objective</TableHead>
+                <TableHead className="font-semibold text-right">
+                  Daily Budget
+                </TableHead>
                 <TableHead className="font-semibold text-right">
                   Spend
                 </TableHead>
@@ -150,68 +146,64 @@ export const MetaCampaignsTable = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {campaigns.map((campaign) => (
+              {adsets.map((adset) => (
                 <TableRow
-                  key={campaign.id}
+                  key={adset.id}
                   className="hover:bg-muted/30 transition-colors"
                 >
-                  {/* Campaign Name */}
-                  <TableCell className="font-medium">{campaign.name}</TableCell>
+                  {/* Ad Set Name */}
+                  <TableCell className="font-medium">{adset.name}</TableCell>
 
                   {/* Status Badge */}
                   <TableCell>
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(
-                        campaign.status
+                        adset.status
                       )}`}
                     >
-                      {formatStatus(campaign.status)}
+                      {formatStatus(adset.status)}
                     </span>
                   </TableCell>
 
-                  {/* Objective */}
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      {formatObjective(campaign.objective)}
-                    </Badge>
+                  {/* Daily Budget */}
+                  <TableCell className="text-right font-medium text-muted-foreground">
+                    {formatBudget(adset.daily_budget)}
                   </TableCell>
 
                   {/* Insights Data */}
-                  {campaign.insights ? (
+                  {adset.insights ? (
                     <>
                       <TableCell className="text-right font-semibold">
-                        {formatCurrency(campaign.insights.spend)}
+                        {formatCurrency(adset.insights.spend)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatNumber(campaign.insights.impressions)}
+                        {formatNumber(adset.insights.impressions)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatNumber(campaign.insights.reach)}
+                        {formatNumber(adset.insights.reach)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatNumber(campaign.insights.clicks)}
+                        {formatNumber(adset.insights.clicks)}
                       </TableCell>
                       <TableCell className="text-right">
                         <span
                           className={
-                            campaign.insights.ctr >= 2
+                            adset.insights.ctr >= 2
                               ? "text-green-600 font-semibold"
                               : ""
                           }
                         >
-                          {formatPercentage(campaign.insights.ctr)}
+                          {formatPercentage(adset.insights.ctr)}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        {" "}
-                        {/* ✅ ADD THIS */}
-                        {campaign.insights.frequency.toFixed(2)}
+                        {adset.insights.frequency.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(campaign.insights.cpm)}
+                        {formatCurrency(adset.insights.cpm)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(campaign.insights.cpc)}
+                        {formatCurrency(adset.insights.cpc)}
                       </TableCell>
                     </>
                   ) : (
@@ -220,8 +212,6 @@ export const MetaCampaignsTable = ({
                         colSpan={8}
                         className="text-center text-muted-foreground text-sm"
                       >
-                        {" "}
-                        {/* ✅ Change from 7 to 8 */}
                         No insights available
                       </TableCell>
                     </>
@@ -235,21 +225,22 @@ export const MetaCampaignsTable = ({
         {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
           <div>
-            <p className="text-xs text-muted-foreground">Total Spend</p>
+            <p className="text-xs text-muted-foreground">Total Budget</p>
             <p className="text-lg font-semibold">
               {formatCurrency(
-                campaigns.reduce((sum, c) => sum + (c.insights?.spend || 0), 0)
+                adsets.reduce(
+                  (sum, a) => sum + parseInt(a.daily_budget) / 100,
+                  0
+                )
               )}
+              /day
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Total Impressions</p>
+            <p className="text-xs text-muted-foreground">Total Spend</p>
             <p className="text-lg font-semibold">
-              {formatNumber(
-                campaigns.reduce(
-                  (sum, c) => sum + (c.insights?.impressions || 0),
-                  0
-                )
+              {formatCurrency(
+                adsets.reduce((sum, a) => sum + (a.insights?.spend || 0), 0)
               )}
             </p>
           </div>
@@ -257,7 +248,7 @@ export const MetaCampaignsTable = ({
             <p className="text-xs text-muted-foreground">Total Clicks</p>
             <p className="text-lg font-semibold">
               {formatNumber(
-                campaigns.reduce((sum, c) => sum + (c.insights?.clicks || 0), 0)
+                adsets.reduce((sum, a) => sum + (a.insights?.clicks || 0), 0)
               )}
             </p>
           </div>
@@ -265,8 +256,8 @@ export const MetaCampaignsTable = ({
             <p className="text-xs text-muted-foreground">Avg. CTR</p>
             <p className="text-lg font-semibold">
               {formatPercentage(
-                campaigns.reduce((sum, c) => sum + (c.insights?.ctr || 0), 0) /
-                  campaigns.filter((c) => c.insights).length || 0
+                adsets.reduce((sum, a) => sum + (a.insights?.ctr || 0), 0) /
+                  adsets.filter((a) => a.insights).length || 0
               )}
             </p>
           </div>
