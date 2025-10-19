@@ -3,5 +3,7 @@ uvicorn[standard]==0.23.0
 python-dotenv==1.1.1
 requests==2.31.0
 pymongo==4.5.0
+google-ads
 python-jose[cryptography]==3.3.0
 apscheduler==3.10.4
+google-generativeai

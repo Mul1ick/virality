@@ -193,6 +193,15 @@ def save_items(collection_name: str, ad_account_id: str, items_data: list, platf
             {"$set": item},
             upsert=True
         )
+    print(f"Saved {len(campaigns_data)} campaigns for ad account {ad_account_id}")
+    
+def get_user_token_by_source(user_id: str, source: str):
+    """
+    Retrieves a user's token for a specific source (google, meta, shopify, etc.)
+    without affecting existing Meta controller logic.
+    """
+    return users_collection.find_one({"user_id": user_id, "source": source})
+
     print(f"Saved {len(items_data)} {collection_name} for {platform} account {ad_account_id}")
 
 
