@@ -193,7 +193,8 @@ def save_items(collection_name: str, ad_account_id: str, items_data: list, platf
             {"$set": item},
             upsert=True
         )
-    print(f"Saved {len(campaigns_data)} campaigns for ad account {ad_account_id}")
+    print(f"Saved {len(items_data)} {collection_name} for {platform} account {ad_account_id}")
+
     
 def get_user_token_by_source(user_id: str, source: str):
     """
