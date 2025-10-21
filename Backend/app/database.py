@@ -195,6 +195,16 @@ def save_items(collection_name: str, ad_account_id: str, items_data: list, platf
         )
     print(f"Saved {len(items_data)} {collection_name} for {platform} account {ad_account_id}")
 
+    
+def get_user_token_by_source(user_id: str, source: str):
+    """
+    Retrieves a user's token for a specific source (google, meta, shopify, etc.)
+    without affecting existing Meta controller logic.
+    """
+    return users_collection.find_one({"user_id": user_id, "source": source})
+
+    print(f"Saved {len(items_data)} {collection_name} for {platform} account {ad_account_id}")
+
 
 # 👇 NEW: A generic function to save insights for any item type
 def save_item_insights(collection_name: str, items_with_insights: list, platform: str):

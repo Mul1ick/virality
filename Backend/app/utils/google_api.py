@@ -1,178 +1,113 @@
-"""
-Google Ads API Helper Module
-============================
-
-Purpose:
---------
-This module acts as a thin abstraction layer over the official Google Ads REST API (v14).  
-It isolates all direct API calls from the main controller logic, following the **Single Responsibility Principle (SRP)**.
-
-Why this exists:
-----------------
-Instead of calling Google Ads API endpoints directly inside FastAPI controllers,  
-we maintain a separate helper module (`google_api.py`) to:
-    - Keep API logic clean and reusable.
-    - Make testing easier (you can mock these functions).
-    - Simplify future migration (e.g., if API version changes to v15).
-
-Main responsibilities:
-----------------------
-1. Build required HTTP headers with OAuth2 and developer credentials.
-2. Query the MCC (Manager Account) to list all accessible customer accounts.
-3. Query a specific child customer account to fetch campaign data using GAQL.
-"""
-
+# app/utils/google_api.py
 import requests
 from app.config import settings
 
-BASE_URL = "https://googleads.googleapis.com/v14"
+BASE_URL = "https://googleads.googleapis.com/v19"
 
 
-# ---------------------------------------------------------------------
-# 🧩 Utility Function: Header Builder
-# ---------------------------------------------------------------------
 def _headers(access_token: str, login_customer_id: str | None = None):
-    """
-    Build the HTTP headers required for Google Ads API requests.
-
-    Args:
-        access_token (str): OAuth2 access token obtained from Google login.
-        login_customer_id (str | None): Optional manager account (MCC) ID if calling on behalf of a child.
-
-    Returns:
-        dict: Properly formatted request headers for Google Ads API.
-
-    Why it exists:
-        Google Ads API requires:
-        - Bearer access token (Authorization)
-        - Developer token (unique to each MCC)
-        - Optionally, 'login-customer-id' if querying child accounts.
-    """
+    dev_token = getattr(settings, "GOOGLE_DEVELOPER_TOKEN", None) or getattr(settings, "DEVELOPER_TOKEN", None)
+    if not dev_token:
+        raise RuntimeError("Missing GOOGLE_DEVELOPER_TOKEN in .env (settings.GOOGLE_DEVELOPER_TOKEN)")
     headers = {
         "Authorization": f"Bearer {access_token}",
-        "developer-token": getattr(settings, "DEVELOPER_TOKEN", None) or "REPLACE_ME",
+        "developer-token": dev_token,
     }
     if login_customer_id:
         headers["login-customer-id"] = login_customer_id
     return headers
 
 
-# ---------------------------------------------------------------------
-# 🧭 1. MCC (Manager Account) Function
-# ---------------------------------------------------------------------
+def _clean_customer_id(customer_id: str) -> str:
+    # Google accepts digits only; strip any dashes the UI might show
+    return customer_id.replace("-", "")
+
+# In app/utils/google_api.py
 def list_accessible_customers(access_token: str):
     """
-    Fetch all Google Ads accounts accessible by the authenticated MCC user.
-
-    Endpoint:
-        GET https://googleads.googleapis.com/v14/customers:listAccessibleCustomers
-
-    Args:
-        access_token (str): Valid OAuth access token.
-
-    Returns:
-        requests.Response: API response object with list of accessible customer accounts.
-
-    Output Example:
-        {
-          "resourceNames": [
-            "customers/9554344066",
-            "customers/1234567890"
-          ]
-        }
-
-    Why it exists:
-        This function is used to identify which Google Ads accounts
-        (child accounts) your manager account can access.
+    Fetch all Google Ads accounts accessible by the authenticated user.
     """
     url = f"{BASE_URL}/customers:listAccessibleCustomers"
-    return requests.get(url, headers=_headers(access_token))
+    resp = requests.get(url, headers=_headers(access_token))
+    if resp.status_code != 200:
+        print(f"[Google Ads] Failed to list customers: {resp.text}")
+    return resp
 
+# In app/utils/google_api.py
+# REPLACE your function with this corrected version
 
-# ---------------------------------------------------------------------
-# 📊 2. Child Account Function
-# ---------------------------------------------------------------------
-def list_campaigns_for_child(
-    access_token: str, child_customer_id: str, login_customer_id: str | None = None
-):
+def list_campaigns_for_child(access_token: str, child_customer_id: str, login_customer_id: str | None = None):
     """
-    Retrieve basic campaign metrics for a specific child account under an MCC.
-
-    Endpoint:
-        POST https://googleads.googleapis.com/v14/customers/{child_customer_id}/googleAds:search
-
-    Args:
-        access_token (str): OAuth access token of the logged-in user.
-        child_customer_id (str): The target customer (child account) ID to query.
-        login_customer_id (str | None): The MCC ID that owns/oversees this child.
-
-    Returns:
-        requests.Response: Raw API response containing campaign metrics.
-
-    Output Example:
-        {
-          "results": [
-            {
-              "campaign": {
-                "id": "123456789",
-                "name": "Summer Sales",
-                "status": "ENABLED"
-              },
-              "metrics": {
-                "impressions": "10000",
-                "clicks": "350",
-                "costMicros": "123000000"
-              }
-            }
-          ]
-        }
-
-    Why it exists:
-        Once you know which child account you want to inspect (from MCC listing),
-        this function allows fetching key performance indicators (KPIs)
-        like clicks, impressions, and cost — all via Google Ads Query Language (GAQL).
+    Retrieve a comprehensive set of campaign metrics for a specific child account.
+    This query is the closest practical equivalent to a 'SELECT *'.
     """
-    url = f"{BASE_URL}/customers/{child_customer_id}/googleAds:search"
-
-    # GAQL (Google Ads Query Language) query
+    url = f"{BASE_URL}/customers/{_clean_customer_id(child_customer_id)}/googleAds:search"
+    
     query = """
     SELECT
       campaign.id,
       campaign.name,
       campaign.status,
+      campaign.advertising_channel_type,
+      campaign.start_date,
+      campaign.end_date,
+      campaign.bidding_strategy_type,
+      campaign.target_cpa.target_cpa_micros,
+      campaign.target_roas.target_roas,
+      campaign_budget.amount_micros,  # <--- THIS IS THE CORRECTED LINE
       metrics.impressions,
       metrics.clicks,
-      metrics.cost_micros
+      metrics.ctr,
+      metrics.average_cpc,
+      metrics.cost_micros,
+      metrics.conversions,
+      metrics.cost_per_conversion,
+      metrics.conversions_from_interactions_rate,
+      metrics.value_per_conversion
     FROM campaign
-    WHERE segments.date DURING LAST_7_DAYS
-    LIMIT 10
+    WHERE segments.date DURING LAST_30_DAYS
+    ORDER BY metrics.impressions DESC
     """
 
     payload = {"query": query}
-    return requests.post(url, headers=_headers(access_token, login_customer_id), json=payload)
+    resp = requests.post(url, headers=_headers(access_token, login_customer_id), json=payload)
+    if resp.status_code != 200:
+        print(f"[Google Ads] Campaign fetch failed: {resp.text}")
+    return resp
 
-
-from app.config import settings
-
-def list_test_account_campaigns(access_token: str):
-    """Fetch campaigns from your Google Ads Test Account."""
-    customer_id = getattr(settings, "GOOGLE_TEST_ACCOUNT_ID", None)
-    if not customer_id:
-        return {"error": "Missing test account ID in environment"}
-
-    url = f"{BASE_URL}/customers/{customer_id}/googleAds:search"
-    query = """
-    SELECT
-      campaign.id,
-      campaign.name,
-      campaign.status,
-      metrics.impressions,
-      metrics.clicks,
-      metrics.cost_micros
-    FROM campaign
-    LIMIT 10
+def list_adgroups_for_campaign(access_token: str, child_customer_id: str, login_customer_id: str, campaign_id: str):
     """
+    Retrieve Ad Groups and their metrics for a specific campaign.
+    """
+    url = f"{BASE_URL}/customers/{_clean_customer_id(child_customer_id)}/googleAds:search"
+    query = f"""
+    SELECT
+      ad_group.id, ad_group.name, ad_group.status, ad_group.type,
+      metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
+    FROM ad_group
+    WHERE campaign.id = {campaign_id} AND segments.date DURING LAST_30_DAYS
+    """
+    payload = {"query": query}
+    resp = requests.post(url, headers=_headers(access_token, login_customer_id), json=payload)
+    if resp.status_code != 200:
+        print(f"[Google Ads] Ad Group fetch failed: {resp.text}")
+    return resp
 
-    resp = requests.post(url, headers=_headers(access_token), json={"query": query})
-    print(f"[Google Ads] Response: {resp.status_code}")
-    return resp.json()
+
+def list_ads_for_adgroup(access_token: str, child_customer_id: str, login_customer_id: str, ad_group_id: str):
+    """
+    Retrieve Ads and their metrics for a specific Ad Group.
+    """
+    url = f"{BASE_URL}/customers/{_clean_customer_id(child_customer_id)}/googleAds:search"
+    query = f"""
+    SELECT
+      ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.ad.type, ad_group_ad.ad.final_urls,
+      ad_group_ad.status, metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.ctr
+    FROM ad_group_ad
+    WHERE ad_group.id = {ad_group_id} AND segments.date DURING LAST_30_DAYS
+    """
+    payload = {"query": query}
+    resp = requests.post(url, headers=_headers(access_token, login_customer_id), json=payload)
+    if resp.status_code != 200:
+        print(f"[Google Ads] Ad fetch failed: {resp.text}")
+    return resp
