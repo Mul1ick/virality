@@ -229,6 +229,3 @@ def save_item_insights(collection_name: str, items_with_insights: list, platform
     print(f"Updated insights for {len(items_with_insights)} {collection_name} from {platform}.")
 
 # ⛔️ OLD platform-specific functions are no longer needed and can be deleted.
-
-def get_user_token_by_source():
-    pass

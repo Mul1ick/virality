@@ -63,7 +63,7 @@ def google_callback(code: str = Query(..., description="Authorization code from 
     save_or_update_user_token(user_id, tokens, source="google")
     logger.info(f"✅ [Google OAuth] Tokens saved for user {user_id}")
 
-    return RedirectResponse(url=f"http://localhost:8080/?user_id={user_id}")
+    return RedirectResponse(url=f"http://localhost:8080/?user_id={user_id}&platform=google")
 
 
 @router.get("/accounts/{user_id}")

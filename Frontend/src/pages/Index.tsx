@@ -223,9 +223,11 @@ const Index = () => {
     const fetchMetaAds = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
+      const platform = urlParams.get("platform"); // ← ADD THIS
 
-      if (!userId) {
-        console.log("No user_id found - user hasn't connected Meta");
+      // ✅ ADD PLATFORM CHECK
+      if (!userId || platform !== "meta") {
+        console.log("No user_id or not connecting via Meta");
         return;
       }
 
@@ -290,28 +292,52 @@ const Index = () => {
     const fetchGoogleCampaigns = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
+      const platform = urlParams.get("platform"); // ✅ CHANGED
 
-      if (!userId) {
-        console.log("No user_id found - user hasn't connected Google");
+      if (!userId || platform !== "google") {
+        // ✅ CHANGED
         return;
       }
+
       try {
         setLoading((prev) => ({ ...prev, google: true }));
-        console.log(`Fetching Google campaigns for user: ${userId}`);
-
-        const response = await axios.get(
-          `${backendUrl}/google/campaigns/${userId}`
+        console.log("Step 1: Fetching Google Ads accounts...");
+        const accountsResponse = await axios.get(
+          `${backendUrl}/google/accounts/${userId}`
         );
 
-        setGoogleCampaigns(response.data.data || []);
-        setError((prev) => ({ ...prev, google: null }));
+        const customerIds = accountsResponse.data.customer_ids || [];
+
+        if (customerIds.length === 0) {
+          throw new Error("No Google Ads accounts found");
+        }
+
+        // 🔹 STEP 2: Use first account's ID
+        const customerId = customerIds[0];
+        const managerId = customerIds[0];
+
+        console.log(`Step 2: Fetching campaigns for account ${customerId}...`);
+
+        // 🔹 STEP 3: Fetch campaigns with both IDs
+        const campaignsResponse = await axios.get(
+          `${backendUrl}/google/campaigns/${userId}`,
+          {
+            params: {
+              customer_id: customerId,
+              manager_id: managerId,
+            },
+          }
+        );
+
+        console.log("Campaigns response:", campaignsResponse.data);
+
+        setGoogleCampaigns(campaignsResponse.data.campaigns || []);
         setSuccess((prev) => ({ ...prev, google: true }));
       } catch (e) {
-        console.log(e);
+        console.error("Error:", e);
         setError((prev) => ({
           ...prev,
-          google:
-            e.response?.data?.detail || "Failed to fetch Google campaigns",
+          google: e.message || "Failed to fetch Google campaigns",
         }));
       } finally {
         setLoading((prev) => ({ ...prev, google: false }));
@@ -326,11 +352,14 @@ const Index = () => {
     const fetchShopifyData = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
+      const platform = urlParams.get("platform"); // ✅ ADDED
 
-      if (!userId) {
-        console.log("No user_id found - user hasn't connected Shopify");
+      if (!userId || platform !== "shopify") {
+        // ✅ CHANGED
+        console.log("No user_id or not connecting via Shopify");
         return;
       }
+
       try {
         setLoading((prev) => ({ ...prev, shopify: true }));
         console.log(`Fetching Shopify data for user: ${userId}`);
@@ -627,12 +656,14 @@ const Index = () => {
           )}
 
           {/* Error States */}
+          {/* Error States */}
           {(error.meta || error.metaAdSets || error.metaAds) && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <Facebook className="h-4 w-4 text-red-600" />
                 <p className="text-red-700">
-                  Meta: {error.meta || error.metaAdSets || error.metaAds}
+                  Meta:{" "}
+                  {String(error.meta || error.metaAdSets || error.metaAds)}
                 </p>
               </div>
             </div>
@@ -641,7 +672,7 @@ const Index = () => {
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <Search className="h-4 w-4 text-red-600" />
-                <p className="text-red-700">Google: {error.google}</p>
+                <p className="text-red-700">Google: {String(error.google)}</p>
               </div>
             </div>
           )}
@@ -649,7 +680,7 @@ const Index = () => {
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="h-4 w-4 text-red-600" />
-                <p className="text-red-700">Shopify: {error.shopify}</p>
+                <p className="text-red-700">Shopify: {String(error.shopify)}</p>
               </div>
             </div>
           )}

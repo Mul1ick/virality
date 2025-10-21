@@ -345,7 +345,7 @@ def meta_callback(code: str = Query(..., description="Authorization code from Me
     
     save_or_update_user_token(user_id, long_lived_token_data, source=PLATFORM_NAME)
     
-    return RedirectResponse(url=f"http://localhost:8080/?user_id={user_id}")
+    return RedirectResponse(url=f"http://localhost:8080/?user_id={user_id}&platform=meta")
 
 # --- Campaign Endpoints (Refactored) ---
 
