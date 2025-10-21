@@ -230,9 +230,5 @@ def save_item_insights(collection_name: str, items_with_insights: list, platform
 
 # ⛔️ OLD platform-specific functions are no longer needed and can be deleted.
 
-def get_items(collection_name: str, ad_account_id: str, platform: str):
-    """Fetches all items from a collection that match an ad account and platform."""
-    collection = db[collection_name]
-    # The MongoDB driver returns a cursor, so we convert it to a list
-    items = list(collection.find({"ad_account_id": ad_account_id, "platform": platform}, {"_id": 0}))
-    return items
+def get_user_token_by_source():
+    pass

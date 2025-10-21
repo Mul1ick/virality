@@ -10,6 +10,8 @@ print(f"Loading environment from: {ENV_PATH}")
 load_dotenv(ENV_PATH)
 
 class Settings:
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") # 👈 ADD THIS LINE
+
     # --- Google OAuth ---
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")

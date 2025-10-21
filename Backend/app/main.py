@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.utils.logger import get_logger
-from app.controllers import google_controller, meta_controller, auth_controller, analytics_controller
+from app.controllers import google_controller,meta_controller,auth_controller,analytics_controller
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler # 👈 Import scheduler
 from app.scheduler import sync_all_meta_data # 👈 Import your job
