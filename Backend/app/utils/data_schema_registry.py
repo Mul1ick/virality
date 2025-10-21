@@ -1,21 +1,40 @@
-# app/config/data_schema_registry.py
+# app/utils/data_schema_registry.py
 
 DATA_SCHEMAS = {
-    "google_ads": {
-        "collection": "google_campaigns",
+    "google_campaigns": {
+        "collection": "campaigns",
         "fields": [
-            "campaign_name", "ad_name", "impressions", "clicks",
-            "ctr", "spend", "cost_micros", "date"
+            "id", "name", "status", "advertisingChannelType", "biddingStrategyType",
+            "startDate", "endDate", "clicks", "impressions", "costMicros", "conversions",
+            "amountMicros", "platform"
         ],
-        "description": "Google Ads performance data per campaign per day."
+        "description": "Top-level Google Ads campaigns. Use this for questions about overall campaign performance, budgets, and strategy."
     },
-    "meta_ads": {
-        "collection": "meta_campaigns",
+    "google_adsets": {
+        "collection": "adsets",
         "fields": [
-            "campaign_name", "ad_set_name", "impressions", "clicks",
-            "spend", "cpc", "ctr", "date"
+            "id", "name", "status", "type", "clicks", "impressions", "costMicros",
+            "conversions", "platform"
         ],
-        "description": "Meta (Facebook/Instagram) ad performance metrics."
+        "description": "Ad Groups (called Ad Sets for consistency with Meta) from Google Ads. Use this for questions about groups of ads."
+    },
+    "google_ads": {
+        "collection": "ads",
+        "fields": [
+            "id", "name", "status", "type", "finalUrls", "clicks", "impressions",
+            "costMicros", "ctr", "platform"
+        ],
+        "description": "Individual ads from Google Ads. Use this for questions about specific ad performance, types (e.g., responsive search), or final URLs."
+    },
+    "meta": {
+        "collection": "campaigns",
+        "fields": [
+            "id", "name", "status", "objective",
+            "insights.spend", "insights.impressions", "insights.reach",
+            "insights.frequency", "insights.cpm", "insights.inline_link_clicks",
+            "insights.ctr", "ad_account_id", "platform"
+        ],
+        "description": "Meta campaigns with performance insights for the last 30 days."
     },
     "shopify": {
         "collection": "shopify_sales",
