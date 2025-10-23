@@ -7,3 +7,5 @@ google-ads
 python-jose[cryptography]==3.3.0
 apscheduler==3.10.4
 google-generativeai
+python-dateutil
+httpx

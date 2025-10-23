@@ -322,3 +322,20 @@ def save_daily_campaign_insights(user_id: str, ad_account_id: str, insights_data
         logger.error(f"Error during bulk save of daily campaign insights: {e}")
         return 0
 
+
+def save_shopify_user_token(user_id: str, access_token: str, shop_url: str):
+    """
+    Specifically saves Shopify user token and shop URL.
+    """
+    update_payload = {
+        "user_id": user_id,
+        "source": "shopify",
+        "access_token": access_token,
+        "shop_url": shop_url # Explicitly save shop_url
+    }
+    users_collection.update_one(
+        {"user_id": user_id, "source": "shopify"},
+        {"$set": update_payload},
+        upsert=True
+    )
+    logger.info(f"Shopify token data saved for user '{user_id}'. Payload: {update_payload}")

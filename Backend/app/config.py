@@ -31,6 +31,11 @@ class Settings:
     META_APP_ID = os.getenv("META_APP_ID")
     META_APP_SECRET = os.getenv("META_APP_SECRET")
     META_REDIRECT_URI = os.getenv("META_REDIRECT_URI", "http://localhost:8000/meta/callback")
+    
+    # --- Shopify OAuth ---
+    SHOPIFY_CLIENT_ID: str = os.getenv("SHOPIFY_CLIENT_ID")
+    SHOPIFY_CLIENT_SECRET: str = os.getenv("SHOPIFY_CLIENT_SECRET")
+    SHOPIFY_REDIRECT_URI: str = os.getenv("SHOPIFY_REDIRECT_URI", "http://localhost:8000/shopify/callback")
 
     # --- Database ---
     MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
