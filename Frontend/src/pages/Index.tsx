@@ -25,6 +25,7 @@ import {
   User,
   Settings,
   LogOut,
+  RefreshCw,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -37,6 +38,7 @@ const Index = () => {
   const [metaAds, setMetaAds] = useState([]);
   const [googleCampaigns, setGoogleCampaigns] = useState([]);
   const [shopifyData, setShopifyData] = useState([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [loading, setLoading] = useState({
     meta: false,
     metaAdSets: false,
@@ -221,9 +223,11 @@ const Index = () => {
     const fetchMetaAds = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
+      const platform = urlParams.get("platform"); // ← ADD THIS
 
-      if (!userId) {
-        console.log("No user_id found - user hasn't connected Meta");
+      // ✅ ADD PLATFORM CHECK
+      if (!userId || platform !== "meta") {
+        console.log("No user_id or not connecting via Meta");
         return;
       }
 
@@ -288,28 +292,52 @@ const Index = () => {
     const fetchGoogleCampaigns = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
+      const platform = urlParams.get("platform"); // ✅ CHANGED
 
-      if (!userId) {
-        console.log("No user_id found - user hasn't connected Google");
+      if (!userId || platform !== "google") {
+        // ✅ CHANGED
         return;
       }
+
       try {
         setLoading((prev) => ({ ...prev, google: true }));
-        console.log(`Fetching Google campaigns for user: ${userId}`);
-
-        const response = await axios.get(
-          `${backendUrl}/google/campaigns/${userId}`
+        console.log("Step 1: Fetching Google Ads accounts...");
+        const accountsResponse = await axios.get(
+          `${backendUrl}/google/accounts/${userId}`
         );
 
-        setGoogleCampaigns(response.data.data || []);
-        setError((prev) => ({ ...prev, google: null }));
+        const customerIds = accountsResponse.data.customer_ids || [];
+
+        if (customerIds.length === 0) {
+          throw new Error("No Google Ads accounts found");
+        }
+
+        // 🔹 STEP 2: Use first account's ID
+        const customerId = customerIds[0];
+        const managerId = customerIds[0];
+
+        console.log(`Step 2: Fetching campaigns for account ${customerId}...`);
+
+        // 🔹 STEP 3: Fetch campaigns with both IDs
+        const campaignsResponse = await axios.get(
+          `${backendUrl}/google/campaigns/${userId}`,
+          {
+            params: {
+              customer_id: customerId,
+              manager_id: managerId,
+            },
+          }
+        );
+
+        console.log("Campaigns response:", campaignsResponse.data);
+
+        setGoogleCampaigns(campaignsResponse.data.campaigns || []);
         setSuccess((prev) => ({ ...prev, google: true }));
       } catch (e) {
-        console.log(e);
+        console.error("Error:", e);
         setError((prev) => ({
           ...prev,
-          google:
-            e.response?.data?.detail || "Failed to fetch Google campaigns",
+          google: e.message || "Failed to fetch Google campaigns",
         }));
       } finally {
         setLoading((prev) => ({ ...prev, google: false }));
@@ -324,11 +352,14 @@ const Index = () => {
     const fetchShopifyData = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
+      const platform = urlParams.get("platform"); // ✅ ADDED
 
-      if (!userId) {
-        console.log("No user_id found - user hasn't connected Shopify");
+      if (!userId || platform !== "shopify") {
+        // ✅ CHANGED
+        console.log("No user_id or not connecting via Shopify");
         return;
       }
+
       try {
         setLoading((prev) => ({ ...prev, shopify: true }));
         console.log(`Fetching Shopify data for user: ${userId}`);
@@ -393,6 +424,131 @@ const Index = () => {
   const handleSignOut = () => {
     localStorage.clear();
     navigate("/signin");
+  };
+
+  const handleRefreshMeta = async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get("user_id");
+
+    if (!userId) {
+      console.log("No user_id found");
+      return;
+    }
+
+    setIsRefreshing(true);
+
+    try {
+      // Fetch all three in parallel
+      const [campaignsRes, adsetsRes, adsRes] = await Promise.all([
+        axios.get(`${backendUrl}/meta/campaigns/insights/${userId}`),
+        axios.get(`${backendUrl}/meta/adsets/insights/${userId}`),
+        axios.get(`${backendUrl}/meta/ads/insights/${userId}`),
+      ]);
+
+      // Process campaigns
+      const processedCampaigns =
+        campaignsRes.data.data?.map((campaign) => ({
+          id: campaign.id,
+          name: campaign.name,
+          status: campaign.status,
+          objective: campaign.objective,
+          insights: campaign.insights?.data?.[0]
+            ? {
+                spend: parseFloat(campaign.insights.data[0].spend || 0),
+                impressions: parseInt(
+                  campaign.insights.data[0].impressions || 0
+                ),
+                reach: parseInt(campaign.insights.data[0].reach || 0),
+                clicks: parseInt(
+                  campaign.insights.data[0].inline_link_clicks || 0
+                ),
+                ctr: parseFloat(campaign.insights.data[0].ctr || 0),
+                cpm: parseFloat(campaign.insights.data[0].cpm || 0),
+                frequency: parseFloat(campaign.insights.data[0].frequency || 0),
+                cpc:
+                  campaign.insights.data[0].inline_link_clicks > 0
+                    ? parseFloat(campaign.insights.data[0].spend || 0) /
+                      parseInt(
+                        campaign.insights.data[0].inline_link_clicks || 1
+                      )
+                    : 0,
+              }
+            : null,
+        })) || [];
+
+      // Process adsets
+      const processedAdSets =
+        adsetsRes.data.data?.map((adset) => ({
+          id: adset.id,
+          name: adset.name,
+          status: adset.status,
+          daily_budget: adset.daily_budget,
+          campaign_id: adset.campaign_id,
+          insights: adset.insights?.data?.[0]
+            ? {
+                spend: parseFloat(adset.insights.data[0].spend || 0),
+                impressions: parseInt(adset.insights.data[0].impressions || 0),
+                reach: parseInt(adset.insights.data[0].reach || 0),
+                clicks: parseInt(
+                  adset.insights.data[0].inline_link_clicks || 0
+                ),
+                ctr: parseFloat(adset.insights.data[0].ctr || 0),
+                cpm: parseFloat(adset.insights.data[0].cpm || 0),
+                frequency: parseFloat(adset.insights.data[0].frequency || 0),
+                cpc:
+                  adset.insights.data[0].inline_link_clicks > 0
+                    ? parseFloat(adset.insights.data[0].spend || 0) /
+                      parseInt(adset.insights.data[0].inline_link_clicks || 1)
+                    : 0,
+              }
+            : null,
+        })) || [];
+
+      // Process ads
+      const processedAds =
+        adsRes.data.data?.map((ad) => ({
+          id: ad.id,
+          name: ad.name,
+          status: ad.status,
+          adset_id: ad.adset_id,
+          creative: ad.creative,
+          insights: ad.insights?.data?.[0]
+            ? {
+                spend: parseFloat(ad.insights.data[0].spend || 0),
+                impressions: parseInt(ad.insights.data[0].impressions || 0),
+                reach: parseInt(ad.insights.data[0].reach || 0),
+                clicks: parseInt(ad.insights.data[0].inline_link_clicks || 0),
+                ctr: parseFloat(ad.insights.data[0].ctr || 0),
+                cpm: parseFloat(ad.insights.data[0].cpm || 0),
+                frequency: parseFloat(ad.insights.data[0].frequency || 0),
+                cpc:
+                  ad.insights.data[0].inline_link_clicks > 0
+                    ? parseFloat(ad.insights.data[0].spend || 0) /
+                      parseInt(ad.insights.data[0].inline_link_clicks || 1)
+                    : 0,
+              }
+            : null,
+        })) || [];
+
+      setMetaCampaigns(processedCampaigns);
+      setMetaAdSets(processedAdSets);
+      setMetaAds(processedAds);
+
+      setSuccess((prev) => ({
+        ...prev,
+        meta: true,
+        metaAdSets: true,
+        metaAds: true,
+      }));
+    } catch (e) {
+      console.error("Refresh failed:", e);
+      setError((prev) => ({
+        ...prev,
+        meta: e.response?.data?.detail || "Failed to refresh Meta data",
+      }));
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   return (
@@ -500,12 +656,14 @@ const Index = () => {
           )}
 
           {/* Error States */}
+          {/* Error States */}
           {(error.meta || error.metaAdSets || error.metaAds) && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <Facebook className="h-4 w-4 text-red-600" />
                 <p className="text-red-700">
-                  Meta: {error.meta || error.metaAdSets || error.metaAds}
+                  Meta:{" "}
+                  {String(error.meta || error.metaAdSets || error.metaAds)}
                 </p>
               </div>
             </div>
@@ -514,7 +672,7 @@ const Index = () => {
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <Search className="h-4 w-4 text-red-600" />
-                <p className="text-red-700">Google: {error.google}</p>
+                <p className="text-red-700">Google: {String(error.google)}</p>
               </div>
             </div>
           )}
@@ -522,7 +680,7 @@ const Index = () => {
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="h-4 w-4 text-red-600" />
-                <p className="text-red-700">Shopify: {error.shopify}</p>
+                <p className="text-red-700">Shopify: {String(error.shopify)}</p>
               </div>
             </div>
           )}
@@ -618,12 +776,27 @@ const Index = () => {
             <TrendChart dateRange={dateRange} />
           </TabsContent>
 
-          {/* META TAB WITH NESTED TABS */}
+          {/* META TAB WITH NESTED TABS AND REFRESH BUTTON */}
           <TabsContent value="meta" className="space-y-6">
             <div className="bg-card rounded-lg border p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <Facebook className="h-6 w-6 text-blue-600" />
-                <h2 className="text-2xl font-bold">Meta Campaigns & Ads</h2>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <Facebook className="h-6 w-6 text-blue-600" />
+                  <h2 className="text-2xl font-bold">Meta Campaigns & Ads</h2>
+                </div>
+                <Button
+                  onClick={handleRefreshMeta}
+                  disabled={isRefreshing}
+                  variant="outline"
+                  size="sm"
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 mr-2 ${
+                      isRefreshing ? "animate-spin" : ""
+                    }`}
+                  />
+                  {isRefreshing ? "Refreshing..." : "Refresh Data"}
+                </Button>
               </div>
               {metaCampaigns.length > 0 ||
               metaAdSets.length > 0 ||
