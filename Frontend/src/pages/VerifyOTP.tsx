@@ -99,6 +99,15 @@ const handleVerify = async (e) => {
       });
       console.log("OTP verification successful:", response.data);
 
+
+      // 1. A new session is starting. Clear all old localStorage data.
+      localStorage.clear(); 
+
+      // 2. Save the new session's token and user ID.
+      //    Your backend returns 'access_token' and 'user_id' 
+      localStorage.setItem("access_token", response.data.access_token);
+      localStorage.setItem("user_id", response.data.user_id);
+
       // After successful verification, navigate to the profile page
       navigate("/profile"); 
 

@@ -287,6 +287,8 @@
         
 #     return ads_with_insights
 
+# Backend/app/controllers/meta_controller.py
+
 from fastapi import APIRouter, Query, HTTPException, BackgroundTasks
 from fastapi.responses import RedirectResponse
 import requests
@@ -301,7 +303,7 @@ from app.database import (
     get_user_token_by_source,
     save_items,
     save_item_insights,
-    save_daily_insights,
+    save_daily_insights, # Assuming these save functions handle user_id/account_id correctly
     save_daily_ad_insights,
     save_daily_campaign_insights
 )
@@ -312,30 +314,8 @@ logger = get_logger()
 
 # --- Constants ---
 API_VERSION = "v20.0"
-SCOPES = "ads_read,read_insights,ads_management"
+SCOPES = "ads_read,read_insights,ads_management,business_management" # Added business_management scope
 PLATFORM_NAME = "meta"
-
-# --- Helper function to get the first ad account ID ---
-def get_ad_account_id(access_token: str):
-    """Fetches the first ad account ID for a given user token."""
-    ad_accounts_url = f"https://graph.facebook.com/{API_VERSION}/me/adaccounts"
-    params = {"access_token": access_token, "fields": "id"}
-    try:
-        resp = requests.get(ad_accounts_url, params=params)
-        resp.raise_for_status()
-        ad_accounts = resp.json()
-
-        if not ad_accounts.get("data"):
-            logger.warning("No ad accounts found for this user.")
-            raise HTTPException(status_code=404, detail="No ad accounts found for this user.")
-        
-        return ad_accounts["data"][0]["id"]
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"HTTP Error fetching ad account ID: {e.response.text}")
-        raise HTTPException(status_code=e.response.status_code, detail=e.response.json().get("error", {}).get("message", "Failed to fetch ad accounts"))
-    except Exception as e:
-        logger.error(f"Unexpected error fetching ad account ID: {e}")
-        raise HTTPException(status_code=500, detail="An internal error occurred while fetching ad accounts.")
 
 # --- Authentication Endpoints ---
 
@@ -362,9 +342,9 @@ def meta_callback(code: str = Query(..., description="Authorization code from Me
     short_lived_token_data = resp.json()
     if "error" in short_lived_token_data:
         raise HTTPException(status_code=400, detail=short_lived_token_data['error']['message'])
-    
+
     short_lived_token = short_lived_token_data['access_token']
-    
+
     long_lived_token_url = f"https://graph.facebook.com/{API_VERSION}/oauth/access_token"
     long_lived_params = {
         "grant_type": "fb_exchange_token",
@@ -376,215 +356,378 @@ def meta_callback(code: str = Query(..., description="Authorization code from Me
     long_lived_token_data = resp.json()
     if "error" in long_lived_token_data:
         raise HTTPException(status_code=400, detail=long_lived_token_data['error']['message'])
-    
+
     user_info_url = f"https://graph.facebook.com/me?access_token={long_lived_token_data['access_token']}"
     user_info_resp = requests.get(user_info_url)
-    user_id = user_info_resp.json().get("id", "unknown_user")
-    
+    user_data = user_info_resp.json()
+    user_id = user_data.get("id") # Use the Facebook User ID
+    # Optionally store name/email if needed, though user_id is the primary key
+    user_name = user_data.get("name")
+    logger.info(f"Meta OAuth successful for user ID: {user_id}, Name: {user_name}")
+
+
     save_or_update_user_token(user_id, long_lived_token_data, source=PLATFORM_NAME)
-    
+
+    # Redirect to profile page, indicating successful Meta connection
     return RedirectResponse(url=f"http://localhost:8080/profile?user_id={user_id}&platform=meta")
+
+
+# --- NEW Endpoint: Get Meta Ad Accounts ---
+@router.get("/accounts/{user_id}")
+def get_meta_ad_accounts(user_id: str):
+    """Fetches all ad accounts accessible by the user's Meta token."""
+    token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
+    if not token_data or "access_token" not in token_data:
+        raise HTTPException(status_code=404, detail="User token not found for Meta.")
+
+    access_token = token_data["access_token"]
+    ad_accounts_url = f"https://graph.facebook.com/{API_VERSION}/me/adaccounts"
+    # Requesting 'name' and 'account_id'
+    params = {"access_token": access_token, "fields": "name,account_id"} # 'id' includes 'act_' prefix, account_id doesn't
+    try:
+        resp = requests.get(ad_accounts_url, params=params)
+        resp.raise_for_status()
+        ad_accounts = resp.json()
+
+        if not ad_accounts.get("data"):
+            logger.warning(f"No Meta ad accounts found for user {user_id}.")
+            # Return empty list instead of 404, as user might just have no accounts
+            return {"user_id": user_id, "accounts": []}
+
+        # Format the response for the frontend
+        formatted_accounts = [
+            {"id": acc.get("account_id"), "name": acc.get("name", f"Account {acc.get('account_id')}")}
+            for acc in ad_accounts["data"]
+        ]
+        return {"user_id": user_id, "accounts": formatted_accounts}
+
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP Error fetching Meta ad accounts for user {user_id}: {e.response.text}")
+        error_detail = "Failed to fetch ad accounts."
+        if e.response is not None:
+             try:
+                 error_detail = e.response.json().get("error", {}).get("message", error_detail)
+             except ValueError:
+                 error_detail = e.response.text or error_detail
+        raise HTTPException(status_code=e.response.status_code, detail=error_detail)
+    except Exception as e:
+        logger.error(f"Unexpected error fetching Meta ad accounts for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="An internal error occurred while fetching ad accounts.")
+
 
 # --- Live Data Sync Endpoints (Corrected & Completed) ---
 
-@router.get("/campaigns/{user_id}")
-def get_and_save_campaigns(user_id: str):
+# Note: All endpoints below now include {ad_account_id} in the path
+
+@router.get("/campaigns/{user_id}/{ad_account_id}")
+def get_and_save_campaigns(user_id: str, ad_account_id: str): # Added ad_account_id
+    """Fetches campaigns for a specific user and ad account."""
     token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
-    
+
     access_token = token_data["access_token"]
-    ad_account_id = get_ad_account_id(access_token)
-    url = f"https://graph.facebook.com/{API_VERSION}/{ad_account_id}/campaigns"
+
+    formatted_ad_account_id = ad_account_id
+    if not formatted_ad_account_id.startswith("act_"):
+        formatted_ad_account_id = f"act_{ad_account_id}"
+    # Removed: ad_account_id = get_ad_account_id(access_token)
+    url = f"https://graph.facebook.com/{API_VERSION}/{formatted_ad_account_id}/campaigns"
     params = {"access_token": access_token, "fields": "name,status,objective"}
-    resp = requests.get(url, params=params)
-    campaigns = resp.json()
+    try:
+        resp = requests.get(url, params=params)
+        resp.raise_for_status()
+        campaigns = resp.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch Meta campaigns for account {ad_account_id}: {e}")
+        error_detail = "Failed to fetch campaigns from Meta API."
+        if e.response is not None:
+            try:
+                error_detail = e.response.json().get("error", {}).get("message", error_detail)
+            except ValueError:
+                error_detail = e.response.text or error_detail
+        raise HTTPException(status_code=getattr(e.response, 'status_code', 502), detail=error_detail)
 
     if campaigns.get("data"):
         save_items("campaigns", ad_account_id, campaigns["data"], PLATFORM_NAME)
-    
+
     return campaigns
 
-@router.get("/adsets/{user_id}")
-def get_and_save_adsets(user_id: str):
+@router.get("/adsets/{user_id}/{ad_account_id}")
+def get_and_save_adsets(user_id: str, ad_account_id: str): # Added ad_account_id
+    """Fetches ad sets for a specific user and ad account."""
     token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
-    
+
     access_token = token_data["access_token"]
-    ad_account_id = get_ad_account_id(access_token)
-    url = f"https://graph.facebook.com/{API_VERSION}/{ad_account_id}/adsets"
+    formatted_ad_account_id = ad_account_id
+    if not formatted_ad_account_id.startswith("act_"):
+        formatted_ad_account_id = f"act_{ad_account_id}"
+    # Removed: ad_account_id = get_ad_account_id(access_token)
+    url = f"https://graph.facebook.com/{API_VERSION}/{formatted_ad_account_id}/adsets"
     params = {"access_token": access_token, "fields": "name,status,daily_budget,campaign_id"}
-    resp = requests.get(url, params=params)
-    adsets = resp.json()
+    try:
+        resp = requests.get(url, params=params)
+        resp.raise_for_status()
+        adsets = resp.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch Meta adsets for account {ad_account_id}: {e}")
+        error_detail = "Failed to fetch adsets from Meta API."
+        if e.response is not None:
+            try:
+                error_detail = e.response.json().get("error", {}).get("message", error_detail)
+            except ValueError:
+                error_detail = e.response.text or error_detail
+        raise HTTPException(status_code=getattr(e.response, 'status_code', 502), detail=error_detail)
+
 
     if adsets.get("data"):
         save_items("adsets", ad_account_id, adsets["data"], PLATFORM_NAME)
-    
+
     return adsets
 
-@router.get("/ads/{user_id}")
-def get_and_save_ads(user_id: str):
+@router.get("/ads/{user_id}/{ad_account_id}")
+def get_and_save_ads(user_id: str, ad_account_id: str): # Added ad_account_id
+    """Fetches ads for a specific user and ad account."""
     token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
-    
+
     access_token = token_data["access_token"]
-    ad_account_id = get_ad_account_id(access_token)
-    url = f"https://graph.facebook.com/{API_VERSION}/{ad_account_id}/ads"
+
+    formatted_ad_account_id = ad_account_id
+    if not formatted_ad_account_id.startswith("act_"):
+        formatted_ad_account_id = f"act_{ad_account_id}"
+
+    # Removed: ad_account_id = get_ad_account_id(access_token)
+    url = f"https://graph.facebook.com/{API_VERSION}/{formatted_ad_account_id}/ads"
     params = {"access_token": access_token, "fields": "name,status,adset_id,creative{image_url,body}"}
-    resp = requests.get(url, params=params)
-    ads = resp.json()
+    try:
+        resp = requests.get(url, params=params)
+        resp.raise_for_status()
+        ads = resp.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch Meta ads for account {ad_account_id}: {e}")
+        error_detail = "Failed to fetch ads from Meta API."
+        if e.response is not None:
+            try:
+                error_detail = e.response.json().get("error", {}).get("message", error_detail)
+            except ValueError:
+                error_detail = e.response.text or error_detail
+        raise HTTPException(status_code=getattr(e.response, 'status_code', 502), detail=error_detail)
 
     if ads.get("data"):
         save_items("ads", ad_account_id, ads["data"], PLATFORM_NAME)
-    
+
     return ads
 
-@router.get("/campaigns/insights/{user_id}")
-def get_campaign_insights(user_id: str):
+@router.get("/campaigns/insights/{user_id}/{ad_account_id}")
+def get_campaign_insights(user_id: str, ad_account_id: str): # Added ad_account_id
+    """Fetches campaign insights for a specific user and ad account."""
     token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
     access_token = token_data["access_token"]
-    ad_account_id = get_ad_account_id(access_token)
-    url = f"https://graph.facebook.com/{API_VERSION}/{ad_account_id}/campaigns"
+
+    formatted_ad_account_id = ad_account_id
+    if not formatted_ad_account_id.startswith("act_"):
+        formatted_ad_account_id = f"act_{ad_account_id}"
+
+    # Removed: ad_account_id = get_ad_account_id(access_token)
+    url = f"https://graph.facebook.com/{API_VERSION}/{formatted_ad_account_id}/campaigns"
     insight_fields = "spend,impressions,reach,frequency,cpm,inline_link_clicks,ctr"
     params = {
         "access_token": access_token,
         "fields": f"name,status,objective,insights.fields({insight_fields})",
         "date_preset": "last_30d"
     }
-    resp = requests.get(url, params=params)
-    data = resp.json()
+    try:
+        resp = requests.get(url, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch Meta campaign insights for account {ad_account_id}: {e}")
+        error_detail = "Failed to fetch campaign insights from Meta API."
+        if e.response is not None:
+            try:
+                error_detail = e.response.json().get("error", {}).get("message", error_detail)
+            except ValueError:
+                error_detail = e.response.text or error_detail
+        raise HTTPException(status_code=getattr(e.response, 'status_code', 502), detail=error_detail)
 
     if data.get("data"):
+        # Assuming save_item_insights implicitly uses the IDs within the data
         save_item_insights("campaigns", data["data"], PLATFORM_NAME)
-    
+
     return data
 
-@router.get("/adsets/insights/{user_id}")
-def get_adset_insights(user_id: str):
+@router.get("/adsets/insights/{user_id}/{ad_account_id}")
+def get_adset_insights(user_id: str, ad_account_id: str): # Added ad_account_id
+    """Fetches ad set insights for a specific user and ad account."""
     token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
-    
+
     access_token = token_data["access_token"]
-    ad_account_id = get_ad_account_id(access_token)
-    url = f"https://graph.facebook.com/{API_VERSION}/{ad_account_id}/adsets"
+
+    formatted_ad_account_id = ad_account_id
+    if not formatted_ad_account_id.startswith("act_"):
+        formatted_ad_account_id = f"act_{ad_account_id}"
+
+    # Removed: ad_account_id = get_ad_account_id(access_token)
+    url = f"https://graph.facebook.com/{API_VERSION}/{formatted_ad_account_id}/adsets"
     insight_fields = "spend,impressions,reach,frequency,cpm,inline_link_clicks,ctr"
     params = {
         "access_token": access_token,
         "fields": f"name,status,daily_budget,campaign_id,insights.fields({insight_fields})",
         "date_preset": "last_30d"
     }
-    resp = requests.get(url, params=params)
-    data = resp.json()
+    try:
+        resp = requests.get(url, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch Meta adset insights for account {ad_account_id}: {e}")
+        error_detail = "Failed to fetch adset insights from Meta API."
+        if e.response is not None:
+            try:
+                error_detail = e.response.json().get("error", {}).get("message", error_detail)
+            except ValueError:
+                error_detail = e.response.text or error_detail
+        raise HTTPException(status_code=getattr(e.response, 'status_code', 502), detail=error_detail)
+
 
     if data.get("data"):
         save_item_insights("adsets", data["data"], PLATFORM_NAME)
-    
+
     return data
 
-@router.get("/ads/insights/{user_id}")
-def get_ad_insights(user_id: str):
+@router.get("/ads/insights/{user_id}/{ad_account_id}")
+def get_ad_insights(user_id: str, ad_account_id: str): # Added ad_account_id
+    """Fetches ad insights for a specific user and ad account."""
     token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
-    
+
     access_token = token_data["access_token"]
-    ad_account_id = get_ad_account_id(access_token)
-    url = f"https://graph.facebook.com/{API_VERSION}/{ad_account_id}/ads"
+
+    formatted_ad_account_id = ad_account_id
+    if not formatted_ad_account_id.startswith("act_"):
+        formatted_ad_account_id = f"act_{ad_account_id}"
+
+    # Removed: ad_account_id = get_ad_account_id(access_token)
+    url = f"https://graph.facebook.com/{API_VERSION}/{formatted_ad_account_id}/ads"
     insight_fields = "spend,impressions,reach,frequency,cpm,inline_link_clicks,ctr"
     params = {
         "access_token": access_token,
         "fields": f"name,status,adset_id,creative{{image_url,body}},insights.fields({insight_fields})",
         "date_preset": "last_30d"
     }
-    resp = requests.get(url, params=params)
-    data = resp.json()
-    
+    try:
+        resp = requests.get(url, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch Meta ad insights for account {ad_account_id}: {e}")
+        error_detail = "Failed to fetch ad insights from Meta API."
+        if e.response is not None:
+            try:
+                error_detail = e.response.json().get("error", {}).get("message", error_detail)
+            except ValueError:
+                error_detail = e.response.text or error_detail
+        raise HTTPException(status_code=getattr(e.response, 'status_code', 502), detail=error_detail)
+
     if data.get("data"):
         save_item_insights("ads", data["data"], PLATFORM_NAME)
-        
+
     return data
 
 
 # --- Generic Historical Fetch Task ---
-async def run_historical_fetch(user_id: str, level: str):
-    """Generic background task to fetch historical data for a specified level."""
-    logger.info(f"[Background Task] Starting historical data fetch for user_id: {user_id}, level: {level}")
-    
+# Modified to accept ad_account_id
+async def run_historical_fetch(user_id: str, ad_account_id: str, level: str):
+    """Generic background task to fetch historical data for a specified user, account, and level."""
+    logger.info(f"[Background Task] Starting historical data fetch for user_id: {user_id}, account: {ad_account_id}, level: {level}")
+
     token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
-        logger.error(f"No valid Meta token for user_id: {user_id}. Aborting.")
+        logger.error(f"No valid Meta token for user_id: {user_id}. Aborting task for account {ad_account_id}.")
         return
 
     access_token = token_data["access_token"]
-    
-    try:
-        ad_account_id = get_ad_account_id(access_token)
-    except HTTPException as e:
-        logger.error(f"Could not get ad_account_id for user_id: {user_id}. Error: {e.detail}")
-        return
+    formatted_ad_account_id = ad_account_id
+    if not formatted_ad_account_id.startswith("act_"):
+        formatted_ad_account_id = f"act_{ad_account_id}"
+
+    # Removed: try/except block for get_ad_account_id as it's now passed in
 
     end_date = date.today()
-    start_date = end_date - relativedelta(years=2, months=6)
+    start_date = end_date - relativedelta(years=2, months=6) # Keeping the 2.5 year range
     monthly_ranges = generate_monthly_ranges(start_date, end_date)
     total_records_saved = 0
 
+    # Determine fields and save function based on level
     if level == "ad":
         fields = "date_start,date_stop,campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,impressions,clicks,spend,actions"
         save_function = save_daily_ad_insights
     elif level == "campaign":
         fields = "date_start,date_stop,campaign_id,campaign_name,impressions,clicks,spend,actions"
         save_function = save_daily_campaign_insights
-    else:
-        level = "adset"
+    else: # Default to adset
+        level = "adset" # Ensure level is explicitly set
         fields = "date_start,date_stop,campaign_id,campaign_name,adset_id,adset_name,impressions,clicks,spend,actions"
         save_function = save_daily_insights
 
-    insights_url = f"https://graph.facebook.com/{API_VERSION}/{ad_account_id}/insights"
+    # Use the provided ad_account_id
+    insights_url = f"https://graph.facebook.com/{API_VERSION}/{formatted_ad_account_id}/insights"
     base_params = {
         "access_token": access_token,
         "level": level,
-        "time_increment": 1,
+        "time_increment": 1, # Daily breakdown
         "fields": fields,
-        "limit": 500
+        "limit": 500 # Max allowed by Meta API per page
     }
 
     for i, (since, until) in enumerate(monthly_ranges):
-        logger.info(f"Fetching {level} data for month {i+1}/{len(monthly_ranges)}: {since} to {until}")
-        
+        logger.info(f"Fetching {level} data for account {ad_account_id}, month {i+1}/{len(monthly_ranges)}: {since} to {until}")
+
         time_range = {"since": since, "until": until}
         current_params = base_params.copy()
-        current_params["time_range"] = str(time_range).replace("'", '"')
+        current_params["time_range"] = str(time_range).replace("'", '"') # Format for API
 
+        # Fetch potentially multiple pages of data for the month
         insights_data = await fetch_paginated_insights(insights_url, current_params)
-        
+
         if insights_data:
+            # Pass user_id and ad_account_id to the save function
             records_saved = save_function(user_id, ad_account_id, insights_data)
             total_records_saved += records_saved
+            logger.info(f"Saved {records_saved} {level} insights for account {ad_account_id}, month {i+1}.")
         else:
-            logger.info(f"No {level} insights data returned for {since} to {until}.")
+            logger.info(f"No {level} insights data returned for account {ad_account_id}, {since} to {until}.")
 
-    logger.info(f"[Background Task] COMPLETED for user: {user_id}, level: {level}. Total records saved/updated: {total_records_saved}.")
+    logger.info(f"[Background Task] COMPLETED for user: {user_id}, account: {ad_account_id}, level: {level}. Total records saved/updated: {total_records_saved}.")
+
 
 # --- Historical Data Fetching Endpoints ---
+# Modified to include ad_account_id in the path
 
-@router.post("/fetch_historical_adsets/{user_id}")
-async def fetch_historical_adset_data(user_id: str, background_tasks: BackgroundTasks):
-    background_tasks.add_task(run_historical_fetch, user_id, "adset")
-    return {"message": f"Historical adset data fetching started for user {user_id}."}
+@router.post("/fetch_historical_adsets/{user_id}/{ad_account_id}")
+async def fetch_historical_adset_data(user_id: str, ad_account_id: str, background_tasks: BackgroundTasks):
+    """Triggers background task to fetch historical adset data for a specific account."""
+    background_tasks.add_task(run_historical_fetch, user_id, ad_account_id, "adset")
+    return {"message": f"Historical adset data fetching started for user {user_id}, account {ad_account_id}."}
 
-@router.post("/fetch_historical_ads/{user_id}")
-async def fetch_historical_ad_data(user_id: str, background_tasks: BackgroundTasks):
-    background_tasks.add_task(run_historical_fetch, user_id, "ad")
-    return {"message": f"Historical ad data fetching started for user {user_id}."}
+@router.post("/fetch_historical_ads/{user_id}/{ad_account_id}")
+async def fetch_historical_ad_data(user_id: str, ad_account_id: str, background_tasks: BackgroundTasks):
+    """Triggers background task to fetch historical ad data for a specific account."""
+    background_tasks.add_task(run_historical_fetch, user_id, ad_account_id, "ad")
+    return {"message": f"Historical ad data fetching started for user {user_id}, account {ad_account_id}."}
 
-@router.post("/fetch_historical_campaigns/{user_id}")
-async def fetch_historical_campaign_data(user_id: str, background_tasks: BackgroundTasks):
-    background_tasks.add_task(run_historical_fetch, user_id, "campaign")
-    return {"message": f"Historical campaign data fetching started for user {user_id}."}
-
+@router.post("/fetch_historical_campaigns/{user_id}/{ad_account_id}")
+async def fetch_historical_campaign_data(user_id: str, ad_account_id: str, background_tasks: BackgroundTasks):
+    """Triggers background task to fetch historical campaign data for a specific account."""
+    background_tasks.add_task(run_historical_fetch, user_id, ad_account_id, "campaign")
+    return {"message": f"Historical campaign data fetching started for user {user_id}, account {ad_account_id}."} 

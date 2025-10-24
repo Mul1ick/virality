@@ -36,6 +36,7 @@ const Index = () => {
   const [metaCampaigns, setMetaCampaigns] = useState([]);
   const [metaAdSets, setMetaAdSets] = useState([]);
   const [metaAds, setMetaAds] = useState([]);
+  const [metaAdAccountId, setMetaAdAccountId] = useState(null);
   const [googleCampaigns, setGoogleCampaigns] = useState([]);
   const [shopifyData, setShopifyData] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -63,12 +64,45 @@ const Index = () => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const navigate = useNavigate();
 
-  // Mock user data - replace with actual user data from your auth context
   const user = {
     name: "Alex Johnson",
     email: "alex.johnson@example.com",
     avatarUrl: "https://placehold.co/100x100/A0BFFF/FFFFFF?text=AJ",
   };
+
+  // Get Meta Ad Account ID first
+  useEffect(() => {
+    const fetchMetaAdAccount = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get("user_id");
+
+      // Check if user has connected Meta
+      const connectedAccounts = JSON.parse(
+        localStorage.getItem("connectedAccounts") || "{}"
+      );
+
+      if (!userId || !connectedAccounts.meta) {
+        console.log("User hasn't connected Meta yet");
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          `${backendUrl}/meta/accounts/${userId}`
+        );
+
+        if (response.data.accounts && response.data.accounts.length > 0) {
+          const adAccountId = response.data.accounts[0].id;
+          setMetaAdAccountId(adAccountId);
+          console.log("Meta Ad Account ID:", adAccountId);
+        }
+      } catch (e) {
+        console.error("Failed to fetch Meta ad accounts:", e);
+      }
+    };
+
+    fetchMetaAdAccount();
+  }, []);
 
   // Fetch Meta campaigns WITH INSIGHTS
   useEffect(() => {
@@ -76,19 +110,18 @@ const Index = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
 
-      if (!userId) {
-        console.log("No user_id found - user hasn't connected Meta");
+      if (!userId || !metaAdAccountId) {
         return;
       }
 
       try {
         setLoading((prev) => ({ ...prev, meta: true }));
         console.log(
-          `Fetching Meta campaigns with insights for user: ${userId}`
+          `Fetching Meta campaigns with insights for user: ${userId}, account: ${metaAdAccountId}`
         );
 
         const response = await axios.get(
-          `${backendUrl}/meta/campaigns/insights/${userId}`
+          `${backendUrl}/meta/campaigns/insights/${userId}/${metaAdAccountId}`
         );
 
         console.log("Meta campaigns with insights fetched:", response.data);
@@ -142,7 +175,7 @@ const Index = () => {
     };
 
     fetchMetaCampaigns();
-  }, [dateRange]);
+  }, [dateRange, metaAdAccountId]);
 
   // Fetch Meta Ad Sets WITH INSIGHTS
   useEffect(() => {
@@ -150,8 +183,7 @@ const Index = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
 
-      if (!userId) {
-        console.log("No user_id found - user hasn't connected Meta");
+      if (!userId || !metaAdAccountId) {
         return;
       }
 
@@ -160,7 +192,7 @@ const Index = () => {
         console.log(`Fetching Meta ad sets with insights for user: ${userId}`);
 
         const response = await axios.get(
-          `${backendUrl}/meta/adsets/insights/${userId}`
+          `${backendUrl}/meta/adsets/insights/${userId}/${metaAdAccountId}`
         );
 
         console.log("Meta ad sets with insights fetched:", response.data);
@@ -216,18 +248,15 @@ const Index = () => {
     };
 
     fetchMetaAdSets();
-  }, [dateRange]);
+  }, [dateRange, metaAdAccountId]);
 
   // Fetch Meta Ads WITH INSIGHTS
   useEffect(() => {
     const fetchMetaAds = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
-      const platform = urlParams.get("platform"); // ← ADD THIS
 
-      // ✅ ADD PLATFORM CHECK
-      if (!userId || platform !== "meta") {
-        console.log("No user_id or not connecting via Meta");
+      if (!userId || !metaAdAccountId) {
         return;
       }
 
@@ -236,7 +265,7 @@ const Index = () => {
         console.log(`Fetching Meta ads with insights for user: ${userId}`);
 
         const response = await axios.get(
-          `${backendUrl}/meta/ads/insights/${userId}`
+          `${backendUrl}/meta/ads/insights/${userId}/${metaAdAccountId}`
         );
 
         console.log("Meta ads with insights fetched:", response.data);
@@ -285,25 +314,31 @@ const Index = () => {
     };
 
     fetchMetaAds();
-  }, [dateRange]);
+  }, [dateRange, metaAdAccountId]);
 
   // Fetch Google campaigns
   useEffect(() => {
     const fetchGoogleCampaigns = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
-      const platform = urlParams.get("platform"); // ✅ CHANGED
 
-      if (!userId || platform !== "google") {
+      const connectedAccounts = JSON.parse(
+        localStorage.getItem("connectedAccounts") || "{}"
+      );
+
+      if (!userId || !connectedAccounts.google) {
         return;
       }
 
       try {
         setLoading((prev) => ({ ...prev, google: true }));
         console.log("Step 1: Fetching Google Ads accounts...");
+
         const accountsResponse = await axios.get(
           `${backendUrl}/google/accounts/${userId}`
         );
+
+        console.log("Accounts response:", accountsResponse.data);
 
         const customerIds = accountsResponse.data.customer_ids || [];
 
@@ -311,13 +346,14 @@ const Index = () => {
           throw new Error("No Google Ads accounts found");
         }
 
-        // 🔹 STEP 2: Use first account's ID
-        const customerId = customerIds[0];
+        // Use first as manager, second as client (or adjust based on your setup)
         const managerId = customerIds[0];
+        const customerId = customerIds[1] || customerIds[0];
 
-        console.log(`Step 2: Fetching campaigns for account ${customerId}...`);
+        console.log(
+          `Step 2: Fetching campaigns with Manager: ${managerId}, Client: ${customerId}`
+        );
 
-        // 🔹 STEP 3: Fetch campaigns with both IDs
         const campaignsResponse = await axios.get(
           `${backendUrl}/google/campaigns/${userId}`,
           {
@@ -351,11 +387,12 @@ const Index = () => {
     const fetchShopifyData = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
-      const platform = urlParams.get("platform"); // ✅ ADDED
 
-      if (!userId || platform !== "shopify") {
-        // ✅ CHANGED
-        console.log("No user_id or not connecting via Shopify");
+      const connectedAccounts = JSON.parse(
+        localStorage.getItem("connectedAccounts") || "{}"
+      );
+
+      if (!userId || !connectedAccounts.shopify) {
         return;
       }
 
@@ -429,8 +466,8 @@ const Index = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const userId = urlParams.get("user_id");
 
-    if (!userId) {
-      console.log("No user_id found");
+    if (!userId || !metaAdAccountId) {
+      console.log("No user_id or ad_account_id found");
       return;
     }
 
@@ -439,9 +476,15 @@ const Index = () => {
     try {
       // Fetch all three in parallel
       const [campaignsRes, adsetsRes, adsRes] = await Promise.all([
-        axios.get(`${backendUrl}/meta/campaigns/insights/${userId}`),
-        axios.get(`${backendUrl}/meta/adsets/insights/${userId}`),
-        axios.get(`${backendUrl}/meta/ads/insights/${userId}`),
+        axios.get(
+          `${backendUrl}/meta/campaigns/insights/${userId}/${metaAdAccountId}`
+        ),
+        axios.get(
+          `${backendUrl}/meta/adsets/insights/${userId}/${metaAdAccountId}`
+        ),
+        axios.get(
+          `${backendUrl}/meta/ads/insights/${userId}/${metaAdAccountId}`
+        ),
       ]);
 
       // Process campaigns
@@ -655,7 +698,6 @@ const Index = () => {
           )}
 
           {/* Error States */}
-          {/* Error States */}
           {(error.meta || error.metaAdSets || error.metaAds) && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -785,7 +827,7 @@ const Index = () => {
                 </div>
                 <Button
                   onClick={handleRefreshMeta}
-                  disabled={isRefreshing}
+                  disabled={isRefreshing || !metaAdAccountId}
                   variant="outline"
                   size="sm"
                 >
