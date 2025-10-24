@@ -367,53 +367,8 @@ def meta_callback(code: str = Query(..., description="Authorization code from Me
 
 
     save_or_update_user_token(user_id, long_lived_token_data, source=PLATFORM_NAME)
-
-    # Redirect to profile page, indicating successful Meta connection
+    
     return RedirectResponse(url=f"http://localhost:8080/profile?user_id={user_id}&platform=meta")
-
-
-# --- NEW Endpoint: Get Meta Ad Accounts ---
-@router.get("/accounts/{user_id}")
-def get_meta_ad_accounts(user_id: str):
-    """Fetches all ad accounts accessible by the user's Meta token."""
-    token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
-    if not token_data or "access_token" not in token_data:
-        raise HTTPException(status_code=404, detail="User token not found for Meta.")
-
-    access_token = token_data["access_token"]
-    ad_accounts_url = f"https://graph.facebook.com/{API_VERSION}/me/adaccounts"
-    # Requesting 'name' and 'account_id'
-    params = {"access_token": access_token, "fields": "name,account_id"} # 'id' includes 'act_' prefix, account_id doesn't
-    try:
-        resp = requests.get(ad_accounts_url, params=params)
-        resp.raise_for_status()
-        ad_accounts = resp.json()
-
-        if not ad_accounts.get("data"):
-            logger.warning(f"No Meta ad accounts found for user {user_id}.")
-            # Return empty list instead of 404, as user might just have no accounts
-            return {"user_id": user_id, "accounts": []}
-
-        # Format the response for the frontend
-        formatted_accounts = [
-            {"id": acc.get("account_id"), "name": acc.get("name", f"Account {acc.get('account_id')}")}
-            for acc in ad_accounts["data"]
-        ]
-        return {"user_id": user_id, "accounts": formatted_accounts}
-
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"HTTP Error fetching Meta ad accounts for user {user_id}: {e.response.text}")
-        error_detail = "Failed to fetch ad accounts."
-        if e.response is not None:
-             try:
-                 error_detail = e.response.json().get("error", {}).get("message", error_detail)
-             except ValueError:
-                 error_detail = e.response.text or error_detail
-        raise HTTPException(status_code=e.response.status_code, detail=error_detail)
-    except Exception as e:
-        logger.error(f"Unexpected error fetching Meta ad accounts for user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="An internal error occurred while fetching ad accounts.")
-
 
 # --- Live Data Sync Endpoints (Corrected & Completed) ---
 

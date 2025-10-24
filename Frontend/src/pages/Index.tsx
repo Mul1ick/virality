@@ -110,9 +110,9 @@ const Index = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
 
-      if (!userId || !metaAdAccountId) {
-        return;
-      }
+      // if (!userId || !metaAdAccountId) {
+      //   return;
+      // }
 
       try {
         setLoading((prev) => ({ ...prev, meta: true }));
@@ -183,9 +183,9 @@ const Index = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
 
-      if (!userId || !metaAdAccountId) {
-        return;
-      }
+      // if (!userId || !metaAdAccountId) {
+      //   return;
+      // }
 
       try {
         setLoading((prev) => ({ ...prev, metaAdSets: true }));
@@ -256,9 +256,9 @@ const Index = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
 
-      if (!userId || !metaAdAccountId) {
-        return;
-      }
+      // if (!userId || !metaAdAccountId) {
+      //   return;
+      // }
 
       try {
         setLoading((prev) => ({ ...prev, metaAds: true }));
