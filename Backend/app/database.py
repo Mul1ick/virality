@@ -140,9 +140,11 @@
 #         )
 #     print(f"Updated insights for {len(ads_with_insights)} ads.")
 
-from pymongo import MongoClient
+from pymongo import MongoClient, UpdateOne
 from app.config import settings
+from app.utils.logger import get_logger
 
+logger = get_logger()
 client = MongoClient(settings.MONGO_URI)
 db = client[settings.DB_NAME]
 
@@ -151,6 +153,9 @@ users_collection = db["users"]
 campaigns_collection = db["campaigns"]
 adsets_collection = db["adsets"]
 ads_collection = db["ads"]
+meta_daily_insights_collection = db["meta_daily_insights"] # 👈 ADD THIS NEW COLLECTION
+meta_daily_ad_insights_collection = db["meta_daily_ad_insights"]
+meta_daily_campaign_insights_collection = db["meta_daily_campaign_insights"]
 
 
 def save_or_update_user_token(user_id: str, token_data: dict, source: str):
@@ -201,9 +206,10 @@ def get_user_token_by_source(user_id: str, source: str):
     Retrieves a user's token for a specific source (google, meta, shopify, etc.)
     without affecting existing Meta controller logic.
     """
+    # In your provided code, you had a find_one with {"user_id": user_id}
+    # This might return the wrong token if a user connects multiple platforms.
+    # The correct query should filter by source as well.
     return users_collection.find_one({"user_id": user_id, "source": source})
-
-    print(f"Saved {len(items_data)} {collection_name} for {platform} account {ad_account_id}")
 
 
 # 👇 NEW: A generic function to save insights for any item type
@@ -228,4 +234,91 @@ def save_item_insights(collection_name: str, items_with_insights: list, platform
         )
     print(f"Updated insights for {len(items_with_insights)} {collection_name} from {platform}.")
 
-# ⛔️ OLD platform-specific functions are no longer needed and can be deleted.
+# 👇 ADD THIS NEW FUNCTION to save historical daily insights
+def save_daily_insights(user_id: str, ad_account_id: str, insights_data: list):
+    """
+    Saves or updates daily historical insights data using a bulk operation.
+    """
+    if not insights_data:
+        logger.info("No daily insights to save.")
+        return 0
+
+    bulk_operations = []
+    for record in insights_data:
+        # Define the unique filter for each document
+        filter_query = {
+            "adset_id": record.get("adset_id"),
+            "date_start": record.get("date_start"),
+            "platform": "meta"
+        }
+        
+        # Prepare the update document, adding user_id and ad_account_id
+        update_doc = {
+            "$set": {
+                **record,
+                "user_id": user_id,
+                "ad_account_id": ad_account_id,
+                "platform": "meta"
+            }
+        }
+        
+        # Add an UpdateOne operation to the list with upsert=True
+        bulk_operations.append(UpdateOne(filter_query, update_doc, upsert=True))
+
+    try:
+        result = meta_daily_insights_collection.bulk_write(bulk_operations)
+        logger.info(f"Bulk write summary: Matched={result.matched_count}, Upserted={result.upserted_count}, Modified={result.modified_count}")
+        return result.upserted_count + result.modified_count
+    except Exception as e:
+        logger.error(f"Error during bulk save of daily insights: {e}")
+        return 0
+
+def save_daily_ad_insights(user_id: str, ad_account_id: str, insights_data: list):
+    """Saves or updates daily historical AD insights data using a bulk operation."""
+    if not insights_data:
+        logger.info("No daily ad insights to save.")
+        return 0
+
+    bulk_operations = []
+    for record in insights_data:
+        filter_query = {
+            "ad_id": record.get("ad_id"),
+            "date_start": record.get("date_start"),
+            "platform": "meta"
+        }
+        update_doc = {"$set": {**record, "user_id": user_id, "ad_account_id": ad_account_id, "platform": "meta"}}
+        bulk_operations.append(UpdateOne(filter_query, update_doc, upsert=True))
+
+    try:
+        result = meta_daily_ad_insights_collection.bulk_write(bulk_operations)
+        logger.info(f"[Ad] Bulk write summary: Matched={result.matched_count}, Upserted={result.upserted_count}, Modified={result.modified_count}")
+        return result.upserted_count + result.modified_count
+    except Exception as e:
+        logger.error(f"Error during bulk save of daily ad insights: {e}")
+        return 0
+
+# --- NEW FUNCTION FOR CAMPAIGN-LEVEL INSIGHTS ---
+def save_daily_campaign_insights(user_id: str, ad_account_id: str, insights_data: list):
+    """Saves or updates daily historical CAMPAIGN insights data using a bulk operation."""
+    if not insights_data:
+        logger.info("No daily campaign insights to save.")
+        return 0
+
+    bulk_operations = []
+    for record in insights_data:
+        filter_query = {
+            "campaign_id": record.get("campaign_id"),
+            "date_start": record.get("date_start"),
+            "platform": "meta"
+        }
+        update_doc = {"$set": {**record, "user_id": user_id, "ad_account_id": ad_account_id, "platform": "meta"}}
+        bulk_operations.append(UpdateOne(filter_query, update_doc, upsert=True))
+
+    try:
+        result = meta_daily_campaign_insights_collection.bulk_write(bulk_operations)
+        logger.info(f"[Campaign] Bulk write summary: Matched={result.matched_count}, Upserted={result.upserted_count}, Modified={result.modified_count}")
+        return result.upserted_count + result.modified_count
+    except Exception as e:
+        logger.error(f"Error during bulk save of daily campaign insights: {e}")
+        return 0
+

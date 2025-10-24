@@ -295,7 +295,6 @@ const Index = () => {
       const platform = urlParams.get("platform"); // ✅ CHANGED
 
       if (!userId || platform !== "google") {
-        // ✅ CHANGED
         return;
       }
 
