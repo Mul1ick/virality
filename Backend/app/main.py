@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.utils.logger import get_logger
-from app.controllers import google_controller,meta_controller,auth_controller,analytics_controller,shopify_controller
+from app.controllers import google_controller,meta_controller,auth_controller,analytics_controller,shopify_controller,user_controller
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -26,6 +26,7 @@ app.include_router(google_controller.router)
 app.include_router(meta_controller.router) 
 app.include_router(analytics_controller.router)
 app.include_router(shopify_controller.router)
+app.include_router(user_controller.router)
 
 @app.on_event("startup")
 async def startup_event():

@@ -289,7 +289,7 @@
 
 # Backend/app/controllers/meta_controller.py
 
-from fastapi import APIRouter, Query, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Query, HTTPException, BackgroundTasks,Depends
 from fastapi.responses import RedirectResponse
 import requests
 import urllib.parse
@@ -299,8 +299,9 @@ from dateutil.relativedelta import relativedelta
 from app.utils.logger import get_logger
 from app.config import settings
 from app.database import (
-    save_or_update_user_token,
-    get_user_token_by_source,
+    get_platform_connection_details, # Use this to get details later
+    save_or_update_platform_connection, # Use this to save
+    get_user_by_id, # Optional: if linking Meta ID to main App ID
     save_items,
     save_item_insights,
     save_daily_insights, # Assuming these save functions handle user_id/account_id correctly
@@ -308,6 +309,7 @@ from app.database import (
     save_daily_campaign_insights
 )
 from app.utils.meta_api_utils import generate_monthly_ranges, fetch_paginated_insights
+from app.utils.security import create_state_token, decode_token, get_current_user_id    
 
 router = APIRouter(prefix="/meta", tags=["Meta Ads"])
 logger = get_logger()
@@ -320,17 +322,51 @@ PLATFORM_NAME = "meta"
 # --- Authentication Endpoints ---
 
 @router.get("/login")
-def meta_login():
+async def meta_login(user_id: str = Depends(get_current_user_id)):
+    """
+    Builds the Meta OAuth login URL, including a JWT state parameter
+    containing the application's user ID.
+    Requires the user to be authenticated (pass JWT in Authorization header).
+    """
+    if not user_id:
+        # This shouldn't happen if get_current_user_id works correctly
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+
+    # Create a short-lived JWT for the state parameter
+    state_token = create_state_token(data={"sub": user_id})
+
     dialog_url = (f"https://www.facebook.com/{API_VERSION}/dialog/oauth?" + urllib.parse.urlencode({
         "client_id": settings.META_APP_ID,
         "redirect_uri": settings.META_REDIRECT_URI,
         "scope": SCOPES,
-        "response_type": "code"
+        "response_type": "code",
+        "state": state_token # Pass the JWT as state
     }))
+    logger.info(f"[Meta OAuth] Redirecting user {user_id} to consent screen with state.")
     return RedirectResponse(url=dialog_url)
 
 @router.get("/callback")
-def meta_callback(code: str = Query(..., description="Authorization code from Meta")):
+def meta_callback(code: str = Query(..., description="Authorization code from Meta"),
+                  state: str = Query(..., description="State parameter containing user ID JWT")):
+    """
+    Handles the callback from Meta, exchanges code for token, fetches ad account ID,
+    and saves connection details to the user's document in MongoDB.
+    """
+
+
+    try:
+        payload = decode_token(state) # Use your JWT decoding function
+        main_app_user_id = payload.get("sub")
+        if not main_app_user_id:
+            raise HTTPException(status_code=400, detail="Invalid state: User ID missing")
+        logger.info(f"[Meta OAuth Callback] State decoded successfully for user: {main_app_user_id}")
+    except Exception as e: # Catch JWT errors (expired, invalid signature etc.)
+        logger.error(f"[Meta OAuth Callback] Invalid state parameter: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid or expired state parameter: {e}")
+    
+
+    
+    # 1. Exchange code for short-lived token
     token_url = f"https://graph.facebook.com/{API_VERSION}/oauth/access_token"
     token_params = {
         "client_id": settings.META_APP_ID,
@@ -338,13 +374,23 @@ def meta_callback(code: str = Query(..., description="Authorization code from Me
         "client_secret": settings.META_APP_SECRET,
         "code": code
     }
-    resp = requests.get(token_url, params=token_params)
-    short_lived_token_data = resp.json()
-    if "error" in short_lived_token_data:
-        raise HTTPException(status_code=400, detail=short_lived_token_data['error']['message'])
+    try:
+        resp = requests.get(token_url, params=token_params)
+        resp.raise_for_status() # Raise HTTP errors
+        short_lived_token_data = resp.json()
+        if "error" in short_lived_token_data:
+            logger.error(f"[Meta OAuth] Short-lived token error: {short_lived_token_data['error']}")
+            raise HTTPException(status_code=400, detail=short_lived_token_data['error']['message'])
+        short_lived_token = short_lived_token_data['access_token']
+    except requests.exceptions.RequestException as e:
+        logger.error(f"[Meta OAuth] Short-lived token request failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to exchange code with Meta: {e}")
+    except Exception as e:
+        logger.error(f"[Meta OAuth] Error parsing short-lived token response: {e}")
+        raise HTTPException(status_code=500, detail="Error processing Meta response.")
 
-    short_lived_token = short_lived_token_data['access_token']
 
+    # 2. Exchange short-lived token for long-lived token
     long_lived_token_url = f"https://graph.facebook.com/{API_VERSION}/oauth/access_token"
     long_lived_params = {
         "grant_type": "fb_exchange_token",
@@ -352,24 +398,94 @@ def meta_callback(code: str = Query(..., description="Authorization code from Me
         "client_secret": settings.META_APP_SECRET,
         "fb_exchange_token": short_lived_token
     }
-    resp = requests.get(long_lived_token_url, params=long_lived_params)
-    long_lived_token_data = resp.json()
-    if "error" in long_lived_token_data:
-        raise HTTPException(status_code=400, detail=long_lived_token_data['error']['message'])
+    try:
+        resp = requests.get(long_lived_token_url, params=long_lived_params)
+        resp.raise_for_status()
+        long_lived_token_data = resp.json()
+        if "error" in long_lived_token_data:
+            logger.error(f"[Meta OAuth] Long-lived token error: {long_lived_token_data['error']}")
+            raise HTTPException(status_code=400, detail=long_lived_token_data['error']['message'])
+        access_token = long_lived_token_data['access_token']
+        expires_in = long_lived_token_data.get('expires_in') # Get expiry time
+    except requests.exceptions.RequestException as e:
+        logger.error(f"[Meta OAuth] Long-lived token request failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to get long-lived token from Meta: {e}")
+    except Exception as e:
+        logger.error(f"[Meta OAuth] Error parsing long-lived token response: {e}")
+        raise HTTPException(status_code=500, detail="Error processing Meta long-lived token response.")
 
-    user_info_url = f"https://graph.facebook.com/me?access_token={long_lived_token_data['access_token']}"
-    user_info_resp = requests.get(user_info_url)
-    user_data = user_info_resp.json()
-    user_id = user_data.get("id") # Use the Facebook User ID
-    # Optionally store name/email if needed, though user_id is the primary key
-    user_name = user_data.get("name")
-    logger.info(f"Meta OAuth successful for user ID: {user_id}, Name: {user_name}")
+    # 3. Get Meta User ID (platform-specific user ID)
+    try:
+        user_info_url = f"https://graph.facebook.com/me?access_token={access_token}"
+        user_info_resp = requests.get(user_info_url)
+        user_info_resp.raise_for_status()
+        user_data = user_info_resp.json()
+        platform_user_id = user_data.get("id") # This is the Meta User ID
+        if not platform_user_id:
+             raise ValueError("Meta User ID not found in /me response")
+        user_name = user_data.get("name", "Unknown User")
+        logger.info(f"[Meta OAuth] Fetched Meta User ID: {platform_user_id}, Name: {user_name}")
+    except requests.exceptions.RequestException as e:
+         logger.error(f"[Meta OAuth] Failed to fetch user info (/me): {e}")
+         raise HTTPException(status_code=502, detail=f"Failed to fetch user info from Meta: {e}")
+    except Exception as e:
+         logger.error(f"[Meta OAuth] Error processing user info response: {e}")
+         raise HTTPException(status_code=500, detail="Error processing Meta user info.")
 
+    # --- NEW: Fetch Ad Account ID ---
+    ad_account_id = None
+    try:
+        ad_accounts_url = f"https://graph.facebook.com/{API_VERSION}/me/adaccounts?limit=1&access_token={access_token}"
+        ad_accounts_resp = requests.get(ad_accounts_url)
+        ad_accounts_resp.raise_for_status()
+        ad_accounts_data = ad_accounts_resp.json()
+        if ad_accounts_data.get("data") and len(ad_accounts_data["data"]) > 0:
+            # Take the first ad account found
+            ad_account_id = ad_accounts_data["data"][0].get("id")
+            # Remove 'act_' prefix if present, as it's often added automatically by APIs
+            if ad_account_id and ad_account_id.startswith("act_"):
+                ad_account_id = ad_account_id[4:]
+            logger.info(f"[Meta OAuth] Fetched Ad Account ID: {ad_account_id}")
+        else:
+            logger.warning(f"[Meta OAuth] No ad accounts found for Meta user {platform_user_id}")
+            # Decide if this is an error or just info. Maybe the user has no ad account.
+            # For now, we'll proceed without it, but the frontend might need to handle this.
 
-    save_or_update_user_token(user_id, long_lived_token_data, source=PLATFORM_NAME)
-    
-    return RedirectResponse(url=f"http://localhost:8080/profile?user_id={user_id}&platform=meta")
+    except requests.exceptions.RequestException as e:
+         logger.error(f"[Meta OAuth] Failed to fetch ad accounts (/me/adaccounts): {e}")
+         # Don't raise an exception here, allow saving without ad account ID if needed
+         # raise HTTPException(status_code=502, detail=f"Failed to fetch ad accounts from Meta: {e}")
+    except Exception as e:
+         logger.error(f"[Meta OAuth] Error processing ad accounts response: {e}")
+         # raise HTTPException(status_code=500, detail="Error processing Meta ad accounts.")
 
+    # --- Determine the Main Application User ID ---
+    # This part depends on how your application identifies users *before* they connect Meta.
+    # If the user is already logged in via your email/OTP system, you should have their
+    # MongoDB '_id' available (e.g., from a session or JWT).
+    # For now, we'll assume the 'user_id' we need to update in the database is passed
+    # somehow, or we need to find it based on the Meta User ID if linked previously.
+    # ---> Placeholder: How do we get the main app's user_id here? <---
+    # Let's assume for now the user_id is the platform_user_id, which matches the old logic.
+    # A better approach is needed for linking accounts.
+    main_app_user_id = platform_user_id # Replace with actual logic to get the main user's MongoDB _id string
+
+    # 4. Save Connection Details using the new function
+    platform_data = {
+        "access_token": access_token,
+        "expires_in": expires_in,
+        "platform_user_id": platform_user_id, # Store the Meta user ID
+        # Add ad_account_id if found
+        **({"ad_account_id": ad_account_id} if ad_account_id else {})
+    }
+
+    # Pass the main application user ID to identify the document to update
+    save_or_update_platform_connection(main_app_user_id, PLATFORM_NAME, platform_data) 
+    logger.info(f"✅ [Meta OAuth] Saved/Updated Meta connection details for user {main_app_user_id}")
+
+    # 5. Redirect back to frontend
+    # Use the main_app_user_id in the redirect URL
+    return RedirectResponse(url=f"http://localhost:8080/profile?user_id={main_app_user_id}&platform=meta") # Use main_app_user_id
 # --- Live Data Sync Endpoints (Corrected & Completed) ---
 
 # Note: All endpoints below now include {ad_account_id} in the path
@@ -377,7 +493,7 @@ def meta_callback(code: str = Query(..., description="Authorization code from Me
 @router.get("/campaigns/{user_id}/{ad_account_id}")
 def get_and_save_campaigns(user_id: str, ad_account_id: str): # Added ad_account_id
     """Fetches campaigns for a specific user and ad account."""
-    token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
@@ -411,7 +527,7 @@ def get_and_save_campaigns(user_id: str, ad_account_id: str): # Added ad_account
 @router.get("/adsets/{user_id}/{ad_account_id}")
 def get_and_save_adsets(user_id: str, ad_account_id: str): # Added ad_account_id
     """Fetches ad sets for a specific user and ad account."""
-    token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
@@ -445,7 +561,7 @@ def get_and_save_adsets(user_id: str, ad_account_id: str): # Added ad_account_id
 @router.get("/ads/{user_id}/{ad_account_id}")
 def get_and_save_ads(user_id: str, ad_account_id: str): # Added ad_account_id
     """Fetches ads for a specific user and ad account."""
-    token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
@@ -480,7 +596,7 @@ def get_and_save_ads(user_id: str, ad_account_id: str): # Added ad_account_id
 @router.get("/campaigns/insights/{user_id}/{ad_account_id}")
 def get_campaign_insights(user_id: str, ad_account_id: str): # Added ad_account_id
     """Fetches campaign insights for a specific user and ad account."""
-    token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
@@ -521,7 +637,7 @@ def get_campaign_insights(user_id: str, ad_account_id: str): # Added ad_account_
 @router.get("/adsets/insights/{user_id}/{ad_account_id}")
 def get_adset_insights(user_id: str, ad_account_id: str): # Added ad_account_id
     """Fetches ad set insights for a specific user and ad account."""
-    token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
@@ -562,7 +678,7 @@ def get_adset_insights(user_id: str, ad_account_id: str): # Added ad_account_id
 @router.get("/ads/insights/{user_id}/{ad_account_id}")
 def get_ad_insights(user_id: str, ad_account_id: str): # Added ad_account_id
     """Fetches ad insights for a specific user and ad account."""
-    token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
@@ -606,7 +722,7 @@ async def run_historical_fetch(user_id: str, ad_account_id: str, level: str):
     """Generic background task to fetch historical data for a specified user, account, and level."""
     logger.info(f"[Background Task] Starting historical data fetch for user_id: {user_id}, account: {ad_account_id}, level: {level}")
 
-    token_data = get_user_token_by_source(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         logger.error(f"No valid Meta token for user_id: {user_id}. Aborting task for account {ad_account_id}.")
         return
