@@ -36,11 +36,31 @@ const Index = () => {
   const [metaCampaigns, setMetaCampaigns] = useState([]);
   const [metaAdSets, setMetaAdSets] = useState([]);
   const [metaAds, setMetaAds] = useState([]);
-  const [metaAdAccountId, setMetaAdAccountId] = useState(null);
   const [googleCampaigns, setGoogleCampaigns] = useState([]);
   const [shopifyData, setShopifyData] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Platform connection state
+  const [platformStatus, setPlatformStatus] = useState({
+    meta: { connected: false, ad_account_id: null },
+    google: {
+      connected: false,
+      customer_ids: [],
+      manager_id: null,
+      client_customer_id: null,
+    },
+    shopify: { connected: false, shop_url: null },
+  });
+
+  // User data
+  const [user, setUser] = useState({
+    name: "Loading...",
+    email: "Loading...",
+    avatarUrl: null,
+  });
+
   const [loading, setLoading] = useState({
+    platforms: true, // Loading platform status
     meta: false,
     metaAdSets: false,
     metaAds: false,
@@ -55,6 +75,7 @@ const Index = () => {
     shopify: false,
   });
   const [error, setError] = useState({
+    platforms: null,
     meta: null,
     metaAdSets: null,
     metaAds: null,
@@ -64,107 +85,113 @@ const Index = () => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const navigate = useNavigate();
 
-  const user = {
-    name: "Alex Johnson",
-    email: "alex.johnson@example.com",
-    avatarUrl: "https://placehold.co/100x100/A0BFFF/FFFFFF?text=AJ",
-  };
-
-  // Get Meta Ad Account ID first
+  // STEP 1: Fetch user platforms and basic info on mount
   useEffect(() => {
-    const fetchMetaAdAccount = async () => {
+    const fetchUserPlatforms = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
 
-      // Check if user has connected Meta
-      const connectedAccounts = JSON.parse(
-        localStorage.getItem("connectedAccounts") || "{}"
-      );
-
-      if (!userId || !connectedAccounts.meta) {
-        console.log("User hasn't connected Meta yet");
+      if (!userId) {
+        console.log("No user_id in URL");
+        setLoading((prev) => ({ ...prev, platforms: false }));
         return;
       }
 
       try {
-        const response = await axios.get(
-          `${backendUrl}/meta/accounts/${userId}`
+        console.log("🔍 Fetching platform status for user:", userId);
+
+        // Fetch platform connections
+        const platformRes = await axios.get(
+          `${backendUrl}/user/${userId}/platforms`
         );
 
-        if (response.data.accounts && response.data.accounts.length > 0) {
-          const adAccountId = response.data.accounts[0].id;
-          setMetaAdAccountId(adAccountId);
-          console.log("Meta Ad Account ID:", adAccountId);
-        }
+        console.log("✅ Platform status:", platformRes.data);
+        setPlatformStatus(platformRes.data);
+
+        // TODO: Fetch user info (name, email) from a /user/{user_id} endpoint
+        // For now, using placeholder
+        setUser({
+          name: "User",
+          email: userId,
+          avatarUrl: null,
+        });
       } catch (e) {
-        console.error("Failed to fetch Meta ad accounts:", e);
+        console.error("❌ Failed to fetch platform status:", e);
+        setError((prev) => ({
+          ...prev,
+          platforms: "Failed to load platform connections",
+        }));
+      } finally {
+        setLoading((prev) => ({ ...prev, platforms: false }));
       }
     };
 
-    fetchMetaAdAccount();
+    fetchUserPlatforms();
   }, []);
 
-  // Fetch Meta campaigns WITH INSIGHTS
+  // STEP 2: Fetch Meta campaigns when platform status is loaded
   useEffect(() => {
     const fetchMetaCampaigns = async () => {
+      if (loading.platforms) return; // Wait for platform status
+      if (!platformStatus.meta?.connected) {
+        console.log("⏭️ Meta not connected, skipping campaigns fetch");
+        return;
+      }
+      if (!platformStatus.meta?.ad_account_id) {
+        console.log("⚠️ Meta connected but no ad_account_id");
+        return;
+      }
+
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
-
-      // if (!userId || !metaAdAccountId) {
-      //   return;
-      // }
 
       try {
         setLoading((prev) => ({ ...prev, meta: true }));
         console.log(
-          `Fetching Meta campaigns with insights for user: ${userId}, account: ${metaAdAccountId}`
+          `📊 Fetching Meta campaigns for user: ${userId}, account: ${platformStatus.meta.ad_account_id}`
         );
 
         const response = await axios.get(
-          `${backendUrl}/meta/campaigns/insights/${userId}/${metaAdAccountId}`
+          `${backendUrl}/meta/campaigns/insights/${userId}/${platformStatus.meta.ad_account_id}`
         );
 
-        console.log("Meta campaigns with insights fetched:", response.data);
-
         const processedCampaigns =
-          response.data.data?.map((campaign) => {
-            return {
-              id: campaign.id,
-              name: campaign.name,
-              status: campaign.status,
-              objective: campaign.objective,
-              insights: campaign.insights?.data?.[0]
-                ? {
-                    spend: parseFloat(campaign.insights.data[0].spend || 0),
-                    impressions: parseInt(
-                      campaign.insights.data[0].impressions || 0
-                    ),
-                    reach: parseInt(campaign.insights.data[0].reach || 0),
-                    clicks: parseInt(
-                      campaign.insights.data[0].inline_link_clicks || 0
-                    ),
-                    ctr: parseFloat(campaign.insights.data[0].ctr || 0),
-                    cpm: parseFloat(campaign.insights.data[0].cpm || 0),
-                    frequency: parseFloat(
-                      campaign.insights.data[0].frequency || 0
-                    ),
-                    cpc:
-                      campaign.insights.data[0].inline_link_clicks > 0
-                        ? parseFloat(campaign.insights.data[0].spend || 0) /
-                          parseInt(
-                            campaign.insights.data[0].inline_link_clicks || 1
-                          )
-                        : 0,
-                  }
-                : null,
-            };
-          }) || [];
+          response.data.data?.map((campaign) => ({
+            id: campaign.id,
+            name: campaign.name,
+            status: campaign.status,
+            objective: campaign.objective,
+            insights: campaign.insights?.data?.[0]
+              ? {
+                  spend: parseFloat(campaign.insights.data[0].spend || 0),
+                  impressions: parseInt(
+                    campaign.insights.data[0].impressions || 0
+                  ),
+                  reach: parseInt(campaign.insights.data[0].reach || 0),
+                  clicks: parseInt(
+                    campaign.insights.data[0].inline_link_clicks || 0
+                  ),
+                  ctr: parseFloat(campaign.insights.data[0].ctr || 0),
+                  cpm: parseFloat(campaign.insights.data[0].cpm || 0),
+                  frequency: parseFloat(
+                    campaign.insights.data[0].frequency || 0
+                  ),
+                  cpc:
+                    campaign.insights.data[0].inline_link_clicks > 0
+                      ? parseFloat(campaign.insights.data[0].spend || 0) /
+                        parseInt(
+                          campaign.insights.data[0].inline_link_clicks || 1
+                        )
+                      : 0,
+                }
+              : null,
+          })) || [];
 
         setMetaCampaigns(processedCampaigns);
         setError((prev) => ({ ...prev, meta: null }));
         setSuccess((prev) => ({ ...prev, meta: true }));
       } catch (e) {
-        console.log(e);
+        console.error("❌ Meta campaigns error:", e);
         setError((prev) => ({
           ...prev,
           meta: e.response?.data?.detail || "Failed to fetch Meta campaigns",
@@ -175,68 +202,64 @@ const Index = () => {
     };
 
     fetchMetaCampaigns();
-  }, [dateRange, metaAdAccountId]);
+  }, [platformStatus, dateRange, loading.platforms]);
 
-  // Fetch Meta Ad Sets WITH INSIGHTS
+  // STEP 3: Fetch Meta Ad Sets
   useEffect(() => {
     const fetchMetaAdSets = async () => {
+      if (loading.platforms) return;
+      if (
+        !platformStatus.meta?.connected ||
+        !platformStatus.meta?.ad_account_id
+      ) {
+        console.log("⏭️ Skipping Meta ad sets fetch");
+        return;
+      }
+
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
 
-      // if (!userId || !metaAdAccountId) {
-      //   return;
-      // }
-
       try {
         setLoading((prev) => ({ ...prev, metaAdSets: true }));
-        console.log(`Fetching Meta ad sets with insights for user: ${userId}`);
 
         const response = await axios.get(
-          `${backendUrl}/meta/adsets/insights/${userId}/${metaAdAccountId}`
+          `${backendUrl}/meta/adsets/insights/${userId}/${platformStatus.meta.ad_account_id}`
         );
 
-        console.log("Meta ad sets with insights fetched:", response.data);
-
         const processedAdSets =
-          response.data.data?.map((adset) => {
-            return {
-              id: adset.id,
-              name: adset.name,
-              status: adset.status,
-              daily_budget: adset.daily_budget,
-              campaign_id: adset.campaign_id,
-              insights: adset.insights?.data?.[0]
-                ? {
-                    spend: parseFloat(adset.insights.data[0].spend || 0),
-                    impressions: parseInt(
-                      adset.insights.data[0].impressions || 0
-                    ),
-                    reach: parseInt(adset.insights.data[0].reach || 0),
-                    clicks: parseInt(
-                      adset.insights.data[0].inline_link_clicks || 0
-                    ),
-                    ctr: parseFloat(adset.insights.data[0].ctr || 0),
-                    cpm: parseFloat(adset.insights.data[0].cpm || 0),
-                    frequency: parseFloat(
-                      adset.insights.data[0].frequency || 0
-                    ),
-                    cpc:
-                      adset.insights.data[0].inline_link_clicks > 0
-                        ? parseFloat(adset.insights.data[0].spend || 0) /
-                          parseInt(
-                            adset.insights.data[0].inline_link_clicks || 1
-                          )
-                        : 0,
-                  }
-                : null,
-            };
-          }) || [];
+          response.data.data?.map((adset) => ({
+            id: adset.id,
+            name: adset.name,
+            status: adset.status,
+            daily_budget: adset.daily_budget,
+            campaign_id: adset.campaign_id,
+            insights: adset.insights?.data?.[0]
+              ? {
+                  spend: parseFloat(adset.insights.data[0].spend || 0),
+                  impressions: parseInt(
+                    adset.insights.data[0].impressions || 0
+                  ),
+                  reach: parseInt(adset.insights.data[0].reach || 0),
+                  clicks: parseInt(
+                    adset.insights.data[0].inline_link_clicks || 0
+                  ),
+                  ctr: parseFloat(adset.insights.data[0].ctr || 0),
+                  cpm: parseFloat(adset.insights.data[0].cpm || 0),
+                  frequency: parseFloat(adset.insights.data[0].frequency || 0),
+                  cpc:
+                    adset.insights.data[0].inline_link_clicks > 0
+                      ? parseFloat(adset.insights.data[0].spend || 0) /
+                        parseInt(adset.insights.data[0].inline_link_clicks || 1)
+                      : 0,
+                }
+              : null,
+          })) || [];
 
         setMetaAdSets(processedAdSets);
         setError((prev) => ({ ...prev, metaAdSets: null }));
         setSuccess((prev) => ({ ...prev, metaAdSets: true }));
       } catch (e) {
-        console.log(e);
+        console.error("❌ Meta ad sets error:", e);
         setError((prev) => ({
           ...prev,
           metaAdSets:
@@ -248,62 +271,60 @@ const Index = () => {
     };
 
     fetchMetaAdSets();
-  }, [dateRange, metaAdAccountId]);
+  }, [platformStatus, dateRange, loading.platforms]);
 
-  // Fetch Meta Ads WITH INSIGHTS
+  // STEP 4: Fetch Meta Ads
   useEffect(() => {
     const fetchMetaAds = async () => {
+      if (loading.platforms) return;
+      if (
+        !platformStatus.meta?.connected ||
+        !platformStatus.meta?.ad_account_id
+      ) {
+        console.log("⏭️ Skipping Meta ads fetch");
+        return;
+      }
+
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get("user_id");
 
-      // if (!userId || !metaAdAccountId) {
-      //   return;
-      // }
-
       try {
         setLoading((prev) => ({ ...prev, metaAds: true }));
-        console.log(`Fetching Meta ads with insights for user: ${userId}`);
 
         const response = await axios.get(
-          `${backendUrl}/meta/ads/insights/${userId}/${metaAdAccountId}`
+          `${backendUrl}/meta/ads/insights/${userId}/${platformStatus.meta.ad_account_id}`
         );
 
-        console.log("Meta ads with insights fetched:", response.data);
-
         const processedAds =
-          response.data.data?.map((ad) => {
-            return {
-              id: ad.id,
-              name: ad.name,
-              status: ad.status,
-              adset_id: ad.adset_id,
-              creative: ad.creative,
-              insights: ad.insights?.data?.[0]
-                ? {
-                    spend: parseFloat(ad.insights.data[0].spend || 0),
-                    impressions: parseInt(ad.insights.data[0].impressions || 0),
-                    reach: parseInt(ad.insights.data[0].reach || 0),
-                    clicks: parseInt(
-                      ad.insights.data[0].inline_link_clicks || 0
-                    ),
-                    ctr: parseFloat(ad.insights.data[0].ctr || 0),
-                    cpm: parseFloat(ad.insights.data[0].cpm || 0),
-                    frequency: parseFloat(ad.insights.data[0].frequency || 0),
-                    cpc:
-                      ad.insights.data[0].inline_link_clicks > 0
-                        ? parseFloat(ad.insights.data[0].spend || 0) /
-                          parseInt(ad.insights.data[0].inline_link_clicks || 1)
-                        : 0,
-                  }
-                : null,
-            };
-          }) || [];
+          response.data.data?.map((ad) => ({
+            id: ad.id,
+            name: ad.name,
+            status: ad.status,
+            adset_id: ad.adset_id,
+            creative: ad.creative,
+            insights: ad.insights?.data?.[0]
+              ? {
+                  spend: parseFloat(ad.insights.data[0].spend || 0),
+                  impressions: parseInt(ad.insights.data[0].impressions || 0),
+                  reach: parseInt(ad.insights.data[0].reach || 0),
+                  clicks: parseInt(ad.insights.data[0].inline_link_clicks || 0),
+                  ctr: parseFloat(ad.insights.data[0].ctr || 0),
+                  cpm: parseFloat(ad.insights.data[0].cpm || 0),
+                  frequency: parseFloat(ad.insights.data[0].frequency || 0),
+                  cpc:
+                    ad.insights.data[0].inline_link_clicks > 0
+                      ? parseFloat(ad.insights.data[0].spend || 0) /
+                        parseInt(ad.insights.data[0].inline_link_clicks || 1)
+                      : 0,
+                }
+              : null,
+          })) || [];
 
         setMetaAds(processedAds);
         setError((prev) => ({ ...prev, metaAds: null }));
         setSuccess((prev) => ({ ...prev, metaAds: true }));
       } catch (e) {
-        console.log(e);
+        console.error("❌ Meta ads error:", e);
         setError((prev) => ({
           ...prev,
           metaAds: e.response?.data?.detail || "Failed to fetch Meta ads",
@@ -314,45 +335,34 @@ const Index = () => {
     };
 
     fetchMetaAds();
-  }, [dateRange, metaAdAccountId]);
+  }, [platformStatus, dateRange, loading.platforms]);
 
-  // Fetch Google campaigns
+  // STEP 5: Fetch Google campaigns
   useEffect(() => {
     const fetchGoogleCampaigns = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const userId = urlParams.get("user_id");
-
-      const connectedAccounts = JSON.parse(
-        localStorage.getItem("connectedAccounts") || "{}"
-      );
-
-      if (!userId || !connectedAccounts.google) {
+      if (loading.platforms) return;
+      if (!platformStatus.google?.connected) {
+        console.log("⏭️ Google not connected, skipping campaigns fetch");
         return;
       }
 
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get("user_id");
+
       try {
         setLoading((prev) => ({ ...prev, google: true }));
-        console.log("Step 1: Fetching Google Ads accounts...");
+        console.log("📊 Fetching Google campaigns...");
 
-        const accountsResponse = await axios.get(
-          `${backendUrl}/google/accounts/${userId}`
-        );
+        const managerId = platformStatus.google.manager_id;
+        const customerId =
+          platformStatus.google.client_customer_id ||
+          platformStatus.google.customer_ids?.[0];
 
-        console.log("Accounts response:", accountsResponse.data);
-
-        const customerIds = accountsResponse.data.customer_ids || [];
-
-        if (customerIds.length === 0) {
-          throw new Error("No Google Ads accounts found");
+        if (!managerId || !customerId) {
+          throw new Error("Missing Google account IDs");
         }
 
-        // Use first as manager, second as client (or adjust based on your setup)
-        const managerId = customerIds[0];
-        const customerId = customerIds[1] || customerIds[0];
-
-        console.log(
-          `Step 2: Fetching campaigns with Manager: ${managerId}, Client: ${customerId}`
-        );
+        console.log(`Using Manager: ${managerId}, Client: ${customerId}`);
 
         const campaignsResponse = await axios.get(
           `${backendUrl}/google/campaigns/${userId}`,
@@ -364,12 +374,10 @@ const Index = () => {
           }
         );
 
-        console.log("Campaigns response:", campaignsResponse.data);
-
         setGoogleCampaigns(campaignsResponse.data.campaigns || []);
         setSuccess((prev) => ({ ...prev, google: true }));
       } catch (e) {
-        console.error("Error:", e);
+        console.error("❌ Google campaigns error:", e);
         setError((prev) => ({
           ...prev,
           google: e.message || "Failed to fetch Google campaigns",
@@ -380,25 +388,23 @@ const Index = () => {
     };
 
     fetchGoogleCampaigns();
-  }, []);
+  }, [platformStatus, loading.platforms]);
 
-  // Fetch Shopify data
+  // STEP 6: Fetch Shopify data
   useEffect(() => {
     const fetchShopifyData = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const userId = urlParams.get("user_id");
-
-      const connectedAccounts = JSON.parse(
-        localStorage.getItem("connectedAccounts") || "{}"
-      );
-
-      if (!userId || !connectedAccounts.shopify) {
+      if (loading.platforms) return;
+      if (!platformStatus.shopify?.connected) {
+        console.log("⏭️ Shopify not connected, skipping fetch");
         return;
       }
 
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get("user_id");
+
       try {
         setLoading((prev) => ({ ...prev, shopify: true }));
-        console.log(`Fetching Shopify data for user: ${userId}`);
+        console.log("📊 Fetching Shopify data...");
 
         const response = await axios.get(
           `${backendUrl}/shopify/orders/${userId}`
@@ -408,7 +414,7 @@ const Index = () => {
         setError((prev) => ({ ...prev, shopify: null }));
         setSuccess((prev) => ({ ...prev, shopify: true }));
       } catch (e) {
-        console.log(e);
+        console.error("❌ Shopify error:", e);
         setError((prev) => ({
           ...prev,
           shopify: e.response?.data?.detail || "Failed to fetch Shopify data",
@@ -419,9 +425,9 @@ const Index = () => {
     };
 
     fetchShopifyData();
-  }, []);
+  }, [platformStatus, loading.platforms]);
 
-  // Auto-hide notifications after 2 seconds
+  // Auto-hide notifications after 3 seconds
   useEffect(() => {
     const hasAnyNotification =
       Object.values(loading).some((v) => v) ||
@@ -431,6 +437,7 @@ const Index = () => {
     if (hasAnyNotification) {
       const timer = setTimeout(() => {
         setLoading({
+          platforms: false,
           meta: false,
           metaAdSets: false,
           metaAds: false,
@@ -438,6 +445,7 @@ const Index = () => {
           shopify: false,
         });
         setError({
+          platforms: null,
           meta: null,
           metaAdSets: null,
           metaAds: null,
@@ -451,7 +459,7 @@ const Index = () => {
           google: false,
           shopify: false,
         });
-      }, 2000);
+      }, 3000);
 
       return () => clearTimeout(timer);
     }
@@ -465,26 +473,26 @@ const Index = () => {
   const handleRefreshMeta = async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const userId = urlParams.get("user_id");
+    const adAccountId = platformStatus.meta?.ad_account_id;
 
-    if (!userId || !metaAdAccountId) {
-      console.log("No user_id or ad_account_id found");
+    if (!userId || !adAccountId) {
+      console.log("Cannot refresh: Missing user_id or ad_account_id");
       return;
     }
 
     setIsRefreshing(true);
 
     try {
-      // Fetch all three in parallel
+      console.log("🔄 Refreshing all Meta data...");
+
       const [campaignsRes, adsetsRes, adsRes] = await Promise.all([
         axios.get(
-          `${backendUrl}/meta/campaigns/insights/${userId}/${metaAdAccountId}`
+          `${backendUrl}/meta/campaigns/insights/${userId}/${adAccountId}`
         ),
         axios.get(
-          `${backendUrl}/meta/adsets/insights/${userId}/${metaAdAccountId}`
+          `${backendUrl}/meta/adsets/insights/${userId}/${adAccountId}`
         ),
-        axios.get(
-          `${backendUrl}/meta/ads/insights/${userId}/${metaAdAccountId}`
-        ),
+        axios.get(`${backendUrl}/meta/ads/insights/${userId}/${adAccountId}`),
       ]);
 
       // Process campaigns
@@ -582,8 +590,10 @@ const Index = () => {
         metaAdSets: true,
         metaAds: true,
       }));
+
+      console.log("✅ Meta data refreshed successfully");
     } catch (e) {
-      console.error("Refresh failed:", e);
+      console.error("❌ Refresh failed:", e);
       setError((prev) => ({
         ...prev,
         meta: e.response?.data?.detail || "Failed to refresh Meta data",
@@ -671,7 +681,27 @@ const Index = () => {
       <main className="container mx-auto px-6 py-4">
         {/* Notifications */}
         <div className="space-y-3 mb-6">
-          {/* Loading States - Consolidated Meta */}
+          {/* Platform Loading */}
+          {loading.platforms && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-blue-600 animate-spin" />
+                <p className="text-blue-700">Loading platform connections...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Platform Error */}
+          {error.platforms && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-red-600" />
+                <p className="text-red-700">{String(error.platforms)}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Meta Loading - Consolidated */}
           {(loading.meta || loading.metaAdSets || loading.metaAds) && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -680,6 +710,7 @@ const Index = () => {
               </div>
             </div>
           )}
+
           {loading.google && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -688,6 +719,7 @@ const Index = () => {
               </div>
             </div>
           )}
+
           {loading.shopify && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -697,7 +729,7 @@ const Index = () => {
             </div>
           )}
 
-          {/* Error States */}
+          {/* Error States - Consolidated */}
           {(error.meta || error.metaAdSets || error.metaAds) && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -709,6 +741,7 @@ const Index = () => {
               </div>
             </div>
           )}
+
           {error.google && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -717,6 +750,7 @@ const Index = () => {
               </div>
             </div>
           )}
+
           {error.shopify && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -726,7 +760,7 @@ const Index = () => {
             </div>
           )}
 
-          {/* Success States - Consolidated Meta */}
+          {/* Success States - Consolidated */}
           {(success.meta || success.metaAdSets || success.metaAds) && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -738,6 +772,7 @@ const Index = () => {
               </div>
             </div>
           )}
+
           {success.google && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -748,6 +783,7 @@ const Index = () => {
               </div>
             </div>
           )}
+
           {success.shopify && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -827,7 +863,7 @@ const Index = () => {
                 </div>
                 <Button
                   onClick={handleRefreshMeta}
-                  disabled={isRefreshing || !metaAdAccountId}
+                  disabled={isRefreshing || !platformStatus.meta?.ad_account_id}
                   variant="outline"
                   size="sm"
                 >
@@ -877,8 +913,9 @@ const Index = () => {
                 </Tabs>
               ) : (
                 <p className="text-muted-foreground">
-                  No Meta data loaded. Connect your Meta account in the Profile
-                  page.
+                  {platformStatus.meta?.connected
+                    ? "No Meta data available. Try refreshing or check your ad account."
+                    : "Meta not connected. Connect your Meta account in the Profile page."}
                 </p>
               )}
             </div>
@@ -899,8 +936,9 @@ const Index = () => {
                 </>
               ) : (
                 <p className="text-muted-foreground">
-                  No Google campaigns loaded. Connect your Google Ads account in
-                  the Profile page.
+                  {platformStatus.google?.connected
+                    ? "No Google campaigns found. Check your Google Ads account."
+                    : "Google not connected. Connect your Google Ads account in the Profile page."}
                 </p>
               )}
             </div>
@@ -948,8 +986,9 @@ const Index = () => {
                 </>
               ) : (
                 <p className="text-muted-foreground">
-                  No Shopify orders loaded. Connect your Shopify store in the
-                  Profile page.
+                  {platformStatus.shopify?.connected
+                    ? "No Shopify orders found."
+                    : "Shopify not connected. Connect your Shopify store in the Profile page."}
                 </p>
               )}
             </div>
