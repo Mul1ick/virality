@@ -483,7 +483,7 @@ def meta_callback(code: str = Query(..., description="Authorization code from Me
 @router.get("/campaigns/{user_id}/{ad_account_id}")
 def get_and_save_campaigns(user_id: str, ad_account_id: str): # Added ad_account_id
     """Fetches campaigns for a specific user and ad account."""
-    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, platform=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
@@ -517,7 +517,7 @@ def get_and_save_campaigns(user_id: str, ad_account_id: str): # Added ad_account
 @router.get("/adsets/{user_id}/{ad_account_id}")
 def get_and_save_adsets(user_id: str, ad_account_id: str): # Added ad_account_id
     """Fetches ad sets for a specific user and ad account."""
-    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, platform=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
@@ -551,7 +551,7 @@ def get_and_save_adsets(user_id: str, ad_account_id: str): # Added ad_account_id
 @router.get("/ads/{user_id}/{ad_account_id}")
 def get_and_save_ads(user_id: str, ad_account_id: str): # Added ad_account_id
     """Fetches ads for a specific user and ad account."""
-    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, platform=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
@@ -586,7 +586,7 @@ def get_and_save_ads(user_id: str, ad_account_id: str): # Added ad_account_id
 @router.get("/campaigns/insights/{user_id}/{ad_account_id}")
 def get_campaign_insights(user_id: str, ad_account_id: str): # Added ad_account_id
     """Fetches campaign insights for a specific user and ad account."""
-    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, platform=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
@@ -627,7 +627,7 @@ def get_campaign_insights(user_id: str, ad_account_id: str): # Added ad_account_
 @router.get("/adsets/insights/{user_id}/{ad_account_id}")
 def get_adset_insights(user_id: str, ad_account_id: str): # Added ad_account_id
     """Fetches ad set insights for a specific user and ad account."""
-    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, platform=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
@@ -668,7 +668,7 @@ def get_adset_insights(user_id: str, ad_account_id: str): # Added ad_account_id
 @router.get("/ads/insights/{user_id}/{ad_account_id}")
 def get_ad_insights(user_id: str, ad_account_id: str): # Added ad_account_id
     """Fetches ad insights for a specific user and ad account."""
-    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, platform=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         raise HTTPException(status_code=404, detail="User token not found for Meta.")
 
@@ -712,7 +712,7 @@ async def run_historical_fetch(user_id: str, ad_account_id: str, level: str):
     """Generic background task to fetch historical data for a specified user, account, and level."""
     logger.info(f"[Background Task] Starting historical data fetch for user_id: {user_id}, account: {ad_account_id}, level: {level}")
 
-    token_data = get_platform_connection_details(user_id, source=PLATFORM_NAME)
+    token_data = get_platform_connection_details(user_id, platform=PLATFORM_NAME)
     if not token_data or "access_token" not in token_data:
         logger.error(f"No valid Meta token for user_id: {user_id}. Aborting task for account {ad_account_id}.")
         return

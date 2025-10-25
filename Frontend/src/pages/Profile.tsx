@@ -381,14 +381,52 @@ const Profile = () => {
 
   const handleShopifyConnect = async () => {
     setIsLoading(true);
-    try {
-      console.log("Shopify connection not yet implemented");
-      setIsLoading(false);
-    } catch (error) {
-      console.error("Error connecting to Shopify:", error);
-      setIsLoading(false);
-    }
-  };
+   const token = localStorage.getItem("access_token"); // Get the auth token
+
+   if (!token) {
+     console.error("Auth token missing. Cannot initiate Shopify login.");
+     setProfileError("Authentication required. Please log in again."); // Show error
+     setIsLoading(false);
+     // navigate('/signin'); // Optionally redirect
+     return;
+   }
+
+   try {
+     // Step 1: Make an AUTHENTICATED request to *your* backend /login endpoint
+     console.log("Requesting Shopify redirect URL from backend...");
+     const response = await axios.get(
+       `${backendUrl}/shopify/login`, // Your backend endpoint
+       {
+         headers: {
+           Authorization: `Bearer ${token}`, // Send the JWT
+         },
+       }
+     );
+
+     // Step 2: Get the URL from the backend's JSON response
+     const redirectUrl = response.data.redirect_url;
+     if (redirectUrl) {
+       console.log("Received redirect URL, redirecting browser:", redirectUrl);
+       // Step 3: Redirect the browser to the URL provided by the backend
+       window.location.href = redirectUrl;
+       // Keep loading true as the page will navigate away
+     } else {
+       console.error("Backend did not provide a redirect URL.");
+       setProfileError("Could not initiate Shopify connection. Please try again.");
+       setIsLoading(false);
+     }
+   } catch (error: any) {
+     console.error("Error initiating Shopify login:", error);
+     setProfileError(error.response?.data?.detail || "Failed to start Shopify connection.");
+     if (error.response?.status === 401 || error.response?.status === 403){
+         localStorage.clear();
+         navigate('/signin'); // Redirect if token invalid
+     }
+     setIsLoading(false);
+   }
+   // Do not set isLoading to false here if redirect happens,
+   // only set it in error cases.
+ };
 
   const handleConnect = (platform) => {
     switch (platform) {

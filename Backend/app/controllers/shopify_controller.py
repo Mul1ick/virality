@@ -90,7 +90,7 @@ def shopify_login(
     logger.info(f"[Shopify OAuth] Redirecting user {current_user_id} for shop: {shop}")
     logger.info(f"[Shopify OAuth] Constructed auth URL: {auth_url}")
     try:
-        return RedirectResponse(url=auth_url, status_code=307)
+        return {"redirect_url": auth_url}
     except Exception as e:
         logger.exception(f"[Shopify OAuth] Failed to create RedirectResponse: {e}")
         raise HTTPException(status_code=500, detail="Failed to initiate Shopify login redirect.")
