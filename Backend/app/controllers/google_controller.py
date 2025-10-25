@@ -50,7 +50,7 @@ def google_login(
         })
     )
     logger.info(f"[Google OAuth] Redirecting user {current_user_id} to consent screen...")
-    return RedirectResponse(url=auth_url)
+    return {"redirect_url": auth_url}
 
 
 @router.get("/callback")

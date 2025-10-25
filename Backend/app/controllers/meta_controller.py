@@ -343,7 +343,7 @@ async def meta_login(user_id: str = Depends(get_current_user_id)):
         "state": state_token # Pass the JWT as state
     }))
     logger.info(f"[Meta OAuth] Redirecting user {user_id} to consent screen with state.")
-    return RedirectResponse(url=dialog_url)
+    return {"redirect_url": dialog_url}
 
 @router.get("/callback")
 def meta_callback(code: str = Query(..., description="Authorization code from Meta"),
@@ -365,7 +365,7 @@ def meta_callback(code: str = Query(..., description="Authorization code from Me
         raise HTTPException(status_code=400, detail=f"Invalid or expired state parameter: {e}")
     
 
-    
+
     # 1. Exchange code for short-lived token
     token_url = f"https://graph.facebook.com/{API_VERSION}/oauth/access_token"
     token_params = {
@@ -459,16 +459,6 @@ def meta_callback(code: str = Query(..., description="Authorization code from Me
          logger.error(f"[Meta OAuth] Error processing ad accounts response: {e}")
          # raise HTTPException(status_code=500, detail="Error processing Meta ad accounts.")
 
-    # --- Determine the Main Application User ID ---
-    # This part depends on how your application identifies users *before* they connect Meta.
-    # If the user is already logged in via your email/OTP system, you should have their
-    # MongoDB '_id' available (e.g., from a session or JWT).
-    # For now, we'll assume the 'user_id' we need to update in the database is passed
-    # somehow, or we need to find it based on the Meta User ID if linked previously.
-    # ---> Placeholder: How do we get the main app's user_id here? <---
-    # Let's assume for now the user_id is the platform_user_id, which matches the old logic.
-    # A better approach is needed for linking accounts.
-    main_app_user_id = platform_user_id # Replace with actual logic to get the main user's MongoDB _id string
 
     # 4. Save Connection Details using the new function
     platform_data = {

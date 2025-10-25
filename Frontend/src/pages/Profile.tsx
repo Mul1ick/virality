@@ -27,14 +27,16 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
-// User mock data
-const user = {
-  name: "Alex Johnson",
-  email: "alex.johnson@example.com",
-  role: "Marketing Manager",
-  avatarUrl: "https://placehold.co/100x100/A0BFFF/FFFFFF?text=AJ",
-};
+interface UserProfileData {
+  id: string;
+  name: string;
+  email: string;
+// avatarUrl: "https://placehold.co/100x100/A0BFFF/FFFFFF?text=AJ"
+}
+
+
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -120,36 +122,131 @@ const Profile = () => {
   });
   const navigate = useNavigate();
 
-  // Check URL parameters for successful connections
+  const [userData, setUserData] = useState<UserProfileData | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  // --- NEW: Separate state for platform status fetching ---
+  const [platformStatusLoading, setPlatformStatusLoading] = useState(true);
+  const [platformStatusError, setPlatformStatusError] = useState<string | null>(null);
+
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      setProfileLoading(true);
+      setProfileError(null);
+      const userId = localStorage.getItem("user_id");
+      const token = localStorage.getItem("access_token");
+
+      if (!userId || !token) {
+        setProfileError("Authentication required. Please log in.");
+        setProfileLoading(false);
+        // navigate("/signin"); // Redirect if auth details missing
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          `${backendUrl}/user/${userId}/profile`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setUserData(response.data);
+      } catch (err: any) {
+        console.error("Failed to fetch user profile:", err);
+        setProfileError(err.response?.data?.detail || "Could not load profile.");
+        if (err.response?.status === 401 || err.response?.status === 403) {
+           localStorage.clear();
+           // navigate("/signin"); // Redirect on auth failure
+        }
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    fetchUserProfile();
+  }, [backendUrl, navigate]); // Dependencies
+
+  // --- Effect 2: Fetch Platform Connection Status ---
+  useEffect(() => {
+    const fetchPlatformStatus = async () => {
+      setPlatformStatusLoading(true);
+      setPlatformStatusError(null);
+      // Reset connections before fetching current status
+      setConnectedAccounts({ meta: false, google: false, shopify: false });
+
+      const userId = localStorage.getItem("user_id");
+      const token = localStorage.getItem("access_token");
+
+      if (!userId || !token) {
+        setPlatformStatusError("Authentication required.");
+        setPlatformStatusLoading(false);
+        // navigate("/signin"); // Redirect if auth details missing
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          `${backendUrl}/user/${userId}/platforms`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        // Update state based *only* on the backend response
+        const statusFromBackend = response.data;
+        setConnectedAccounts({
+          meta: statusFromBackend.meta?.connected || false,
+          google: statusFromBackend.google?.connected || false,
+          shopify: statusFromBackend.shopify?.connected || false,
+        });
+
+      } catch (err: any) {
+        console.error("Failed to fetch platform status:", err);
+        setPlatformStatusError(err.response?.data?.detail || "Could not load connection status.");
+        if (err.response?.status === 401 || err.response?.status === 403) {
+           localStorage.clear();
+           // navigate("/signin"); // Redirect on auth failure
+        }
+      } finally {
+        setPlatformStatusLoading(false);
+      }
+    };
+
+    // Only fetch platform status *after* profile fetch succeeds (or adjust logic if independent)
+    // For simplicity, let's assume they can run somewhat independently but need auth info
+     fetchPlatformStatus();
+
+  }, [backendUrl, navigate]); // Dependencies
+
+
+  // --- Effect 3: Handle OAuth Redirect (One-time URL check) ---
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const userId = urlParams.get("user_id");
+    const platformUserId = urlParams.get("user_id"); // User ID might be in param after OAuth
     const platform = urlParams.get("platform");
 
-    if (userId && platform) {
-      setConnectedAccounts((prev) => ({
-        ...prev,
-        [platform]: true,
-      }));
+    // This effect now ONLY saves userId if missing and cleans URL.
+    // It DOES NOT optimistically set connectedAccounts state anymore.
+    if (platformUserId && platform) {
+      console.log(`OAuth redirect detected for ${platform}, user ID ${platformUserId}`);
+      // Ensure main user_id is saved if it came from URL param and wasn't already set
+      if (!localStorage.getItem("user_id")) {
+         localStorage.setItem("user_id", platformUserId);
+         console.log(`Saved user ID ${platformUserId} from URL parameter.`);
+         // Optionally trigger a refetch of platform status here if needed immediately
+         // fetchPlatformStatus(); // Defined in Effect 2
+      } else {
+         // Verify if the user ID from param matches stored ID
+         const storedUserId = localStorage.getItem("user_id");
+         if (platformUserId !== storedUserId) {
+             console.warn(`OAuth redirect user ID (${platformUserId}) doesn't match stored user ID (${storedUserId}). Check logic.`);
+             // Handle potential mismatch - maybe logout, show error?
+         }
+      }
 
-      const stored = JSON.parse(
-        localStorage.getItem("connectedAccounts") || "{}"
-      );
-      stored[platform] = true;
-      localStorage.setItem("connectedAccounts", JSON.stringify(stored));
-      localStorage.setItem("user_id", userId);
-
+      // Clean the URL parameters
       window.history.replaceState({}, document.title, "/profile");
     }
-
-    const stored = JSON.parse(
-      localStorage.getItem("connectedAccounts") || "{}"
-    );
-    setConnectedAccounts((prev) => ({
-      ...prev,
-      ...stored,
-    }));
-  }, []);
+  // Run only once on mount to check URL params
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array means this runs only once
 
   const integrations = [
     {
@@ -186,23 +283,101 @@ const Profile = () => {
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
-    try {
-      window.location.href = `${backendUrl}/google/login`;
-    } catch (error) {
-      console.error("Error fetching Google login URL:", error);
-      setIsLoading(false);
-    }
-  };
+   const token = localStorage.getItem("access_token"); // Get the auth token
+
+   if (!token) {
+     console.error("Auth token missing. Cannot initiate Google login.");
+     setProfileError("Authentication required. Please log in again."); // Show error
+     setIsLoading(false);
+     // navigate('/signin'); // Optionally redirect
+     return;
+   }
+
+   try {
+     // Step 1: Make an AUTHENTICATED request to *your* backend /login endpoint
+     console.log("Requesting Google redirect URL from backend...");
+     const response = await axios.get(
+       `${backendUrl}/google/login`, // Your backend endpoint
+       {
+         headers: {
+           Authorization: `Bearer ${token}`, // Send the JWT
+         },
+       }
+     );
+
+     // Step 2: Get the URL from the backend's JSON response
+     const redirectUrl = response.data.redirect_url;
+     if (redirectUrl) {
+       console.log("Received redirect URL, redirecting browser:", redirectUrl);
+       // Step 3: Redirect the browser to the URL provided by the backend
+       window.location.href = redirectUrl;
+       // Keep loading true as the page will navigate away
+     } else {
+       console.error("Backend did not provide a redirect URL.");
+       setProfileError("Could not initiate Google connection. Please try again.");
+       setIsLoading(false);
+     }
+   } catch (error: any) {
+     console.error("Error initiating Google login:", error);
+     setProfileError(error.response?.data?.detail || "Failed to start Google connection.");
+     if (error.response?.status === 401 || error.response?.status === 403){
+         localStorage.clear();
+         navigate('/signin'); // Redirect if token invalid
+     }
+     setIsLoading(false);
+   }
+   // Do not set isLoading to false here if redirect happens,
+   // only set it in error cases.
+ };
 
   const handleMetaLogin = async () => {
-    setIsLoading(true);
-    try {
-      window.location.href = `${backendUrl}/meta/login`;
-    } catch (error) {
-      console.error("Error fetching Meta login URL:", error);
-      setIsLoading(false);
-    }
-  };
+   setIsLoading(true);
+   const token = localStorage.getItem("access_token"); // Get the auth token
+
+   if (!token) {
+     console.error("Auth token missing. Cannot initiate Meta login.");
+     setProfileError("Authentication required. Please log in again."); // Show error
+     setIsLoading(false);
+     // navigate('/signin'); // Optionally redirect
+     return;
+   }
+
+   try {
+     // Step 1: Make an AUTHENTICATED request to *your* backend /login endpoint
+     console.log("Requesting Meta redirect URL from backend...");
+     const response = await axios.get(
+       `${backendUrl}/meta/login`, // Your backend endpoint
+       {
+         headers: {
+           Authorization: `Bearer ${token}`, // Send the JWT
+         },
+       }
+     );
+
+     // Step 2: Get the URL from the backend's JSON response
+     const redirectUrl = response.data.redirect_url;
+     if (redirectUrl) {
+       console.log("Received redirect URL, redirecting browser:", redirectUrl);
+       // Step 3: Redirect the browser to the URL provided by the backend
+       window.location.href = redirectUrl;
+       // Keep loading true as the page will navigate away
+     } else {
+       console.error("Backend did not provide a redirect URL.");
+       setProfileError("Could not initiate Meta connection. Please try again.");
+       setIsLoading(false);
+     }
+   } catch (error: any) {
+     console.error("Error initiating Meta login:", error);
+     setProfileError(error.response?.data?.detail || "Failed to start Meta connection.");
+     if (error.response?.status === 401 || error.response?.status === 403){
+         localStorage.clear();
+         navigate('/signin'); // Redirect if token invalid
+     }
+     setIsLoading(false);
+   }
+   // Do not set isLoading to false here if redirect happens,
+   // only set it in error cases.
+ };
 
   const handleShopifyConnect = async () => {
     setIsLoading(true);
@@ -244,6 +419,15 @@ const Profile = () => {
   const connectedCount = Object.values(connectedAccounts).filter(
     (v) => v
   ).length;
+
+  if (profileLoading || platformStatusLoading) { // Check both loading states
+       return <div className="min-h-screen flex items-center justify-center">Loading profile and connections...</div>;
+   }
+  
+  const displayError = profileError || platformStatusError;
+   if (displayError) {
+       return <div className="min-h-screen flex items-center justify-center text-destructive">{displayError} <Button onClick={() => navigate('/signin')} variant="link">Login</Button></div>;
+   }
 
   return (
     <div className="min-h-screen bg-background">
@@ -318,20 +502,18 @@ const Profile = () => {
               <CardHeader className="pb-6">
                 <div className="flex flex-col items-center text-center">
                   <Avatar className="h-24 w-24 border-4 border-primary/20 mb-4">
-                    <AvatarImage src={user.avatarUrl} alt={user.name} />
+                    <AvatarImage
+            src={"https://placehold.co/100x100/A0BFFF/FFFFFF?text=" + (userData?.name?.split(" ").map(n => n[0]).join("") || "U")}
+            alt={userData?.name || "User"} // Fallback alt text
+          />
                     <AvatarFallback className="bg-primary/20 text-primary font-bold text-2xl">
-                      {user.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
+                      {userData?.name?.split(" ").map((n) => n[0]).join("") || "U"}
                     </AvatarFallback>
                   </Avatar>
                   <CardTitle className="text-2xl font-bold">
-                    {user.name}
+                    {userData?.name || "User"}
                   </CardTitle>
-                  <CardDescription className="text-base mt-1">
-                    {user.role}
-                  </CardDescription>
+
                 </div>
               </CardHeader>
 
@@ -348,7 +530,7 @@ const Profile = () => {
                         Email Address
                       </p>
                       <p className="text-sm font-medium truncate">
-                        {user.email}
+                       {userData?.id || "N/A"}
                       </p>
                     </div>
                   </div>
