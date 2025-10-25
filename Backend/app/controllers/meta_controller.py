@@ -530,7 +530,7 @@ class SelectedAccount(BaseModel):
     ad_account_name: str # It's good to save the name too!
 
 @router.post("/select-account")
-def select_ad_account(account: SelectedAccount, user_id: str = Depends(get_current_user_id)):
+def select_ad_account(account: SelectedAccount, user_id: str = Depends(get_current_user_id), background_tasks: BackgroundTasks=None):
     """
     Saves the user's chosen ad_account_id to their platform connection details.
     """
@@ -546,7 +546,13 @@ def select_ad_account(account: SelectedAccount, user_id: str = Depends(get_curre
     try:
         save_or_update_platform_connection(user_id, PLATFORM_NAME, platform_data_to_add)
         logger.info(f"✅ Successfully saved ad_account_id {account.ad_account_id} for user {user_id}")
+        if background_tasks:
+            background_tasks.add_task(run_historical_fetch, user_id, account.ad_account_id, "campaign")
+            background_tasks.add_task(run_historical_fetch, user_id, account.ad_account_id, "adset")
+            background_tasks.add_task(run_historical_fetch, user_id, account.ad_account_id, "ad")
         return {"message": "Ad account selected successfully."}
+    
     except Exception as e:
         logger.error(f"Failed to save ad_account_id for user {user_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to save ad account selection.")
+    

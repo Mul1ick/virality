@@ -1,6 +1,13 @@
 // pages/Index.tsx
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Facebook, Search, ShoppingCart } from "lucide-react";
+import {
+  TrendingUp,
+  Facebook,
+  Search,
+  ShoppingCart,
+  Loader2,
+  X,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { NotificationBanner } from "@/components/dashboard/NotificationBanner";
@@ -16,6 +23,7 @@ import { useShopifyData } from "@/hooks/useShopifyData";
 const Index = () => {
   const [dateRange, setDateRange] = useState("30days");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showHistoricalBanner, setShowHistoricalBanner] = useState(true);
 
   // User data
   const [user, setUser] = useState({
@@ -234,6 +242,32 @@ const Index = () => {
             shopifyOrders: shopifyOrders.length,
           }}
         />
+
+        {showHistoricalBanner &&
+          platformStatus.meta.connected &&
+          platformStatus.meta.ad_account_id && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 relative">
+              <button
+                onClick={() => setShowHistoricalBanner(false)}
+                className="absolute top-3 right-3 text-blue-600 hover:text-blue-900 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <div className="flex items-center gap-3 pr-8">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                <div>
+                  <p className="font-semibold text-blue-900">
+                    Loading Historical Data
+                  </p>
+                  <p className="text-sm text-blue-700">
+                    Fetching 2.5 years of data in the background. This may take
+                    5-15 minutes. You can use the dashboard normally while this
+                    completes.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
