@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MessageCircle, X, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import apiClient from "@/lib/api"
 
 interface Message {
   id: string;
@@ -40,39 +41,115 @@ export const ChatBot = () => {
   }, [isOpen]);
 
   const handleSend = async () => {
-    if (!inputValue.trim()) return;
+  if (!inputValue.trim()) return;
 
-    // Add user message
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: inputValue,
-      sender: "user",
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInputValue("");
-    setIsTyping(true);
-
-    // Simulate bot response (replace with actual API call)
-    setTimeout(() => {
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: getBotResponse(inputValue),
-        sender: "bot",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, botMessage]);
-      setIsTyping(false);
-    }, 1000);
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    text: inputValue,
+    sender: "user",
+    timestamp: new Date(),
   };
+  setMessages((prev) => [...prev, userMessage]);
+  const currentInput = inputValue; // Capture input before clearing
+  setInputValue("");
+  setIsTyping(true);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+  // --- NEW LOGIC ---
+  let detectedPlatform: string | null = null;
+  const lowerInput = currentInput.toLowerCase();
+
+  // Simple Platform Detection (enhance as needed)
+  if (lowerInput.includes("meta") || lowerInput.includes("facebook") || lowerInput.includes("instagram")) {
+    detectedPlatform = "meta"; // Match the collection name used in DATA_SCHEMAS
+  } else if (lowerInput.includes("google")) {
+    // Decide which Google collection is most likely, or enhance detection.
+    // Let's default to campaigns for now if just "google" is mentioned.
+    if (lowerInput.includes("ad group") || lowerInput.includes("adset")) {
+       detectedPlatform = "google_adsets"; // Match schema key [cite: 283]
+    } else if (lowerInput.includes("ad") && !lowerInput.includes("ad group")) { // Avoid matching "ad group"
+       detectedPlatform = "google_ads"; // Match schema key [cite: 284]
+    } else {
+       detectedPlatform = "google_campaigns"; // Default Google match [cite: 281]
     }
+  } else if (lowerInput.includes("shopify")) {
+    detectedPlatform = "shopify"; // Match schema key [cite: 285]
+  }
+  // Add more keywords/logic as needed
+
+  let botResponseText = "";
+
+  if (detectedPlatform) {
+    try {
+      console.log(`Chatbot: Querying backend for platform: ${detectedPlatform}, question: ${currentInput}`);
+      // Make API call using apiClient (handles auth automatically)
+      const response = await apiClient.post(`/analytics/${detectedPlatform}`, {
+        question: currentInput,
+      });
+
+      console.log("Chatbot: Received response:", response.data);
+
+      const { explanation, results } = response.data;
+
+      if (results && results.length > 0) {
+        // Format the results (simple example: list top 3)
+        let resultsSummary = "Here's what I found:\n";
+        results.slice(0, 3).forEach((item: any, index: number) => {
+          // Try to find a 'name' or use the first few fields
+          const name = item.name || item.campaign_name || item.ad_name || `Result ${index + 1}`;
+          const valueKey = Object.keys(item).find(k => k.includes('spend') || k.includes('clicks') || k.includes('impressions') || k.includes('revenue') || k.includes('costMicros'));
+          const value = valueKey ? item[valueKey] : '(details in data)';
+          resultsSummary += `- ${name}: ${value}\n`;
+        });
+         botResponseText = `${explanation}\n\n${resultsSummary}`;
+         if (results.length > 3) {
+             botResponseText += `(...and ${results.length - 3} more results)`;
+         }
+
+      } else if (explanation) {
+         botResponseText = explanation + "\n\nHowever, I couldn't find any specific data matching your question.";
+      }
+       else {
+        botResponseText = "I understood the question, but I couldn't find any specific data for that.";
+      }
+
+    } catch (error: any) {
+      console.error("Chatbot API Error:", error);
+      if (error.response?.status === 401) {
+         botResponseText = "Sorry, your session seems to have expired. Please log in again.";
+         // Optional: Redirect to login
+         // window.location.href = '/signin';
+      } else if (error.response?.status === 404 && error.response.data?.detail?.includes("Unknown platform")){
+         // This case might happen if our frontend detection logic passes a platform the backend doesn't know
+         botResponseText = `Sorry, I can't query the platform '${detectedPlatform}' yet. You can ask about Meta, Google, or Shopify.`;
+      }
+      else {
+         botResponseText = `Sorry, I couldn't process that query right now. Error: ${error.response?.data?.detail || error.message}`;
+      }
+    }
+  } else {
+    // Fallback if no platform detected
+    botResponseText = "Which platform are you asking about (Meta, Google, Shopify)? Or maybe I can help with general dashboard features?";
+  }
+  // --- END NEW LOGIC ---
+
+  // Add bot response message
+  const botMessage: Message = {
+    id: (Date.now() + 1).toString(),
+    text: botResponseText, // Use the generated or fallback text
+    sender: "bot",
+    timestamp: new Date(),
   };
+  setMessages((prev) => [...prev, botMessage]);
+  setIsTyping(false);
+};
+
+// Keep handleKeyPress as it is [cite: 410-411]
+const handleKeyPress = (e: React.KeyboardEvent) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    handleSend();
+  }
+};
 
   // Simple bot responses (replace with actual AI/API integration)
   const getBotResponse = (userInput: string): string => {
