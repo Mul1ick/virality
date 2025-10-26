@@ -64,11 +64,12 @@ const Index = () => {
     campaigns: googleCampaigns,
     loading: googleLoading,
     error: googleError,
+    refreshAll: refreshGoogle,
   } = useGoogleData(
     userId,
     platformStatus.google.selected_manager_id ||
-      platformStatus.google.manager_id, // ← Use selected_manager_id
-    platformStatus.google.client_customer_id, // ← Use client_customer_id directly
+      platformStatus.google.manager_id,
+    platformStatus.google.client_customer_id,
     platformStatus.google.connected,
     !platformsLoading
   );
@@ -127,13 +128,13 @@ const Index = () => {
       loading: {
         platforms: platformsLoading,
         meta: anyMetaLoading,
-        google: googleLoading,
+        google: googleLoading.campaigns,
         shopify: shopifyLoading,
       },
       error: {
         platforms: platformsError,
         meta: anyMetaError,
-        google: googleError,
+        google: googleError.campaigns,
         shopify: shopifyError,
       },
       success: {
@@ -143,8 +144,8 @@ const Index = () => {
           metaCampaigns.length > 0 &&
           platformStatus.meta.connected,
         google:
-          !googleLoading &&
-          !googleError &&
+          !googleLoading.campaigns &&
+          !googleError.campaigns &&
           googleCampaigns.length > 0 &&
           platformStatus.google.connected,
         shopify:
@@ -221,6 +222,22 @@ const Index = () => {
     }
   };
 
+  // Handle Google refresh
+  const handleRefreshGoogle = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshGoogle();
+      setNotifications((prev) => ({
+        ...prev,
+        success: { ...prev.success, google: true },
+      }));
+    } catch (e) {
+      console.error("Google refresh failed:", e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader
@@ -281,7 +298,8 @@ const Index = () => {
             </TabsTrigger>
             <TabsTrigger value="google" className="gap-2">
               <Search className="h-4 w-4" />
-              Google
+              Google{" "}
+              {googleCampaigns.length > 0 && `(${googleCampaigns.length})`}
             </TabsTrigger>
             <TabsTrigger value="shopify" className="gap-2">
               <ShoppingCart className="h-4 w-4" />
@@ -309,13 +327,9 @@ const Index = () => {
             <GoogleTab
               campaigns={googleCampaigns}
               isConnected={platformStatus.google.connected}
-              loading={{
-                campaigns: false,
-              }}
-              isRefreshing={false}
-              onRefresh={function (): Promise<void> {
-                throw new Error("Function not implemented.");
-              }}
+              loading={googleLoading}
+              isRefreshing={isRefreshing}
+              onRefresh={handleRefreshGoogle}
             />
           </TabsContent>
 
