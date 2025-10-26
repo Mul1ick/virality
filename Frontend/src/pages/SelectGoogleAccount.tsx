@@ -1,7 +1,6 @@
-// pages/SelectGoogleAccount.tsx
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AccountSelectionModal } from "@/components/modals/AccountSelectionModal";
+import { GoogleAccountSelectionModal } from "@/components/modals/GoogleAccountSelectionModal";
 import { Loader2 } from "lucide-react";
 
 const SelectGoogleAccount = () => {
@@ -15,12 +14,11 @@ const SelectGoogleAccount = () => {
       navigate("/signin");
       return;
     }
-
     setIsModalOpen(true);
   }, [userId, navigate]);
 
-  const handleComplete = (accountId: string) => {
-    console.log("✅ Google account selected:", accountId);
+  const handleComplete = (managerId: string, customerId: string) => {
+    console.log("✅ Google accounts selected:", { managerId, customerId });
     navigate(`/?user_id=${userId}`);
   };
 
@@ -45,9 +43,8 @@ const SelectGoogleAccount = () => {
         </div>
       </div>
 
-      <AccountSelectionModal
+      <GoogleAccountSelectionModal
         isOpen={isModalOpen}
-        platform="google"
         userId={userId}
         onComplete={handleComplete}
         onCancel={handleCancel}

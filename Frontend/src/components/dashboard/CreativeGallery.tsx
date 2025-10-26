@@ -6,23 +6,35 @@ interface Creative {
   id: string;
   name: string;
   objective: string;
-  status: string;
+  status?: string;
 }
 
 interface CreativeGalleryProps {
   campaigns: Creative[];
+  isLoading?: boolean;
 }
 
-export const CreativeGallery = ({ campaigns }: CreativeGalleryProps) => {
+export const CreativeGallery = ({
+  campaigns,
+  isLoading = false,
+}: CreativeGalleryProps) => {
   // Get custom status styling
-  const getStatusStyle = (status: string) => {
+  const getStatusStyle = (status: string | undefined) => {
+    if (!status) {
+      return "bg-gray-500/10 text-gray-700 border-gray-500/20";
+    }
+
     const statusUpper = status.toUpperCase();
 
-    if (statusUpper === "ACTIVE") {
+    if (statusUpper === "ACTIVE" || statusUpper === "ENABLED") {
       return "bg-green-500/10 text-green-700 border-green-500/20 hover:bg-green-500/20";
     } else if (statusUpper === "PAUSED") {
       return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20 hover:bg-yellow-500/20";
-    } else if (statusUpper === "ARCHIVED" || statusUpper === "DELETED") {
+    } else if (
+      statusUpper === "ARCHIVED" ||
+      statusUpper === "DELETED" ||
+      statusUpper === "REMOVED"
+    ) {
       return "bg-red-500/10 text-red-700 border-red-500/20 hover:bg-red-500/20";
     }
     return "bg-gray-500/10 text-gray-700 border-gray-500/20";
@@ -30,6 +42,8 @@ export const CreativeGallery = ({ campaigns }: CreativeGalleryProps) => {
 
   // Format objective text (remove OUTCOME_ prefix and capitalize)
   const formatObjective = (objective: string) => {
+    if (!objective) return "Unknown";
+
     return objective
       .replace("OUTCOME_", "")
       .split("_")
@@ -38,9 +52,21 @@ export const CreativeGallery = ({ campaigns }: CreativeGalleryProps) => {
   };
 
   // Format status text
-  const formatStatus = (status: string) => {
+  const formatStatus = (status: string | undefined) => {
+    if (!status) return "Unknown";
     return status.charAt(0) + status.slice(1).toLowerCase();
   };
+
+  if (isLoading) {
+    return (
+      <Card className="p-6">
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading campaigns...</p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-6">

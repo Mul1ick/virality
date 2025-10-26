@@ -66,9 +66,9 @@ const Index = () => {
     error: googleError,
   } = useGoogleData(
     userId,
-    platformStatus.google.manager_id,
-    platformStatus.google.client_customer_id ||
-      platformStatus.google.customer_ids?.[0],
+    platformStatus.google.selected_manager_id ||
+      platformStatus.google.manager_id, // ← Use selected_manager_id
+    platformStatus.google.client_customer_id, // ← Use client_customer_id directly
     platformStatus.google.connected,
     !platformsLoading
   );
@@ -309,6 +309,13 @@ const Index = () => {
             <GoogleTab
               campaigns={googleCampaigns}
               isConnected={platformStatus.google.connected}
+              loading={{
+                campaigns: false,
+              }}
+              isRefreshing={false}
+              onRefresh={function (): Promise<void> {
+                throw new Error("Function not implemented.");
+              }}
             />
           </TabsContent>
 

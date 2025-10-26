@@ -83,6 +83,8 @@ def save_or_update_platform_connection(user_id: str, platform: str, platform_dat
             update_fields[f"connected_platforms.{platform}.manager_id"] = platform_data["manager_id"]
         if "client_customer_id" in platform_data:
             update_fields[f"connected_platforms.{platform}.client_customer_id"] = platform_data["client_customer_id"]
+        if "selected_manager_id" in platform_data:
+            update_fields[f"connected_platforms.{platform}.selected_manager_id"] = platform_data["selected_manager_id"]
 
     # --- Meta-specific fields ---
     if platform == "meta" and "ad_account_id" in platform_data:

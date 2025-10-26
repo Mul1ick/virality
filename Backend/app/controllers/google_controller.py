@@ -82,6 +82,10 @@ class SelectManagerPayload(BaseModel):
     """Payload for selecting a manager account (MCC)."""
     manager_id: str
 
+class SaveClientPayload(BaseModel):
+    """Payload for saving selected client."""
+    client_customer_id: str
+
 
 # -----------------------------------------------------------------------------
 # OAuth Flow
@@ -350,6 +354,46 @@ def _maybe_refresh_access_token(user_id: str, details: dict) -> str:
             return new_token
 
     return access_token
+
+@router.post("/save-client/{user_id}")
+def save_client_account(
+    user_id: str,
+    payload: SaveClientPayload,
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """
+    Save the selected client account ID.
+    Manager was already saved in /select-manager.
+    
+    Body:
+        { "client_customer_id": "5754295060" }
+    
+    Returns:
+        { user_id, client_customer_id }
+    """
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
+    if not payload.client_customer_id:
+        raise HTTPException(status_code=400, detail="Missing client_customer_id")
+    
+    # Save the client ID to the existing Google connection
+    platform_data_update = {
+        "client_customer_id": payload.client_customer_id,
+    }
+    
+    save_or_update_platform_connection(
+        user_id=user_id,
+        platform="google",
+        platform_data=platform_data_update,
+    )
+    
+    logger.info(f"✅ Saved Google client: {payload.client_customer_id} for user {user_id}")
+    
+    return {
+        "user_id": user_id,
+        "client_customer_id": payload.client_customer_id,
+    }
 
 
 # -----------------------------------------------------------------------------
