@@ -15,9 +15,11 @@ import axios from "axios";
 
 interface Account {
   id: string;
-  name: string;
+  name?: string;
+  descriptiveName?: string; // Add this
   business_name?: string;
   account_status?: number;
+  isManager?: boolean; // Add this
 }
 
 interface AccountSelectionModalProps {
@@ -61,13 +63,14 @@ export const AccountSelectionModal = ({
       const endpoint =
         platform === "meta"
           ? `${backendUrl}/meta/ad-accounts`
-          : `${backendUrl}/google/ad-accounts`;
+          : `${backendUrl}/google/accounts/${userId}`; // ✅ FIXED
 
       const response = await axios.get(endpoint, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+
       const accountsList = response.data.accounts || [];
 
       setAccounts(accountsList);
@@ -105,21 +108,34 @@ export const AccountSelectionModal = ({
       // Get JWT token from localStorage
       const token = localStorage.getItem("access_token");
 
-      const endpoint =
-        platform === "meta"
-          ? `${backendUrl}/meta/select-account`
-          : `${backendUrl}/google/select-account`;
-
-      const payload = {
-        ad_account_id: selectedAccountId,
-        ad_account_name: selectedAccount.name,
-      };
-
-      await axios.post(endpoint, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      if (platform === "meta") {
+        // Meta uses POST /meta/select-account
+        await axios.post(
+          `${backendUrl}/meta/select-account`,
+          {
+            ad_account_id: selectedAccountId,
+            ad_account_name: selectedAccount.name,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+      } else {
+        // Google uses POST /google/select-manager/{user_id}
+        await axios.post(
+          `${backendUrl}/google/select-manager/${userId}`,
+          {
+            manager_id: selectedAccountId,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+      }
 
       // Success - call onComplete with the selected account ID
       onComplete(selectedAccountId);
@@ -206,7 +222,9 @@ export const AccountSelectionModal = ({
                       htmlFor={account.id}
                       className="cursor-pointer font-medium"
                     >
-                      {account.name}
+                      {account.name ||
+                        account.descriptiveName ||
+                        "Unnamed Account"}
                     </Label>
                     {account.business_name && (
                       <p className="text-sm text-muted-foreground mt-0.5">
@@ -216,6 +234,16 @@ export const AccountSelectionModal = ({
                     <p className="text-xs text-muted-foreground mt-1">
                       ID: {account.id}
                     </p>
+                    {/* Show if it's a manager account (Google) */}
+                    {account.isManager && (
+                      <div className="flex items-center gap-1 mt-2">
+                        <CheckCircle2 className="h-3 w-3 text-blue-500" />
+                        <span className="text-xs text-blue-500">
+                          Manager Account
+                        </span>
+                      </div>
+                    )}
+                    {/* Show account status (Meta) */}
                     {account.account_status === 1 && (
                       <div className="flex items-center gap-1 mt-2">
                         <CheckCircle2 className="h-3 w-3 text-success" />

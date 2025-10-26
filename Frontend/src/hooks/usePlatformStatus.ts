@@ -1,29 +1,31 @@
 // hooks/usePlatformStatus.ts
 import { useState, useEffect } from "react";
 import axios from "axios";
-import apiClient from "@/lib/api";
 
 interface PlatformStatus {
-  meta: { connected: boolean; ad_account_id: string | null };
+  meta: {
+    connected: boolean;
+    ad_account_id?: string | null;
+    ad_account_name?: string | null;
+  };
   google: {
     connected: boolean;
-    customer_ids: string[];
-    manager_id: string | null;
-    client_customer_id: string | null;
+    customer_ids?: string[];
+    manager_id?: string | null;
+    client_customer_id?: string | null;
+    selected_manager_id?: string | null;
   };
-  shopify: { connected: boolean; shop_url: string | null };
+  shopify: {
+    connected: boolean;
+    shop_url?: string | null;
+  };
 }
 
 export const usePlatformStatus = (userId: string | null) => {
   const [platformStatus, setPlatformStatus] = useState<PlatformStatus>({
-    meta: { connected: false, ad_account_id: null },
-    google: {
-      connected: false,
-      customer_ids: [],
-      manager_id: null,
-      client_customer_id: null,
-    },
-    shopify: { connected: false, shop_url: null },
+    meta: { connected: false },
+    google: { connected: false },
+    shopify: { connected: false },
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,43 +38,57 @@ export const usePlatformStatus = (userId: string | null) => {
         setLoading(false);
         return;
       }
-      // Reset status before fetching
-      setPlatformStatus({
-         meta: { connected: false, ad_account_id: null },
-         google: { connected: false, customer_ids: [], manager_id: null, client_customer_id: null },
-         shopify: { connected: false, shop_url: null },
-      });
-      setLoading(true); // Set loading true before fetch
-      setError(null);
-
 
       try {
         console.log("🔍 Fetching platform status for user:", userId);
-        // Use apiClient instead of axios
-        const res = await apiClient.get(`/user/${userId}/platforms`); // Use relative path
+
+        // CRITICAL: Always include JWT token in request
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+          throw new Error("No authentication token found");
+        }
+
+        const res = await axios.get(`${backendUrl}/user/${userId}/platforms`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
         console.log("✅ Platform status:", res.data);
 
-        // Ensure defaults if platform data is missing in response
+        // Backend now returns cleaner structure - use it directly
+        const data = res.data;
+
         setPlatformStatus({
-           meta: res.data.meta || { connected: false, ad_account_id: null },
-           google: res.data.google || { connected: false, customer_ids: [], manager_id: null, client_customer_id: null },
-           shopify: res.data.shopify || { connected: false, shop_url: null },
+          meta: {
+            connected: data.meta?.connected || false,
+            ad_account_id: data.meta?.ad_account_id || null,
+            ad_account_name: data.meta?.ad_account_name || null,
+          },
+          google: {
+            connected: data.google?.connected || false,
+            customer_ids: data.google?.customer_ids || [],
+            manager_id: data.google?.manager_id || null,
+            client_customer_id: data.google?.client_customer_id || null,
+            selected_manager_id: data.google?.selected_manager_id || null,
+          },
+          shopify: {
+            connected: data.shopify?.connected || false,
+            shop_url: data.shopify?.shop_url || null,
+          },
         });
+
         setError(null);
-      } catch (e: any) { // Catch block already handles 401 via interceptor
-        // Interceptor handles 401 redirect. Log other errors.
-         if (e.response?.status !== 401) {
-            console.error("❌ Failed to fetch platform status:", e);
-            setError(e.response?.data?.detail || "Failed to load platform connections");
-         }
+      } catch (e) {
+        console.error("❌ Failed to fetch platform status:", e);
+        setError("Failed to load platform connections");
       } finally {
         setLoading(false);
       }
     };
 
     fetchPlatforms();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]); // Removed backendUrl dependency if baseURL is set
+  }, [userId, backendUrl]);
 
   return { platformStatus, loading, error };
 };

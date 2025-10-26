@@ -223,10 +223,15 @@ def google_callback(
     )
     logger.info(f"✅ [Google Callback] Connection details saved for user {main_app_user_id}")
 
-    # 6) Frontend redirect
+    # 6) Frontend redirect - OLD 
+    # return RedirectResponse(
+    #     url=f"http://localhost:8080/profile?user_id={main_app_user_id}&connect_status=google_success"
+    # )
+
+    # NEW
     return RedirectResponse(
-        url=f"http://localhost:8080/profile?user_id={main_app_user_id}&connect_status=google_success"
-    )
+    url=f"http://localhost:8080/select-google-account?user_id={main_app_user_id}"
+)
 
 
 # -----------------------------------------------------------------------------

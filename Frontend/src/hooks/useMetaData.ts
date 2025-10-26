@@ -60,7 +60,7 @@ const processInsights = (insightsData: any): MetaInsights | null => {
 
 export const useMetaData = (
   userId: string | null,
-  adAccountId: string | null,
+  adAccountId: string | null | undefined,
   isConnected: boolean,
   platformsLoaded: boolean,
   dateRange: string
@@ -85,13 +85,21 @@ export const useMetaData = (
 
   // Fetch campaigns
   useEffect(() => {
-    if (!platformsLoaded || !isConnected || !adAccountId || !userId) return;
+    if (!platformsLoaded || !isConnected || !adAccountId || !userId) {
+      if (platformsLoaded && isConnected && !adAccountId) {
+        console.log("⚠️ Meta connected but no ad_account_id selected yet");
+      }
+      return;
+    }
 
     const fetchCampaigns = async () => {
       try {
         setLoading((prev) => ({ ...prev, campaigns: true }));
+
+        const token = localStorage.getItem("access_token");
         const res = await axios.get(
-          `${backendUrl}/meta/campaigns/insights/${userId}/${adAccountId}`
+          `${backendUrl}/meta/campaigns/insights/${userId}/${adAccountId}`,
+          token ? { headers: { Authorization: `Bearer ${token}` } } : {}
         );
 
         const processed =
@@ -128,13 +136,21 @@ export const useMetaData = (
 
   // Fetch ad sets
   useEffect(() => {
-    if (!platformsLoaded || !isConnected || !adAccountId || !userId) return;
+    if (!platformsLoaded || !isConnected || !adAccountId || !userId) {
+      if (platformsLoaded && isConnected && !adAccountId) {
+        console.log("⚠️ Meta connected but no ad_account_id selected yet");
+      }
+      return;
+    }
 
     const fetchAdSets = async () => {
       try {
         setLoading((prev) => ({ ...prev, adSets: true }));
+
+        const token = localStorage.getItem("access_token");
         const res = await axios.get(
-          `${backendUrl}/meta/adsets/insights/${userId}/${adAccountId}`
+          `${backendUrl}/meta/adsets/insights/${userId}/${adAccountId}`,
+          token ? { headers: { Authorization: `Bearer ${token}` } } : {}
         );
 
         const processed =
@@ -172,13 +188,21 @@ export const useMetaData = (
 
   // Fetch ads
   useEffect(() => {
-    if (!platformsLoaded || !isConnected || !adAccountId || !userId) return;
+    if (!platformsLoaded || !isConnected || !adAccountId || !userId) {
+      if (platformsLoaded && isConnected && !adAccountId) {
+        console.log("⚠️ Meta connected but no ad_account_id selected yet");
+      }
+      return;
+    }
 
     const fetchAds = async () => {
       try {
         setLoading((prev) => ({ ...prev, ads: true }));
+
+        const token = localStorage.getItem("access_token");
         const res = await axios.get(
-          `${backendUrl}/meta/ads/insights/${userId}/${adAccountId}`
+          `${backendUrl}/meta/ads/insights/${userId}/${adAccountId}`,
+          token ? { headers: { Authorization: `Bearer ${token}` } } : {}
         );
 
         const processed =
@@ -220,14 +244,24 @@ export const useMetaData = (
     try {
       setLoading({ campaigns: true, adSets: true, ads: true });
 
+      const token = localStorage.getItem("access_token");
+      const config = token
+        ? { headers: { Authorization: `Bearer ${token}` } }
+        : {};
+
       const [campaignsRes, adsetsRes, adsRes] = await Promise.all([
         axios.get(
-          `${backendUrl}/meta/campaigns/insights/${userId}/${adAccountId}`
+          `${backendUrl}/meta/campaigns/insights/${userId}/${adAccountId}`,
+          config
         ),
         axios.get(
-          `${backendUrl}/meta/adsets/insights/${userId}/${adAccountId}`
+          `${backendUrl}/meta/adsets/insights/${userId}/${adAccountId}`,
+          config
         ),
-        axios.get(`${backendUrl}/meta/ads/insights/${userId}/${adAccountId}`),
+        axios.get(
+          `${backendUrl}/meta/ads/insights/${userId}/${adAccountId}`,
+          config
+        ),
       ]);
 
       setCampaigns(

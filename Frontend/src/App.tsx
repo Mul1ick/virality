@@ -11,6 +11,7 @@ import SignIn from "./pages/SignIn";
 import Profile from "./pages/Profile";
 import VerifyOTP from "./pages/VerifyOTP";
 import SelectMetaAccount from "./pages/SelectMetaAccount";
+import SelectGoogleAccount from "./pages/SelectGoogleAccount";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,11 @@ const App = () => (
           <Route path="/verify-otp" element={<VerifyOTP />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/select-meta-account" element={<SelectMetaAccount />} />
+          <Route
+            path="/select-google-account"
+            element={<SelectGoogleAccount />}
+          />
+
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

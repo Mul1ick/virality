@@ -4,8 +4,8 @@ import axios from "axios";
 
 export const useGoogleData = (
   userId: string | null,
-  managerId: string | null,
-  customerId: string | null,
+  managerId: string | null | undefined,
+  customerId: string | null | undefined,
   isConnected: boolean,
   platformsLoaded: boolean
 ) => {
@@ -16,13 +16,16 @@ export const useGoogleData = (
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
-    if (
-      !platformsLoaded ||
-      !isConnected ||
-      !managerId ||
-      !customerId ||
-      !userId
-    ) {
+    if (!platformsLoaded || !isConnected || !userId) {
+      return;
+    }
+
+    // Use selected_manager_id if available, fallback to manager_id
+    const effectiveManagerId = managerId;
+    const effectiveCustomerId = customerId;
+
+    if (!effectiveManagerId || !effectiveCustomerId) {
+      console.log("⚠️ Google connected but missing manager_id or customer_id");
       return;
     }
 
@@ -31,6 +34,7 @@ export const useGoogleData = (
         setLoading(true);
         console.log(`📊 Fetching Google campaigns...`);
 
+        const token = localStorage.getItem("access_token");
         const res = await axios.get(
           `${backendUrl}/google/campaigns/${userId}`,
           {
@@ -38,6 +42,7 @@ export const useGoogleData = (
               customer_id: customerId,
               manager_id: managerId,
             },
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
           }
         );
 

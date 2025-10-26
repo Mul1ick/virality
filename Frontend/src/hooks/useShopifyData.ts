@@ -21,7 +21,11 @@ export const useShopifyData = (
         setLoading(true);
         console.log("📊 Fetching Shopify data...");
 
-        const res = await axios.get(`${backendUrl}/shopify/orders/${userId}`);
+        const token = localStorage.getItem("access_token");
+        const res = await axios.get(
+          `${backendUrl}/shopify/orders/${userId}`,
+          token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+        );
 
         setOrders(res.data.data || []);
         setError(null);

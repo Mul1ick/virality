@@ -168,8 +168,9 @@ def get_user_connection_status(user_id: str):
                 # Add essential IDs needed by the frontend to fetch data
                 "ad_account_id": details.get("ad_account_id") if platform == "meta" else None,
                 "customer_ids": details.get("customer_ids") if platform == "google" else None,
-                 "manager_id": details.get("manager_id") if platform == "google" else None, # Pass manager_id
-                 "client_customer_id": details.get("client_customer_id") if platform == "google" else None, # Pass client_id
+                "manager_id": details.get("manager_id") if platform == "google" else None, # Pass manager_id
+                "client_customer_id": details.get("client_customer_id") if platform == "google" else None, # Pass client_id
+                "selected_manager_id": details.get("selected_manager_id") if platform == "google" else None,
                 "shop_url": details.get("shop_url") if platform == "shopify" else None,
             }
             # Remove keys with None values for cleaner output
