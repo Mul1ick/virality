@@ -1,144 +1,4 @@
-# from pymongo import MongoClient
-# from app.config import settings
 
-# client = MongoClient(settings.MONGO_URI)
-# db = client[settings.DB_NAME]
-
-# users_collection = db["users"]
-# campaigns_collection = db["campaigns"]
-# adsets_collection = db["adsets"]
-# ads_collection = db["ads"]
-
-
-# def save_or_update_user_token(user_id: str, token_data: dict, source: str):
-#     users_collection.update_one(
-#         {"user_id": user_id, "source": source},  # 👈 composite key
-#         {"$set": {
-#             "access_token": token_data["access_token"],
-#             "refresh_token": token_data.get("refresh_token"),
-#             "token_type": token_data.get("token_type"),
-#             "expires_in": token_data.get("expires_in")
-#         }},
-#         upsert=True
-#     )
-
-
-# # ADD THIS NEW FUNCTION
-# def get_user_token(user_id: str):
-#     """Retrieves a user's token data from the database."""
-#     user_data = users_collection.find_one({"user_id": user_id})
-#     return user_data
-
-# def save_campaigns(ad_account_id: str, campaigns_data: list):
-#     # ... (this function is correct, no changes needed)
-#     if not campaigns_data:
-#         print("No campaigns to save.")
-#         return
-
-#     for campaign in campaigns_data:
-#         campaign_id = campaign["id"]
-#         campaign["ad_account_id"] = ad_account_id
-#         campaigns_collection.update_one(
-#             {"id": campaign_id},
-#             {"$set": campaign},
-#             upsert=True
-#         )
-#     print(f"Saved {len(campaigns_data)} campaigns for ad account {ad_account_id}")
-
-# def save_campaign_insights(campaigns_with_insights: list):
-#     """Merges insights data into existing campaign documents."""
-#     if not campaigns_with_insights:
-#         print("No campaign insights to save.")
-#         return
-
-#     for campaign in campaigns_with_insights:
-#         # The insights data is nested, so we extract it.
-#         insights = campaign.get("insights", {}).get("data", [{}])[0]
-        
-#         # Prepare the update document. We use dot notation for nested fields.
-#         update_data = {
-#             f"insights.{key}": value for key, value in insights.items()
-#         }
-
-#         campaigns_collection.update_one(
-#             {"id": campaign["id"]},
-#             {"$set": update_data},
-#             upsert=False # We only update campaigns that already exist
-#         )
-#     print(f"Updated insights for {len(campaigns_with_insights)} campaigns.")
-
-
-# def save_adsets(ad_account_id: str, adsets_data: list):
-#     """Saves a list of ad sets to the adsets_collection."""
-#     if not adsets_data:
-#         print("No ad sets to save.")
-#         return
-
-#     for adset in adsets_data:
-#         adset_id = adset["id"]
-#         adset["ad_account_id"] = ad_account_id
-#         adsets_collection.update_one(
-#             {"id": adset_id},
-#             {"$set": adset},
-#             upsert=True
-#         )
-#     print(f"Saved {len(adsets_data)} ad sets for ad account {ad_account_id}")
-
-
-# # 👇 ADD THIS NEW FUNCTION TO SAVE ADS
-# def save_ads(ad_account_id: str, ads_data: list):
-#     """Saves a list of ads to the ads_collection."""
-#     if not ads_data:
-#         print("No ads to save.")
-#         return
-
-#     for ad in ads_data:
-#         ad_id = ad["id"]
-#         ad["ad_account_id"] = ad_account_id
-#         ads_collection.update_one(
-#             {"id": ad_id},
-#             {"$set": ad},
-#             upsert=True
-#         )
-#     print(f"Saved {len(ads_data)} ads for ad account {ad_account_id}")
-
-# def save_adset_insights(adsets_with_insights: list):
-#     """Merges insights data into existing adset documents."""
-#     if not adsets_with_insights:
-#         print("No ad set insights to save.")
-#         return
-
-#     for adset in adsets_with_insights:
-#         insights = adset.get("insights", {}).get("data", [{}])[0]
-#         update_data = {
-#             f"insights.{key}": value for key, value in insights.items()
-#         }
-#         adsets_collection.update_one(
-#             {"id": adset["id"]},
-#             {"$set": update_data},
-#             upsert=False
-#         )
-#     print(f"Updated insights for {len(adsets_with_insights)} ad sets.")
-
-
-# # 👇 ADD THIS NEW FUNCTION FOR AD INSIGHTS
-# def save_ad_insights(ads_with_insights: list):
-#     """Merges insights data into existing ad documents."""
-#     if not ads_with_insights:
-#         print("No ad insights to save.")
-#         return
-
-#     for ad in ads_with_insights:
-#         insights = ad.get("insights", {}).get("data", [{}])[0]
-#         update_data = {
-#             f"insights.{key}": value for key, value in insights.items()
-#         }
-#         ads_collection.update_one(
-#             {"id": ad["id"]},
-#             {"$set": update_data},
-#             upsert=False
-#         )
-#     print(f"Updated insights for {len(ads_with_insights)} ads.")
 
 from pymongo import MongoClient, UpdateOne
 from app.config import settings
@@ -191,65 +51,68 @@ def get_user_by_id(user_id: str):
 def save_or_update_platform_connection(user_id: str, platform: str, platform_data: dict):
     """
     Updates a user's document to store connection details for a specific platform.
-    Uses dot notation to update nested fields within connected_platforms.
+    Uses dot-notation to update nested fields within connected_platforms.<platform>.
+    Automatically handles tokens, expiry, customer IDs, accounts list, etc.
     """
     update_fields = {}
-    # Basic connection status and timestamp
+    # --- Basic connection status ---
     update_fields[f"connected_platforms.{platform}.connected"] = True
     update_fields[f"connected_platforms.{platform}.connected_at"] = datetime.utcnow()
 
-    # Platform-specific tokens and IDs
+    # --- Tokens and expiry ---
     if "access_token" in platform_data:
         update_fields[f"connected_platforms.{platform}.access_token"] = platform_data["access_token"]
-    if "refresh_token" in platform_data: # Mainly for Google
-        update_fields[f"connected_platforms.{platform}.refresh_token"] = platform_data.get("refresh_token")
-    if "expires_in" in platform_data: # Mainly for Meta
-        update_fields[f"connected_platforms.{platform}.expires_in"] = platform_data.get("expires_in")
-        update_fields[f"connected_platforms.{platform}.token_expiry"] = datetime.utcnow() + timedelta(seconds=platform_data.get("expires_in", 0))
-    if "expiry" in platform_data: # Google's expiry timestamp
-         update_fields[f"connected_platforms.{platform}.token_expiry"] = platform_data.get("expiry") # Assuming it's already a datetime object or ISO string
+    if "refresh_token" in platform_data:
+        update_fields[f"connected_platforms.{platform}.refresh_token"] = platform_data["refresh_token"]
+    if "expires_in" in platform_data:
+        update_fields[f"connected_platforms.{platform}.expires_in"] = platform_data["expires_in"]
+        update_fields[f"connected_platforms.{platform}.token_expiry"] = datetime.utcnow() + timedelta(
+            seconds=platform_data.get("expires_in", 0)
+        )
+    if "expiry" in platform_data:
+        update_fields[f"connected_platforms.{platform}.token_expiry"] = platform_data["expiry"]
 
-    # Store specific IDs needed later
+    # --- Google-specific fields ---
+    if platform == "google":
+        if "customer_ids" in platform_data:
+            ids = platform_data["customer_ids"]
+            update_fields[f"connected_platforms.{platform}.customer_ids"] = (
+                ids if isinstance(ids, list) else [ids]
+            )
+        if "manager_id" in platform_data:
+            update_fields[f"connected_platforms.{platform}.manager_id"] = platform_data["manager_id"]
+        if "client_customer_id" in platform_data:
+            update_fields[f"connected_platforms.{platform}.client_customer_id"] = platform_data["client_customer_id"]
+
+    # --- Meta-specific fields ---
     if platform == "meta" and "ad_account_id" in platform_data:
         update_fields[f"connected_platforms.{platform}.ad_account_id"] = platform_data["ad_account_id"]
-    if platform == "google" and "customer_ids" in platform_data:
-        # Ensure it's always stored as a list, even if only one is found
-        customer_ids = platform_data.get("customer_ids", [])
-        update_fields[f"connected_platforms.{platform}.customer_ids"] = customer_ids if isinstance(customer_ids, list) else [customer_ids]
-        # Optionally store the specific manager/client IDs used if needed later
-        if "manager_id" in platform_data:
-             update_fields[f"connected_platforms.{platform}.manager_id"] = platform_data["manager_id"]
-        if "client_customer_id" in platform_data:
-             update_fields[f"connected_platforms.{platform}.client_customer_id"] = platform_data["client_customer_id"]
+
+    # --- Shopify-specific fields ---
     if platform == "shopify" and "shop_url" in platform_data:
         update_fields[f"connected_platforms.{platform}.shop_url"] = platform_data["shop_url"]
 
-    # Also store the platform's user identifier if available (e.g., Google user ID, Meta user ID)
+    # --- Platform user identifier ---
     if "platform_user_id" in platform_data:
-         update_fields[f"platform_ids.{platform}"] = platform_data["platform_user_id"]
+        update_fields[f"platform_ids.{platform}"] = platform_data["platform_user_id"]
 
+    # --- ✅ FIX: Save accounts list (Google Ads Manager accounts etc.) ---
+    if "accounts" in platform_data:
+        update_fields[f"connected_platforms.{platform}.accounts"] = platform_data["accounts"]
 
-    # Use the MongoDB '_id' (ObjectId) for updating the specific user document
+    # --- Perform the update ---
     try:
         result = users_collection.update_one(
-            {"_id": ObjectId(user_id)}, # Find user by primary MongoDB ID
+            {"_id": ObjectId(user_id)},
             {"$set": update_fields},
-            upsert=True # Creates the connected_platforms field if it doesn't exist
+            upsert=True
         )
-        logger.info(f"Updated platform connection for user '{user_id}', platform '{platform}'. Matched: {result.matched_count}, Modified: {result.modified_count}, UpsertedId: {result.upserted_id}")
+        logger.info(
+            f"Updated platform connection for user '{user_id}', platform '{platform}'. "
+            f"Matched: {result.matched_count}, Modified: {result.modified_count}, UpsertedId: {result.upserted_id}"
+        )
     except Exception as e:
-         logger.error(f"Failed to update platform connection for user '{user_id}', platform '{platform}': {e}")
-         # Attempt fallback using email if ObjectId failed (might happen during initial connection if only email is known)
-         logger.info(f"Retrying update using email for user '{user_id}'")
-         result_email = users_collection.update_one(
-             {"email": user_id}, # Try finding user by email
-             {"$set": update_fields},
-             upsert=False # Do not create a new user doc if email not found
-         )
-         if result_email.matched_count == 0:
-             logger.error(f"User not found by ObjectId or email for '{user_id}'. Platform connection update failed.")
-         else:
-              logger.info(f"Updated platform connection via email fallback for user '{user_id}', platform '{platform}'. Matched: {result_email.matched_count}, Modified: {result_email.modified_count}")
+        logger.error(f"Failed to update platform connection for user '{user_id}', platform '{platform}': {e}")
 
 
 def get_platform_connection_details(user_id: str, platform: str):
@@ -495,3 +358,36 @@ def save_shopify_user_token(user_id: str, access_token: str, shop_url: str):
         upsert=True
     )
     logger.info(f"Shopify token data saved for user '{user_id}'. Payload: {update_payload}")
+    
+    google_daily_insights_collection = db["google_daily_insights"]
+
+def save_google_daily_insights(user_id: str, ad_account_id: str, insights_data: list):
+    """Bulk-upserts daily Google Ads insights."""
+    if not insights_data:
+        logger.info("No Google insights to save.")
+        return 0
+
+    bulk_ops = []
+    for record in insights_data:
+        filter_query = {
+            "campaign_id": record.get("campaign_id"),
+            "date": record.get("date"),
+            "platform": "google"
+        }
+        update_doc = {
+            "$set": {
+                **record,
+                "user_id": user_id,
+                "ad_account_id": ad_account_id,
+                "platform": "google"
+            }
+        }
+        bulk_ops.append(UpdateOne(filter_query, update_doc, upsert=True))
+
+    try:
+        result = google_daily_insights_collection.bulk_write(bulk_ops)
+        logger.info(f"[Google Insights] Bulk write: Matched={result.matched_count}, Upserted={result.upserted_count}, Modified={result.modified_count}")
+        return result.upserted_count + result.modified_count
+    except Exception as e:
+        logger.error(f"[Google Insights] Error during bulk write: {e}")
+        return 0

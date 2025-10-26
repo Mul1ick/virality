@@ -24,8 +24,8 @@ class Settings:
 
     # --- Google Ads API ---
     GOOGLE_DEVELOPER_TOKEN = os.getenv("GOOGLE_DEVELOPER_TOKEN")  # REQUIRED
-    GOOGLE_TEST_ACCOUNT_ID = os.getenv("GOOGLE_TEST_ACCOUNT_ID")  # optional (for local tests)
-    GOOGLE_LOGIN_CUSTOMER_ID = os.getenv("GOOGLE_LOGIN_CUSTOMER_ID")  # optional MCC id (no dashes)
+
+   
 
     # --- Meta OAuth ---
     META_APP_ID = os.getenv("META_APP_ID")
