@@ -5,6 +5,7 @@ import string
 from datetime import datetime, timedelta
 from jose import jwt
 
+from app.utils.logger import get_logger
 from app.database import db
 from app.utils.email_sender import send_otp_email
 from app.config import settings
@@ -17,7 +18,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 hours
 
 users_collection = db["users"]
-
+logger = get_logger()
 # --- Pydantic Models ---
 class UserCreate(BaseModel):
     name: str
@@ -92,4 +93,5 @@ def verify_otp(data: OtpVerify):
     )
 
     access_token = create_access_token(data={"sub": user["email"], "user_id": str(user["_id"])})
+    logger.info(f"Generated JWT for {user['email']}: {access_token}")
     return {"access_token": access_token, "token_type": "bearer", "user_id": str(user["_id"])}

@@ -1,131 +1,86 @@
-# FILE: app/utils/shopify_api.py
-
-import requests
+import requests, time
 from app.utils.logger import get_logger
-from app.config import settings # Needed if you use settings later
 
 logger = get_logger()
-
-# Use the latest stable API version (check Shopify docs for current version)
 API_VERSION = "2025-10"
 
-def _get_graphql_url(shop_url: str) -> str:
-    """Constructs the GraphQL endpoint URL."""
-    return f"https://{shop_url}/admin/api/{API_VERSION}/graphql.json"
-
-def _get_shopify_headers(access_token: str) -> dict:
-    """Creates the necessary headers for Shopify API requests."""
-    return {
-        "X-Shopify-Access-Token": access_token,
-        "Content-Type": "application/json",
-    }
-
-def execute_shopify_query(shop_url: str, access_token: str, query: str, variables: dict = None) -> dict | None:
-    """Executes a GraphQL query against the Shopify Admin API."""
-    graphql_url = _get_graphql_url(shop_url)
-    headers = _get_shopify_headers(access_token)
-    payload = {'query': query}
-    if variables:
-        payload['variables'] = variables
-
+def _graphql(shop_url, token, query, variables=None):
+    url = f"https://{shop_url}/admin/api/{API_VERSION}/graphql.json"
+    headers = {"X-Shopify-Access-Token": token, "Content-Type": "application/json"}
     try:
-        resp = requests.post(graphql_url, headers=headers, json=payload)
-        resp.raise_for_status() # Check for HTTP errors
-        response_data = resp.json()
-
-        # Check for GraphQL errors within the response
-        if "errors" in response_data:
-            logger.error(f"[Shopify API] GraphQL errors for shop {shop_url}: {response_data['errors']}")
-            return None # Indicate failure
-
-        logger.info(f"[Shopify API] GraphQL query successful for shop {shop_url}.")
-        return response_data
-
-    except requests.exceptions.RequestException as e:
-        error_detail = e.response.text if e.response else str(e)
-        logger.error(f"[Shopify API] Failed to execute query for shop {shop_url}: {error_detail}")
-        return None # Indicate failure
+        r = requests.post(url, headers=headers, json={"query": query, "variables": variables or {}}, timeout=20)
+        if r.status_code == 429:
+            wait = int(r.headers.get("Retry-After", "2"))
+            logger.warning(f"[Shopify API] Rate limited, sleeping {wait}s")
+            time.sleep(wait)
+            return _graphql(shop_url, token, query, variables)
+        r.raise_for_status()
+        data = r.json()
+        if "errors" in data:
+            logger.error(f"[Shopify API] GraphQL errors: {data['errors']}")
+            return None
+        return data
     except Exception as e:
-        logger.error(f"[Shopify API] An unexpected error occurred for shop {shop_url}: {str(e)}")
-        return None # Indicate failure
+        logger.error(f"[Shopify API] Request failed: {e}")
+        return None
 
 
-# --- Specific Data Fetching Functions ---
-
-def get_shopify_orders(shop_url: str, access_token: str) -> dict | None:
-    """Fetches the 10 most recent orders."""
-    query = """
-    query GetOrders {
-      orders(first: 10, sortKey: PROCESSED_AT, reverse: true) {
-        edges {
-          node {
-            id
-            name # Order number like #1001
-            processedAt
-            displayFinancialStatus
-            displayFulfillmentStatus
-            totalPriceSet {
-              shopMoney {
-                amount
-                currencyCode
-              }
-            }
-            customer {
-              firstName
-              lastName
-              email
-            }
-            lineItems(first: 5) {
-              edges {
-                node {
-                  title
-                  quantity
-                  variant {
-                    price
-                    product { title }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+def _iterate(shop_url, token, connection, node_fields, variables=None):
+    query = f"""
+    query Paginated($cursor: String) {{
+      {connection}(first: 100, after: $cursor) {{
+        edges {{
+          cursor
+          node {{ {node_fields} }}
+        }}
+        pageInfo {{ hasNextPage }}
+      }}
+    }}
     """
-    return execute_shopify_query(shop_url, access_token, query)
+    cursor, all_nodes = None, []
+    while True:
+        resp = _graphql(shop_url, token, query, {"cursor": cursor})
+        if not resp: break
+        edges = resp["data"][connection]["edges"]
+        all_nodes += [e["node"] for e in edges]
+        if not resp["data"][connection]["pageInfo"]["hasNextPage"]:
+            break
+        cursor = edges[-1]["cursor"]
+        logger.info(f"[Shopify API] Fetched {len(all_nodes)} so far from {connection}")
+    return all_nodes
 
 
-def get_shopify_products(shop_url: str, access_token: str) -> dict | None:
-    """Fetches the first 10 products."""
-    query = """
-    query GetProducts {
-      products(first: 10) {
-        edges {
-          node {
-            id
-            title
-            handle
-            status
-            totalInventory
-            productType
-            vendor
-            createdAt
-            updatedAt
-            variants(first: 5) {
-              edges {
-                node {
-                  id
-                  title
-                  price
-                  inventoryQuantity
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+def get_all_orders(shop_url, token):
+    fields = """
+      id name processedAt displayFinancialStatus displayFulfillmentStatus
+      totalPriceSet { shopMoney { amount currencyCode } }
+      lineItems(first: 50) { edges { node { title quantity variant { price } } } }
     """
-    return execute_shopify_query(shop_url, access_token, query)
+    return _iterate(shop_url, token, "orders", fields)
 
-# Add more functions here later for analytics, customers, etc. as needed
+
+def get_all_products(shop_url, token):
+    fields = """
+      id title handle status totalInventory productType vendor createdAt updatedAt
+      variants(first: 50) { edges { node { id title price inventoryQuantity } } }
+    """
+    return _iterate(shop_url, token, "products", fields)
+
+
+def get_all_customers(shop_url, token):
+    fields = "id email firstName lastName state createdAt updatedAt verifiedEmail"
+    return _iterate(shop_url, token, "customers", fields)
+
+
+def get_all_collections(shop_url, token):
+    fields = "id title handle updatedAt"
+    return _iterate(shop_url, token, "collections", fields)
+
+
+def get_inventory_levels(shop_url, token):
+    fields = """
+      id sku inventoryQuantity
+      inventoryItem { id }
+      product { id title }
+    """
+    return _iterate(shop_url, token, "productVariants", fields)
