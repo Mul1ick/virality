@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from datetime import date
 from typing import Optional
 
-from app.services.aggregation_service import AggregationService
+from app.services.aggeregation_service import AggregationService
 from app.utils.security import get_current_user_id
 from app.utils.logger import get_logger
 

@@ -13,7 +13,7 @@ from app.config import config
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # --- Security and Configuration ---
-SECRET_KEY = config.JWT_SECRET_KEY
+SECRET_KEY = config.settings.JWT_SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 hours
 

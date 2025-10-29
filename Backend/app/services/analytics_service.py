@@ -20,13 +20,13 @@ class AnalyticsService:
     def __init__(self):
         # Initialize DB + Gemini client once
         try:
-            genai.configure(api_key=config.GEMINI_API_KEY)
+            genai.configure(api_key=config.settings.GEMINI_API_KEY)
         except AttributeError:
             raise RuntimeError("Missing GEMINI_API_KEY in .env file")
 
         try:
-            client = MongoClient(config.MONGO_URI)
-            self.db = client[config.DB_NAME]
+            client = MongoClient(config.settings.MONGO_URI)
+            self.db = client[config.settings.DB_NAME]
         except Exception as e:
             raise RuntimeError(f"Failed to connect to MongoDB: {e}")
 

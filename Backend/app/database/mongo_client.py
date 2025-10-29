@@ -21,8 +21,8 @@ logger = get_logger()
 # ------------------------------------------------------------
 # ⚙️ MongoDB Initialization
 # ------------------------------------------------------------
-client = MongoClient(config.MONGO_URI)
-db = client[config.DB_NAME]
+client = MongoClient(config.settings.MONGO_URI)
+db = client[config.settings.DB_NAME]
 
 # Core collections
 users_collection = db["users"]
