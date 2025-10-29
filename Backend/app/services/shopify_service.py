@@ -11,7 +11,7 @@ from app.utils.shopify_api import (
     get_all_collections, get_inventory_levels
 )
 from app.utils.security import decode_token
-from app.config.settings import settings
+from virality.Backend.app.config.config import settings
 
 logger = get_logger()
 

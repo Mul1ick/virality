@@ -7,7 +7,7 @@ for Shopify platform integrations.
 
 from fastapi import APIRouter, Query, HTTPException, Request, Depends
 from fastapi.responses import RedirectResponse
-from app.config.settings import settings
+from virality.Backend.app.config.config import settings
 from app.utils.security import create_state_token, get_current_user_id
 from app.utils.logger import get_logger
 from app.services import shopify_service

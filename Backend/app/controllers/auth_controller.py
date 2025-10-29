@@ -8,12 +8,12 @@ from jose import jwt
 from app.utils.logger import get_logger
 from app.database import db
 from app.utils.email_sender import send_otp_email
-from app.config import settings
+from virality.Backend.app.config import config
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # --- Security and Configuration ---
-SECRET_KEY = settings.JWT_SECRET_KEY
+SECRET_KEY = config.JWT_SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 hours
 
