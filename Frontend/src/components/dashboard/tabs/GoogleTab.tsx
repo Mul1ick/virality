@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { CreativeGallery } from "@/components/dashboard/CreativeGallery";
 import { RefreshCw } from "lucide-react";
+import { DateRange } from "react-day-picker";
 
 interface GoogleCampaign {
   id: string;
@@ -18,6 +19,8 @@ interface GoogleTabProps {
   isConnected: boolean;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
+  dateRange: string;
+  customRange?: DateRange;
 }
 
 export const GoogleTab = ({
@@ -26,6 +29,8 @@ export const GoogleTab = ({
   isConnected,
   isRefreshing,
   onRefresh,
+  dateRange,
+  customRange,
 }: GoogleTabProps) => {
   const hasData = campaigns.length > 0;
 

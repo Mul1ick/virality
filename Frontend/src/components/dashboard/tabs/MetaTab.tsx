@@ -1,4 +1,3 @@
-// components/dashboard/tabs/MetaTab.tsx
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { MetaCampaignsTable } from "@/components/dashboard/MetaCampaignsTable";
@@ -6,6 +5,7 @@ import { MetaAdSetsTable } from "@/components/dashboard/MetaAdSetsTable";
 import { MetaAdsTable } from "@/components/dashboard/MetaAdsTable";
 import { Facebook, RefreshCw } from "lucide-react";
 import { MetaCampaign, MetaAdSet, MetaAd } from "@/hooks/useMetaData";
+import { DateRange } from "react-day-picker";
 
 interface MetaTabProps {
   campaigns: MetaCampaign[];
@@ -19,6 +19,8 @@ interface MetaTabProps {
   isConnected: boolean;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
+  dateRange: string;
+  customRange?: DateRange;
 }
 
 export const MetaTab = ({
@@ -29,6 +31,8 @@ export const MetaTab = ({
   isConnected,
   isRefreshing,
   onRefresh,
+  dateRange,
+  customRange,
 }: MetaTabProps) => {
   const hasData = campaigns.length > 0 || adSets.length > 0 || ads.length > 0;
 

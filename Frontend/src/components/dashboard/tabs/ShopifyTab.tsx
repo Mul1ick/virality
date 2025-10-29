@@ -1,12 +1,19 @@
-// components/dashboard/tabs/ShopifyTab.tsx
 import { ShoppingCart } from "lucide-react";
+import { DateRange } from "react-day-picker";
 
 interface ShopifyTabProps {
   orders: any[];
   isConnected: boolean;
+  dateRange: string;
+  customRange?: DateRange;
 }
 
-export const ShopifyTab = ({ orders, isConnected }: ShopifyTabProps) => {
+export const ShopifyTab = ({
+  orders,
+  isConnected,
+  dateRange,
+  customRange,
+}: ShopifyTabProps) => {
   return (
     <div className="bg-card rounded-lg border p-6">
       <div className="flex items-center gap-3 mb-4">

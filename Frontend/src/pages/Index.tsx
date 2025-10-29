@@ -1,4 +1,3 @@
-// pages/Index.tsx
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   TrendingUp,
@@ -9,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { DateRange } from "react-day-picker";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { NotificationBanner } from "@/components/dashboard/NotificationBanner";
 import { OverviewTab } from "@/components/dashboard/tabs/OverviewTab";
@@ -22,15 +22,9 @@ import { useShopifyData } from "@/hooks/useShopifyData";
 
 const Index = () => {
   const [dateRange, setDateRange] = useState("30days");
+  const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showHistoricalBanner, setShowHistoricalBanner] = useState(true);
-
-  // User data
-  const [user, setUser] = useState({
-    name: "Loading...",
-    email: "Loading...",
-    avatarUrl: null as string | null,
-  });
 
   // Get userId from URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -84,17 +78,6 @@ const Index = () => {
     platformStatus.shopify.connected,
     !platformsLoading
   );
-
-  // Set user info when platforms load
-  useEffect(() => {
-    if (!platformsLoading && userId) {
-      setUser({
-        name: "User",
-        email: userId,
-        avatarUrl: null,
-      });
-    }
-  }, [platformsLoading, userId]);
 
   // Notification state
   const [notifications, setNotifications] = useState({
@@ -238,12 +221,26 @@ const Index = () => {
     }
   };
 
+  // Handle date range change
+  const handleDateRangeChange = (value: string) => {
+    setDateRange(value);
+    if (value !== "custom") {
+      setCustomRange(undefined);
+    }
+  };
+
+  // Handle custom range change
+  const handleCustomRangeChange = (range: DateRange | undefined) => {
+    setCustomRange(range);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader
-        user={user}
         dateRange={dateRange}
-        onDateRangeChange={setDateRange}
+        onDateRangeChange={handleDateRangeChange}
+        customRange={customRange}
+        onCustomRangeChange={handleCustomRangeChange}
       />
 
       <main className="container mx-auto px-6 py-4">
@@ -308,7 +305,7 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="overview">
-            <OverviewTab dateRange={dateRange} />
+            <OverviewTab dateRange={dateRange} customRange={customRange} />
           </TabsContent>
 
           <TabsContent value="meta">
@@ -320,6 +317,8 @@ const Index = () => {
               isConnected={platformStatus.meta.connected}
               isRefreshing={isRefreshing}
               onRefresh={handleRefreshMeta}
+              dateRange={dateRange}
+              customRange={customRange}
             />
           </TabsContent>
 
@@ -330,6 +329,8 @@ const Index = () => {
               loading={googleLoading}
               isRefreshing={isRefreshing}
               onRefresh={handleRefreshGoogle}
+              dateRange={dateRange}
+              customRange={customRange}
             />
           </TabsContent>
 
@@ -337,6 +338,8 @@ const Index = () => {
             <ShopifyTab
               orders={shopifyOrders}
               isConnected={platformStatus.shopify.connected}
+              dateRange={dateRange}
+              customRange={customRange}
             />
           </TabsContent>
         </Tabs>

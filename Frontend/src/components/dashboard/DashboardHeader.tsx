@@ -1,5 +1,4 @@
-// components/dashboard/DashboardHeader.tsx
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,25 +11,36 @@ import {
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
 import { BarChart3, User, Settings, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-interface User {
-  name: string;
-  email: string;
-  avatarUrl: string | null;
-}
+import { DateRange } from "react-day-picker";
+import { useState, useEffect } from "react";
 
 interface DashboardHeaderProps {
-  user: User;
   dateRange: string;
   onDateRangeChange: (range: string) => void;
+  customRange?: DateRange;
+  onCustomRangeChange?: (range: DateRange | undefined) => void;
 }
 
 export const DashboardHeader = ({
-  user,
   dateRange,
   onDateRangeChange,
+  customRange,
+  onCustomRangeChange,
 }: DashboardHeaderProps) => {
   const navigate = useNavigate();
+  const [userName, setUserName] = useState("U");
+  const [userEmail, setUserEmail] = useState("");
+
+  // Get user info from localStorage on mount
+  useEffect(() => {
+    const userId = localStorage.getItem("user_id");
+    if (userId) {
+      setUserEmail(userId);
+      // Generate initials from email (first letter before @)
+      const initial = userId.charAt(0).toUpperCase();
+      setUserName(initial);
+    }
+  }, []);
 
   const handleSignOut = () => {
     localStorage.clear();
@@ -54,7 +64,12 @@ export const DashboardHeader = ({
           </div>
 
           <div className="flex items-center gap-4">
-            <DateRangeSelector date={dateRange} onChange={onDateRangeChange} />
+            <DateRangeSelector
+              date={dateRange}
+              onChange={onDateRangeChange}
+              customRange={customRange}
+              onCustomRangeChange={onCustomRangeChange}
+            />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -63,12 +78,8 @@ export const DashboardHeader = ({
                   className="relative h-10 w-10 rounded-full"
                 >
                   <Avatar className="h-10 w-10 border-2 border-primary/20">
-                    <AvatarImage src={user.avatarUrl || ""} alt={user.name} />
                     <AvatarFallback className="bg-primary/20 text-primary font-semibold">
-                      {user.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
+                      {userName}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -77,10 +88,10 @@ export const DashboardHeader = ({
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">
-                      {user.name}
+                      {userEmail || "User"}
                     </p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {user.email}
+                      Dashboard User
                     </p>
                   </div>
                 </DropdownMenuLabel>

@@ -1,12 +1,13 @@
-// components/dashboard/tabs/OverviewTab.tsx
 import { KPICard } from "@/components/dashboard/KPICard";
 import { TrendChart } from "@/components/dashboard/TrendChart";
+import { DateRange } from "react-day-picker";
 
 interface OverviewTabProps {
   dateRange: string;
+  customRange?: DateRange;
 }
 
-export const OverviewTab = ({ dateRange }: OverviewTabProps) => {
+export const OverviewTab = ({ dateRange, customRange }: OverviewTabProps) => {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
