@@ -12,6 +12,7 @@ from app.services.meta_service import (
 )
 from app.database.mongo_client import save_or_update_platform_connection, get_platform_connection_details
 from app.config import config
+import requests
 
 router = APIRouter( tags=["Meta Ads"])
 logger = get_logger()
@@ -70,17 +71,39 @@ def meta_callback(code: str = Query(...), state: str = Query(...)):
 # ---------------------------------------------------------------------------
 @router.get("/campaigns/{user_id}/{ad_account_id}")
 def get_campaigns(user_id: str, ad_account_id: str):
-    return fetch_and_save("campaigns", user_id, ad_account_id, "name,status,objective", "campaigns")
+    """Fetches campaigns (basic info) and saves them."""
+    # Arguments: endpoint, user_id, ad_account_id, fields, collection_name
+    return fetch_and_save(
+        endpoint="campaigns",
+        user_id=user_id,
+        ad_account_id=ad_account_id,
+        fields="name,status,objective", # Fields from your old code
+        collection="campaigns" # Collection name from your old code
+    )
 
 
 @router.get("/adsets/{user_id}/{ad_account_id}")
 def get_adsets(user_id: str, ad_account_id: str):
-    return fetch_and_save("adsets", user_id, ad_account_id, "name,status,daily_budget,campaign_id", "adsets")
+    """Fetches ad sets (basic info) and saves them."""
+    return fetch_and_save(
+        endpoint="adsets",
+        user_id=user_id,
+        ad_account_id=ad_account_id,
+        fields="name,status,daily_budget,campaign_id", # Fields from your old code
+        collection="adsets" # Collection name from your old code
+    )
 
 
 @router.get("/ads/{user_id}/{ad_account_id}")
 def get_ads(user_id: str, ad_account_id: str):
-    return fetch_and_save("ads", user_id, ad_account_id, "name,status,adset_id,creative{image_url,body}", "ads")
+    """Fetches ads (basic info + creative) and saves them."""
+    return fetch_and_save(
+        endpoint="ads",
+        user_id=user_id,
+        ad_account_id=ad_account_id,
+        fields="name,status,adset_id,creative{image_url,body}", # Fields from your old code
+        collection="ads" # Collection name from your old code
+    )
 
 
 # ---------------------------------------------------------------------------

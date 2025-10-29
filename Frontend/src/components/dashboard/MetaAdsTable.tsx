@@ -154,9 +154,9 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
                   Clicks
                 </TableHead>
                 <TableHead className="font-semibold text-right">CTR</TableHead>
-                <TableHead className="font-semibold text-right">
+                {/* <TableHead className="font-semibold text-right">
                   Frequency
-                </TableHead>
+                </TableHead> */}
                 <TableHead className="font-semibold text-right">CPM</TableHead>
                 <TableHead className="font-semibold text-right">CPC</TableHead>
               </TableRow>
@@ -234,9 +234,9 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
                             {formatPercentage(ad.insights.ctr)}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right">
+                        {/* <TableCell className="text-right">
                           {ad.insights.frequency.toFixed(2)}
-                        </TableCell>
+                        </TableCell> */}
                         <TableCell className="text-right">
                           {formatCurrency(ad.insights.cpm)}
                         </TableCell>
