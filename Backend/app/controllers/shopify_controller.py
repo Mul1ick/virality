@@ -173,7 +173,7 @@ def shopify_login(shop: str = Query(..., description="The merchant's shop domain
         f"&redirect_uri={redirect_uri}"
         f"&state=dummy_state"
     )
-    logger.info(f"[Shopify OAuth] Redirecting user {current_user_id} for shop: {shop}")
+    # logger.info(f"[Shopify OAuth] Redirecting user {current_user_id} for shop: {shop}")
     logger.info(f"[Shopify OAuth] Constructed auth URL: {auth_url}")
     try:
         return {"redirect_url": auth_url}

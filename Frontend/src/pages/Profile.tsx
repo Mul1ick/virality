@@ -33,7 +33,6 @@ interface UserProfileData {
   id: string;
   name: string;
   email: string;
-  // avatarUrl: "https://placehold.co/100x100/A0BFFF/FFFFFF?text=AJ"
 }
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -123,13 +122,12 @@ const Profile = () => {
   const [userData, setUserData] = useState<UserProfileData | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
-
-  // --- NEW: Separate state for platform status fetching ---
   const [platformStatusLoading, setPlatformStatusLoading] = useState(true);
   const [platformStatusError, setPlatformStatusError] = useState<string | null>(
     null
   );
 
+  // Effect 1: Fetch User Profile
   useEffect(() => {
     const fetchUserProfile = async () => {
       setProfileLoading(true);
@@ -140,7 +138,6 @@ const Profile = () => {
       if (!userId || !token) {
         setProfileError("Authentication required. Please log in.");
         setProfileLoading(false);
-        // navigate("/signin"); // Redirect if auth details missing
         return;
       }
 
@@ -157,21 +154,19 @@ const Profile = () => {
         );
         if (err.response?.status === 401 || err.response?.status === 403) {
           localStorage.clear();
-          // navigate("/signin"); // Redirect on auth failure
         }
       } finally {
         setProfileLoading(false);
       }
     };
     fetchUserProfile();
-  }, [backendUrl, navigate]); // Dependencies
+  }, []);
 
-  // --- Effect 2: Fetch Platform Connection Status ---
+  // Effect 2: Fetch Platform Connection Status
   useEffect(() => {
     const fetchPlatformStatus = async () => {
       setPlatformStatusLoading(true);
       setPlatformStatusError(null);
-      // Reset connections before fetching current status
       setConnectedAccounts({ meta: false, google: false, shopify: false });
 
       const userId = localStorage.getItem("user_id");
@@ -180,7 +175,6 @@ const Profile = () => {
       if (!userId || !token) {
         setPlatformStatusError("Authentication required.");
         setPlatformStatusLoading(false);
-        // navigate("/signin"); // Redirect if auth details missing
         return;
       }
 
@@ -190,7 +184,6 @@ const Profile = () => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        // Update state based *only* on the backend response
         const statusFromBackend = response.data;
         setConnectedAccounts({
           meta: statusFromBackend.meta?.connected || false,
@@ -204,53 +197,78 @@ const Profile = () => {
         );
         if (err.response?.status === 401 || err.response?.status === 403) {
           localStorage.clear();
-          // navigate("/signin"); // Redirect on auth failure
         }
       } finally {
         setPlatformStatusLoading(false);
       }
     };
 
-    // Only fetch platform status *after* profile fetch succeeds (or adjust logic if independent)
-    // For simplicity, let's assume they can run somewhat independently but need auth info
     fetchPlatformStatus();
-  }, [backendUrl, navigate]); // Dependencies
+  }, []);
 
-  // --- Effect 3: Handle OAuth Redirect (One-time URL check) ---
+  // Effect 3: Handle OAuth Redirect (Shopify, Meta, Google) - FIXED VERSION
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const platformUserId = urlParams.get("user_id"); // User ID might be in param after OAuth
-    const platform = urlParams.get("platform");
 
-    // This effect now ONLY saves userId if missing and cleans URL.
-    // It DOES NOT optimistically set connectedAccounts state anymore.
+    // Check for Shopify callback parameters
+    const shopifyCode = urlParams.get("code");
+    const shopifyShop = urlParams.get("shop");
+    const shopifyHmac = urlParams.get("hmac");
+
+    // Check for general platform parameter (Meta/Google)
+    const platform = urlParams.get("platform");
+    const platformUserId = urlParams.get("user_id");
+
+    // Handle Shopify OAuth callback
+    if (shopifyCode && shopifyShop && shopifyHmac) {
+      console.log("Shopify OAuth callback detected");
+
+      // 🔥 CHECK IF WE ALREADY PROCESSED THIS CALLBACK
+      const callbackProcessed = sessionStorage.getItem(
+        "shopify_callback_processed"
+      );
+
+      if (!callbackProcessed) {
+        // Mark as processed FIRST to prevent infinite loop
+        sessionStorage.setItem("shopify_callback_processed", "true");
+
+        // Clean the URL
+        window.history.replaceState({}, document.title, "/profile");
+
+        // Show success message
+        alert("Shopify connected successfully! Refreshing your connections...");
+
+        // Refresh platform status to show new connection
+        window.location.reload();
+      }
+      return;
+    }
+
+    // 🔥 CLEAR THE FLAG if no Shopify callback params (normal page load)
+    sessionStorage.removeItem("shopify_callback_processed");
+
+    // Handle Meta/Google OAuth callback
     if (platformUserId && platform) {
       console.log(
         `OAuth redirect detected for ${platform}, user ID ${platformUserId}`
       );
-      // Ensure main user_id is saved if it came from URL param and wasn't already set
+
       if (!localStorage.getItem("user_id")) {
         localStorage.setItem("user_id", platformUserId);
         console.log(`Saved user ID ${platformUserId} from URL parameter.`);
-        // Optionally trigger a refetch of platform status here if needed immediately
-        // fetchPlatformStatus(); // Defined in Effect 2
       } else {
-        // Verify if the user ID from param matches stored ID
         const storedUserId = localStorage.getItem("user_id");
         if (platformUserId !== storedUserId) {
           console.warn(
-            `OAuth redirect user ID (${platformUserId}) doesn't match stored user ID (${storedUserId}). Check logic.`
+            `OAuth redirect user ID (${platformUserId}) doesn't match stored user ID (${storedUserId}).`
           );
-          // Handle potential mismatch - maybe logout, show error?
         }
       }
 
       // Clean the URL parameters
       window.history.replaceState({}, document.title, "/profile");
     }
-    // Run only once on mount to check URL params
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array means this runs only once
+  }, []);
 
   const integrations = [
     {
@@ -287,35 +305,25 @@ const Profile = () => {
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
-    const token = localStorage.getItem("access_token"); // Get the auth token
+    const token = localStorage.getItem("access_token");
 
     if (!token) {
       console.error("Auth token missing. Cannot initiate Google login.");
-      setProfileError("Authentication required. Please log in again."); // Show error
+      setProfileError("Authentication required. Please log in again.");
       setIsLoading(false);
-      // navigate('/signin'); // Optionally redirect
       return;
     }
 
     try {
-      // Step 1: Make an AUTHENTICATED request to *your* backend /login endpoint
       console.log("Requesting Google redirect URL from backend...");
-      const response = await axios.get(
-        `${backendUrl}/google/login`, // Your backend endpoint
-        {
-          headers: {
-            Authorization: `Bearer ${token}`, // Send the JWT
-          },
-        }
-      );
+      const response = await axios.get(`${backendUrl}/google/login`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-      // Step 2: Get the URL from the backend's JSON response
       const redirectUrl = response.data.redirect_url;
       if (redirectUrl) {
         console.log("Received redirect URL, redirecting browser:", redirectUrl);
-        // Step 3: Redirect the browser to the URL provided by the backend
         window.location.href = redirectUrl;
-        // Keep loading true as the page will navigate away
       } else {
         console.error("Backend did not provide a redirect URL.");
         setProfileError(
@@ -330,45 +338,33 @@ const Profile = () => {
       );
       if (error.response?.status === 401 || error.response?.status === 403) {
         localStorage.clear();
-        navigate("/signin"); // Redirect if token invalid
+        navigate("/signin");
       }
       setIsLoading(false);
     }
-    // Do not set isLoading to false here if redirect happens,
-    // only set it in error cases.
   };
 
   const handleMetaLogin = async () => {
     setIsLoading(true);
-    const token = localStorage.getItem("access_token"); // Get the auth token
+    const token = localStorage.getItem("access_token");
 
     if (!token) {
       console.error("Auth token missing. Cannot initiate Meta login.");
-      setProfileError("Authentication required. Please log in again."); // Show error
+      setProfileError("Authentication required. Please log in again.");
       setIsLoading(false);
-      // navigate('/signin'); // Optionally redirect
       return;
     }
 
     try {
-      // Step 1: Make an AUTHENTICATED request to *your* backend /login endpoint
       console.log("Requesting Meta redirect URL from backend...");
-      const response = await axios.get(
-        `${backendUrl}/meta/login`, // Your backend endpoint
-        {
-          headers: {
-            Authorization: `Bearer ${token}`, // Send the JWT
-          },
-        }
-      );
+      const response = await axios.get(`${backendUrl}/meta/login`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-      // Step 2: Get the URL from the backend's JSON response
       const redirectUrl = response.data.redirect_url;
       if (redirectUrl) {
         console.log("Received redirect URL, redirecting browser:", redirectUrl);
-        // Step 3: Redirect the browser to the URL provided by the backend
         window.location.href = redirectUrl;
-        // Keep loading true as the page will navigate away
       } else {
         console.error("Backend did not provide a redirect URL.");
         setProfileError(
@@ -383,27 +379,17 @@ const Profile = () => {
       );
       if (error.response?.status === 401 || error.response?.status === 403) {
         localStorage.clear();
-        navigate("/signin"); // Redirect if token invalid
+        navigate("/signin");
       }
       setIsLoading(false);
     }
-    // Do not set isLoading to false here if redirect happens,
-    // only set it in error cases.
   };
 
   const handleShopifyConnect = async () => {
     setIsLoading(true);
-    const token = localStorage.getItem("access_token");
-
-    if (!token) {
-      console.error("Auth token missing.");
-      setProfileError("Authentication required. Please log in again.");
-      setIsLoading(false);
-      return;
-    }
 
     try {
-      // 🔥 ASK USER FOR THEIR SHOP DOMAIN FIRST
+      // Ask user for their shop domain
       const shopInput = prompt(
         "Enter your Shopify store domain:\n\n" +
           "Examples:\n" +
@@ -421,11 +407,16 @@ const Profile = () => {
       shop = shop.replace("https://", "").replace("http://", "");
       shop = shop.split("/")[0];
 
+      // Add .myshopify.com if not present
+      if (!shop.includes(".")) {
+        shop = `${shop}.myshopify.com`;
+      }
+
       console.log("Requesting Shopify OAuth URL with shop:", shop);
 
+      // NO AUTH TOKEN NEEDED - Shopify login is public
       const response = await axios.get(`${backendUrl}/shopify/login`, {
-        params: { shop }, // 👈 Send shop as query parameter
-        headers: { Authorization: `Bearer ${token}` },
+        params: { shop },
       });
 
       const redirectUrl = response.data.redirect_url;
@@ -441,10 +432,6 @@ const Profile = () => {
         error.response?.data?.detail ||
           "Failed to start Shopify connection. Please check your store domain and try again."
       );
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        localStorage.clear();
-        navigate("/signin");
-      }
       setIsLoading(false);
     }
   };
@@ -480,7 +467,6 @@ const Profile = () => {
   ).length;
 
   if (profileLoading || platformStatusLoading) {
-    // Check both loading states
     return (
       <div className="min-h-screen flex items-center justify-center">
         Loading profile and connections...
@@ -581,7 +567,7 @@ const Profile = () => {
                           .map((n) => n[0])
                           .join("") || "U")
                       }
-                      alt={userData?.name || "User"} // Fallback alt text
+                      alt={userData?.name || "User"}
                     />
                     <AvatarFallback className="bg-primary/20 text-primary font-bold text-2xl">
                       {userData?.name
@@ -609,21 +595,7 @@ const Profile = () => {
                         Email Address
                       </p>
                       <p className="text-sm font-medium truncate">
-                        {userData?.id || "N/A"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg mt-0.5">
-                      <Hash className="h-4 w-4 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                        Account ID
-                      </p>
-                      <p className="text-sm font-medium font-mono">
-                        #9479387489923
+                        {userData?.email || userData?.id || "N/A"}
                       </p>
                     </div>
                   </div>

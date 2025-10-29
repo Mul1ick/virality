@@ -141,18 +141,22 @@ const Index = () => {
   }, [
     platformsLoading,
     platformsError,
-    metaLoading,
-    metaError,
+    metaLoading.campaigns,
+    metaLoading.adSets,
+    metaLoading.ads,
+    metaError.campaigns,
+    metaError.adSets,
+    metaError.ads,
     metaCampaigns.length,
-    metaAdSets.length,
-    metaAds.length,
-    googleLoading,
-    googleError,
+    googleLoading.campaigns,
+    googleError.campaigns,
     googleCampaigns.length,
     shopifyLoading,
     shopifyError,
     shopifyOrders.length,
-    platformStatus,
+    platformStatus.meta.connected, // 🔥 ONLY track specific properties
+    platformStatus.google.connected, // 🔥 NOT the whole object
+    platformStatus.shopify.connected, // 🔥 NOT the whole object
   ]);
 
   // Auto-hide notifications after 3 seconds
