@@ -164,22 +164,48 @@ def get_platform_connection_details(user_id: str, platform: str):
 # 📊 ITEM STORAGE (Campaigns / Adsets / Ads)
 # ============================================================
 def save_items(collection_name: str, ad_account_id: str, items_data: list, platform: str):
-    """Generic function to save items (campaign/adset/ad)."""
+    """
+    Generic function to save items (campaign/adset/ad).
+    Adds safe ID extraction and skips invalid records.
+    """
     if not items_data:
         logger.info(f"[DB][Items] No {collection_name} to save for {platform}")
         return
 
     collection = db[collection_name]
+    saved_count = 0
+
     for item in items_data:
-        item["platform"] = platform
-        item["ad_account_id"] = ad_account_id
-        collection.update_one(
-            {"id": item["id"], "platform": platform},
-            {"$set": item},
-            upsert=True
+        # 1️⃣ Try to extract an identifier safely
+        doc_id = (
+            item.get("id")
+            or item.get("campaign_id")
+            or item.get("ad_group_id")
+            or item.get("resourceName")
         )
 
-    logger.info(f"[DB][Items] Saved {len(items_data)} {collection_name} records for {platform}:{ad_account_id}")
+        if not doc_id:
+            logger.warning(f"[DB][Items] Skipping {collection_name} record without ID: {item}")
+            continue
+
+        # 2️⃣ Add platform and ad_account metadata
+        item["platform"] = platform
+        item["ad_account_id"] = ad_account_id
+        item["last_updated"] = datetime.utcnow()
+
+        # 3️⃣ Upsert safely
+        try:
+            collection.update_one(
+                {"id": doc_id, "platform": platform},
+                {"$set": item},
+                upsert=True
+            )
+            saved_count += 1
+        except Exception as e:
+            logger.error(f"[DB][Items] Failed to upsert {collection_name} record: {e}", exc_info=True)
+
+    logger.info(f"[DB][Items] Saved {saved_count}/{len(items_data)} {collection_name} records for {platform}:{ad_account_id}")
+
 
 
 # ============================================================

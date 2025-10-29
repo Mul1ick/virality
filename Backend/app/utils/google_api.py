@@ -19,7 +19,9 @@ from typing import List, Dict, Optional
 import requests
 from datetime import datetime, timedelta
 
-from app.config import config
+from app.config.config import settings
+
+
 from app.utils.logger import get_logger
 from app.database.mongo_client import save_or_update_platform_connection, get_platform_connection_details
 
@@ -44,7 +46,7 @@ def _headers(access_token: str, login_customer_id: Optional[str] = None) -> Dict
     Returns:
         Dict of headers.
     """
-    dev_token = getattr(config, "GOOGLE_DEVELOPER_TOKEN", None)
+    dev_token = getattr(settings, "GOOGLE_DEVELOPER_TOKEN", None)
     if not dev_token:
         logger.error("Missing GOOGLE_DEVELOPER_TOKEN in settings.")
         raise RuntimeError("Missing GOOGLE_DEVELOPER_TOKEN in settings.")
@@ -86,11 +88,11 @@ def refresh_google_access_token(user_id: str) -> Optional[str]:
         return None
 
     payload = {
-        "client_id": config.GOOGLE_CLIENT_ID,
-        "client_secret": config.GOOGLE_CLIENT_SECRET,
-        "grant_type": "refresh_token",
-        "refresh_token": details["refresh_token"],
-    }
+       "client_id": settings.GOOGLE_CLIENT_ID,
+        "client_secret": settings.GOOGLE_CLIENT_SECRET,
+      "grant_type": "refresh_token",
+       "refresh_token": details["refresh_token"],
+   }
 
     try:
         resp = requests.post("https://oauth2.googleapis.com/token", data=payload, timeout=20)
@@ -162,7 +164,7 @@ def get_account_details_batch(access_token: str, customer_ids: List[str]) -> Lis
     # Select query context (MCC) heuristically
     query_login_customer_id: Optional[str] = None
     try:
-        known = getattr(config, "GOOGLE_LOGIN_CUSTOMER_ID", None)
+        known = getattr(settings, "GOOGLE_LOGIN_CUSTOMER_ID", None)
         if known and _clean_customer_id(known) in { _clean_customer_id(str(x)) for x in customer_ids }:
             query_login_customer_id = _clean_customer_id(known)
             logger.info(f"Using known GOOGLE_LOGIN_CUSTOMER_ID '{query_login_customer_id}' for batch query.")
@@ -226,7 +228,7 @@ def get_account_details_batch(access_token: str, customer_ids: List[str]) -> Lis
                 )
                 for mid in missing_ids:
                     is_likely_manager = (
-                        _clean_customer_id(getattr(config, "GOOGLE_LOGIN_CUSTOMER_ID", "") or "")
+                        _clean_customer_id(getattr(settings, "GOOGLE_LOGIN_CUSTOMER_ID", "") or "")
                         == _clean_customer_id(mid)
                     )
                     account_details.append({

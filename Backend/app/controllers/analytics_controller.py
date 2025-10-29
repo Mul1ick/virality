@@ -5,7 +5,7 @@ from app.services.analytics_service import AnalyticsService
 from app.utils.security import rate_limiter
 from app.utils.logger import get_logger
 
-router = APIRouter(prefix="/analytics", tags=["Cross-Platform Analytics"])
+router = APIRouter(tags=["Cross-Platform Analytics"])
 logger = get_logger()
 
 # Instantiate once (can also be dependency-injected)
