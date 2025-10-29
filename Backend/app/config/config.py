@@ -88,6 +88,7 @@ class Settings:
 # 🔧 Instantiate and Validate
 # ------------------------------------------------------------------
 settings = Settings()
+config = settings  # backward compatibility alias
 
 try:
     settings.validate()

@@ -20,8 +20,8 @@ import urllib.parse
 
 from fastapi import HTTPException
 from app.utils.logger import get_logger
-from virality.Backend.app.config import config
-from app.database import (
+from app.config import config
+from app.database.helpers import (
     save_or_update_platform_connection,
     get_platform_connection_details,
     save_items,

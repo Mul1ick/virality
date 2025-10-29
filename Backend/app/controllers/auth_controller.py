@@ -6,9 +6,9 @@ from datetime import datetime, timedelta
 from jose import jwt
 
 from app.utils.logger import get_logger
-from app.database import db
+from app.database.helpers import db
 from app.utils.email_sender import send_otp_email
-from virality.Backend.app.config import config
+from app.config import config
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

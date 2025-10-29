@@ -7,7 +7,7 @@ from bson import ObjectId
 import google.generativeai as genai
 from fastapi import HTTPException
 
-from virality.Backend.app.config import config
+from app.config import config
 from app.utils.data_schema_registry import DATA_SCHEMAS
 from app.utils.logger import get_logger
 

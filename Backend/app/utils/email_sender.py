@@ -1,6 +1,6 @@
 import smtplib
 from email.mime.text import MIMEText
-from app.config import settings
+from app.config.config import settings
 from app.utils.logger import get_logger
 
 logger = get_logger()

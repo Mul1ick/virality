@@ -10,8 +10,8 @@ from app.services.meta_service import (
     fetch_and_save,
     run_historical_fetch,
 )
-from app.database import save_or_update_platform_connection, get_platform_connection_details
-from virality.Backend.app.config import config
+from app.database.helpers import save_or_update_platform_connection, get_platform_connection_details
+from app.config import config
 
 router = APIRouter(prefix="/meta", tags=["Meta Ads"])
 logger = get_logger()

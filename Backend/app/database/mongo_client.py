@@ -13,7 +13,7 @@ from pymongo import MongoClient, UpdateOne
 from bson import ObjectId
 from datetime import datetime, timedelta
 from fastapi import HTTPException
-from virality.Backend.app.config import config
+from app.config import config
 from app.utils.logger import get_logger
 
 logger = get_logger()

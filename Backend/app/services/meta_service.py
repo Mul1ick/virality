@@ -9,8 +9,8 @@ import requests
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from fastapi import HTTPException
-from virality.Backend.app.config import config
-from app.database import (
+from app.config import config
+from app.database.helpers import (
     save_or_update_platform_connection,
     get_platform_connection_details,
     save_items,

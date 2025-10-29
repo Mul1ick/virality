@@ -1,4 +1,4 @@
-# from app.database import db, save_item_insights
+# from app.database.helpers import db, save_item_insights
 # from app.controllers.meta_controller import get_ad_account_id
 # from app.utils.logger import get_logger
 # import requests

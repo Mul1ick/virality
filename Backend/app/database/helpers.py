@@ -8,6 +8,7 @@ from pymongo import MongoClient, UpdateOne
 from bson import ObjectId
 from datetime import datetime, timedelta
 from app.config.config import settings
+
 from app.utils.logger import get_logger
 
 logger = get_logger()

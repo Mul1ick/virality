@@ -1,7 +1,7 @@
 # FILE: app/services/user_service.py
 
 from fastapi import HTTPException
-from app.database import get_user_connection_status, get_user_by_id
+from app.database.helpers import get_user_connection_status, get_user_by_id
 from app.utils.logger import get_logger
 
 logger = get_logger()

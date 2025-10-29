@@ -5,7 +5,7 @@ from typing import Optional, List, Dict, Any
 from bson import ObjectId
 from fastapi import HTTPException
 from app.utils.logger import get_logger
-from app.database import db
+from app.database.helpers import db
 
 logger = get_logger()
 

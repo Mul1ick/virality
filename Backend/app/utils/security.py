@@ -6,8 +6,9 @@ from pymongo import MongoClient
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from bson import ObjectId
+import os
 
-from app.config import settings
+from app.config.config import settings
 from app.utils.logger import get_logger
 
 logger = get_logger()
