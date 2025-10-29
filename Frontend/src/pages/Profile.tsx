@@ -388,6 +388,16 @@ const Profile = () => {
   const handleShopifyConnect = async () => {
     setIsLoading(true);
 
+    // 🔥 ADD THIS - Get the token
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      console.error("Auth token missing. Cannot initiate Shopify login.");
+      setProfileError("Authentication required. Please log in again.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       // Ask user for their shop domain
       const shopInput = prompt(
@@ -414,9 +424,10 @@ const Profile = () => {
 
       console.log("Requesting Shopify OAuth URL with shop:", shop);
 
-      // NO AUTH TOKEN NEEDED - Shopify login is public
+      // 🔥 ADD AUTH HEADER - Now matches Meta/Google pattern
       const response = await axios.get(`${backendUrl}/shopify/login`, {
         params: { shop },
+        headers: { Authorization: `Bearer ${token}` }, // 👈 ADD THIS
       });
 
       const redirectUrl = response.data.redirect_url;
@@ -432,6 +443,10 @@ const Profile = () => {
         error.response?.data?.detail ||
           "Failed to start Shopify connection. Please check your store domain and try again."
       );
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        localStorage.clear();
+        navigate("/signin");
+      }
       setIsLoading(false);
     }
   };

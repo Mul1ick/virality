@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
+const backendUrl = import.meta.env.VITE_BACKEND_URL; // 🔥 MOVE OUTSIDE
+
 export const useShopifyData = (
   userId: string | null,
   isConnected: boolean,
@@ -10,8 +12,6 @@ export const useShopifyData = (
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
     if (!platformsLoaded || !isConnected || !userId) return;
@@ -38,7 +38,7 @@ export const useShopifyData = (
     };
 
     fetchOrders();
-  }, [userId, isConnected, platformsLoaded, backendUrl]);
+  }, [userId, isConnected, platformsLoaded]); // 🔥 REMOVED backendUrl
 
   return { orders, loading, error };
 };

@@ -89,7 +89,6 @@ export const usePlatformStatus = (userId: string | null) => {
     };
 
     fetchPlatforms();
-  }, [userId]); // 🔥 REMOVED backendUrl from dependencies
-
+  }, [userId]);
   return { platformStatus, loading, error };
 };
