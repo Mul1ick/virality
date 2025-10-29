@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query, HTTPException, Request, Depends
 from fastapi.responses import RedirectResponse
-import requests, hmac, hashlib, time, re, urllib.parse
+import requests, hmac, hashlib, time, urllib.parse
 from app.config import settings
 from app.database import save_or_update_platform_connection, get_platform_connection_details, save_items
 from app.utils.security import create_state_token, decode_token, get_current_user_id
@@ -14,23 +14,37 @@ router = APIRouter(prefix="/shopify", tags=["Shopify"])
 logger = get_logger()
 
 SCOPES = "read_orders,read_all_orders,read_products,read_customers,read_inventory,read_analytics"
-SHOP_DOMAIN_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$")
 
 # ---------------------------------------------------------------------------
 # 🔐 OAuth Phase 1 — Login / Install
 # ---------------------------------------------------------------------------
 @router.get("/login")
 def shopify_login(
-    shop: str = Query(..., description="The merchant's myshopify.com domain"),
+    shop: str = Query(..., description="The merchant's shop domain"),
     current_user_id: str = Depends(get_current_user_id)
 ):
     if not shop:
         raise HTTPException(status_code=400, detail="Missing 'shop' parameter")
-    shop = shop.strip().replace("https://", "").split("/")[0]
-    if not shop.endswith(".myshopify.com"):
-        shop = f"{shop}.myshopify.com"
-    if not SHOP_DOMAIN_RE.match(shop):
+    
+    # Clean up input
+    shop = shop.strip().lower()
+    shop = shop.replace("https://", "").replace("http://", "")
+    shop = shop.split("/")[0]  # Remove any path
+    
+    # Basic validation - just check it's a valid domain format
+    if not shop or len(shop) < 3:
         raise HTTPException(status_code=400, detail="Invalid shop domain")
+    
+    # Must have at least one dot (domain.tld)
+    if "." not in shop:
+        raise HTTPException(
+            status_code=400, 
+            detail="Invalid domain format. Must be like 'storename.myshopify.com' or 'yourdomain.com'"
+        )
+    
+    # Check for obviously invalid characters
+    if not all(c.isalnum() or c in ".-" for c in shop):
+        raise HTTPException(status_code=400, detail="Domain contains invalid characters")
 
     state_jwt = create_state_token({"sub": current_user_id})
     auth_url = (
@@ -114,7 +128,8 @@ def shopify_callback(request: Request, code: str, shop: str, state: str, timesta
     )
     logger.info(f"[Shopify Callback] ✅ Saved connection for user={user_id}, shop={shop}")
 
-    return RedirectResponse(url=f"http://localhost:8080/profile?user_id={user_id}&connect_status=shopify_success")
+    # 🔄 Redirect to selection page like Meta/Google
+    return RedirectResponse(url=f"http://localhost:8080/select-shopify?user_id={user_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -137,7 +152,7 @@ def fetch_orders(user_id: str, current_user_id: str = Depends(get_current_user_i
     try:
         orders = get_all_orders(shop_url, token)
         if orders:
-            save_items("orders", user_id, orders, "shopify")
+            save_items("shopify_orders", user_id, orders, "shopify")
             logger.info(f"[Shopify Orders] Saved {len(orders)} orders for {user_id}")
         return {"count": len(orders or []), "user_id": user_id}
     except Exception as e:
@@ -153,7 +168,7 @@ def fetch_products(user_id: str, current_user_id: str = Depends(get_current_user
     try:
         products = get_all_products(shop_url, token)
         if products:
-            save_items("products", user_id, products, "shopify")
+            save_items("shopify_products", user_id, products, "shopify")
             logger.info(f"[Shopify Products] Saved {len(products)} products for {user_id}")
         return {"count": len(products or []), "user_id": user_id}
     except Exception as e:
@@ -168,7 +183,7 @@ def fetch_customers(user_id: str, current_user_id: str = Depends(get_current_use
     try:
         customers = get_all_customers(shop_url, token)
         if customers:
-            save_items("customers", user_id, customers, "shopify")
+            save_items("shopify_customers", user_id, customers, "shopify")
             logger.info(f"[Shopify Customers] Saved {len(customers)} for {user_id}")
         return {"count": len(customers or []), "user_id": user_id}
     except Exception as e:
@@ -183,7 +198,7 @@ def fetch_collections(user_id: str, current_user_id: str = Depends(get_current_u
     try:
         cols = get_all_collections(shop_url, token)
         if cols:
-            save_items("collections", user_id, cols, "shopify")
+            save_items("shopify_collections", user_id, cols, "shopify")
         return {"count": len(cols or []), "user_id": user_id}
     except Exception as e:
         logger.exception(f"[Shopify Collections] Failed: {e}")
@@ -197,7 +212,7 @@ def fetch_inventory(user_id: str, current_user_id: str = Depends(get_current_use
     try:
         inv = get_inventory_levels(shop_url, token)
         if inv:
-            save_items("inventory_levels", user_id, inv, "shopify")
+            save_items("shopify_inventory", user_id, inv, "shopify")
         return {"count": len(inv or []), "user_id": user_id}
     except Exception as e:
         logger.exception(f"[Shopify Inventory] Failed: {e}")
