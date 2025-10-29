@@ -21,7 +21,7 @@ import urllib.parse
 from fastapi import HTTPException
 from app.utils.logger import get_logger
 from app.config import config
-from app.database.helpers import (
+from app.database.mongo_client import (
     save_or_update_platform_connection,
     get_platform_connection_details,
     save_items,
@@ -59,8 +59,8 @@ class GoogleService:
         auth_url = (
             "https://accounts.google.com/o/oauth2/v2/auth?"
             + urllib.parse.urlencode({
-                "client_id": config.GOOGLE_CLIENT_ID,
-                "redirect_uri": config.GOOGLE_REDIRECT_URI,
+                "client_id": config.settings.GOOGLE_CLIENT_ID,
+                "redirect_uri": config.settings.GOOGLE_REDIRECT_URI,
                 "response_type": "code",
                 "scope": GoogleService.SCOPES,
                 "access_type": "offline",
@@ -86,9 +86,9 @@ class GoogleService:
         token_url = "https://oauth2.googleapis.com/token"
         data = {
             "code": code,
-            "client_id": config.GOOGLE_CLIENT_ID,
-            "client_secret": config.GOOGLE_CLIENT_SECRET,
-            "redirect_uri": config.GOOGLE_REDIRECT_URI,
+            "client_id": config.settings.GOOGLE_CLIENT_ID,
+            "client_secret": config.settings.GOOGLE_CLIENT_SECRET,
+            "redirect_uri": config.settings.GOOGLE_REDIRECT_URI,
             "grant_type": "authorization_code",
         }
         try:

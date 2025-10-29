@@ -8,7 +8,7 @@ from app.services.google_service import GoogleService
 from app.utils.security import get_current_user_id
 from app.utils.logger import get_logger
 
-router = APIRouter(prefix="/google", tags=["Google Ads"])
+router = APIRouter( tags=["Google Ads"])
 logger = get_logger()
 
 

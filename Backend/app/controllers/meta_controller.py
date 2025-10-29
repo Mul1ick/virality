@@ -10,10 +10,10 @@ from app.services.meta_service import (
     fetch_and_save,
     run_historical_fetch,
 )
-from app.database.helpers import save_or_update_platform_connection, get_platform_connection_details
+from app.database.mongo_client import save_or_update_platform_connection, get_platform_connection_details
 from app.config import config
 
-router = APIRouter(prefix="/meta", tags=["Meta Ads"])
+router = APIRouter( tags=["Meta Ads"])
 logger = get_logger()
 
 API_VERSION = "v20.0"
@@ -33,8 +33,8 @@ async def meta_login(user_id: str = Depends(get_current_user_id)):
     state_token = create_state_token({"sub": user_id})
     auth_url = (
         f"https://www.facebook.com/{API_VERSION}/dialog/oauth?"
-        f"client_id={config.META_APP_ID}"
-        f"&redirect_uri={config.META_REDIRECT_URI}"
+        f"client_id={config.settings.META_APP_ID}"
+        f"&redirect_uri={config.settings.META_REDIRECT_URI}"
         f"&scope={SCOPES}"
         f"&response_type=code"
         f"&state={state_token}"

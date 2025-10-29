@@ -47,7 +47,7 @@ logger.info("✅ CORS middleware initialized.")
 # --------------------------------------------------------------------
 # 🔗 Router Registration
 # --------------------------------------------------------------------
-app.include_router(auth_controller.router, prefix="/auth", tags=["Authentication"])
+app.include_router(auth_controller.router, tags=["Authentication"])
 app.include_router(google_controller.router, prefix="/google", tags=["Google Ads"])
 app.include_router(meta_controller.router, prefix="/meta", tags=["Meta Ads"])
 app.include_router(shopify_controller.router, prefix="/shopify", tags=["Shopify"])

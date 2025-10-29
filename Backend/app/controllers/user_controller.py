@@ -8,7 +8,7 @@ from app.services.user_service import UserService
 from app.utils.security import get_current_user_id
 from app.utils.logger import get_logger
 
-router = APIRouter(prefix="/user", tags=["User"])
+router = APIRouter( tags=["User"])
 logger = get_logger()
 
 # ------------------------------------------------------------

@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 
 from app.config import config
 from app.utils.logger import get_logger
-from app.database.helpers import save_or_update_platform_connection, get_platform_connection_details
+from app.database.mongo_client import save_or_update_platform_connection, get_platform_connection_details
 
 logger = get_logger()
 

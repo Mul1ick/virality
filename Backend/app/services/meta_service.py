@@ -10,7 +10,7 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from fastapi import HTTPException
 from app.config import config
-from app.database.helpers import (
+from app.database.mongo_client import (
     save_or_update_platform_connection,
     get_platform_connection_details,
     save_items,
@@ -35,9 +35,9 @@ def exchange_code_for_token(code: str) -> dict:
         # Step 1: Short-lived token
         short_url = f"https://graph.facebook.com/{API_VERSION}/oauth/access_token"
         short_params = {
-            "client_id": config.META_APP_ID,
-            "redirect_uri": config.META_REDIRECT_URI,
-            "client_secret": config.META_APP_SECRET,
+            "client_id": config.settings.META_APP_ID,
+            "redirect_uri": config.settings.META_REDIRECT_URI,
+            "client_secret": config.settings.META_APP_SECRET,
             "code": code,
         }
         short_resp = requests.get(short_url, params=short_params)
@@ -50,8 +50,8 @@ def exchange_code_for_token(code: str) -> dict:
         long_url = f"https://graph.facebook.com/{API_VERSION}/oauth/access_token"
         long_params = {
             "grant_type": "fb_exchange_token",
-            "client_id": config.META_APP_ID,
-            "client_secret": config.META_APP_SECRET,
+            "client_id": config.settings.META_APP_ID,
+            "client_secret": config.settings.META_APP_SECRET,
             "fb_exchange_token": short_token,
         }
         long_resp = requests.get(long_url, params=long_params)
