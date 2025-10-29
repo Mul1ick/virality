@@ -19,7 +19,7 @@ from app.database import (
     save_daily_ad_insights,
     save_daily_campaign_insights
 )
-from app.utils.meta_api_utils import generate_monthly_ranges, fetch_paginated_insights
+from virality.Backend.app.utils.meta_api import generate_monthly_ranges, fetch_paginated_insights
 from app.utils.security import create_state_token, decode_token, get_current_user_id    
 from pydantic import BaseModel
 
