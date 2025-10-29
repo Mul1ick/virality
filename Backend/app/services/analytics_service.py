@@ -7,7 +7,7 @@ from bson import ObjectId
 import google.generativeai as genai
 from fastapi import HTTPException
 
-from app.config import config
+from app.config.config import settings
 from app.utils.data_schema_registry import DATA_SCHEMAS
 from app.utils.logger import get_logger
 
@@ -20,13 +20,13 @@ class AnalyticsService:
     def __init__(self):
         # Initialize DB + Gemini client once
         try:
-            genai.configure(api_key=config.settings.GEMINI_API_KEY)
+            genai.configure(api_key=settings.GEMINI_API_KEY)
         except AttributeError:
             raise RuntimeError("Missing GEMINI_API_KEY in .env file")
 
         try:
-            client = MongoClient(config.settings.MONGO_URI)
-            self.db = client[config.settings.DB_NAME]
+            client = MongoClient(settings.MONGO_URI)
+            self.db = client[settings.DB_NAME]
         except Exception as e:
             raise RuntimeError(f"Failed to connect to MongoDB: {e}")
 

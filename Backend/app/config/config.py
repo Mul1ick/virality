@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 # ------------------------------------------------------------------
 # 🌍 Load .env file
 # ------------------------------------------------------------------
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ENV_PATH = BASE_DIR / ".env"
 
 if not ENV_PATH.exists():
