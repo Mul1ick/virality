@@ -142,9 +142,9 @@ export const MetaCampaignsTable = ({
                   Clicks
                 </TableHead>
                 <TableHead className="font-semibold text-right">CTR</TableHead>
-                <TableHead className="font-semibold text-right">
+                {/* <TableHead className="font-semibold text-right">
                   Frequency
-                </TableHead>
+                </TableHead> */}
                 <TableHead className="font-semibold text-right">CPM</TableHead>
                 <TableHead className="font-semibold text-right">CPC</TableHead>
               </TableRow>
@@ -202,11 +202,10 @@ export const MetaCampaignsTable = ({
                           {formatPercentage(campaign.insights.ctr)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right">
+                      {/* <TableCell className="text-right">
                         {" "}
-                        {/* ✅ ADD THIS */}
                         {campaign.insights.frequency.toFixed(2)}
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell className="text-right">
                         {formatCurrency(campaign.insights.cpm)}
                       </TableCell>

@@ -19,9 +19,11 @@ from typing import List, Dict, Optional
 import requests
 from datetime import datetime, timedelta
 
-from app.config import settings
+from app.config.config import settings
+
+
 from app.utils.logger import get_logger
-from app.database import save_or_update_platform_connection, get_platform_connection_details
+from app.database.mongo_client import save_or_update_platform_connection, get_platform_connection_details
 
 logger = get_logger()
 
@@ -86,11 +88,11 @@ def refresh_google_access_token(user_id: str) -> Optional[str]:
         return None
 
     payload = {
-        "client_id": settings.GOOGLE_CLIENT_ID,
+       "client_id": settings.GOOGLE_CLIENT_ID,
         "client_secret": settings.GOOGLE_CLIENT_SECRET,
-        "grant_type": "refresh_token",
-        "refresh_token": details["refresh_token"],
-    }
+      "grant_type": "refresh_token",
+       "refresh_token": details["refresh_token"],
+   }
 
     try:
         resp = requests.post("https://oauth2.googleapis.com/token", data=payload, timeout=20)

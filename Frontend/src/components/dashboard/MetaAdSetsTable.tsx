@@ -138,9 +138,9 @@ export const MetaAdSetsTable = ({
                   Clicks
                 </TableHead>
                 <TableHead className="font-semibold text-right">CTR</TableHead>
-                <TableHead className="font-semibold text-right">
+                {/* <TableHead className="font-semibold text-right">
                   Frequency
-                </TableHead>
+                </TableHead> */}
                 <TableHead className="font-semibold text-right">CPM</TableHead>
                 <TableHead className="font-semibold text-right">CPC</TableHead>
               </TableRow>
@@ -196,9 +196,9 @@ export const MetaAdSetsTable = ({
                           {formatPercentage(adset.insights.ctr)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right">
+                      {/* <TableCell className="text-right">
                         {adset.insights.frequency.toFixed(2)}
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell className="text-right">
                         {formatCurrency(adset.insights.cpm)}
                       </TableCell>

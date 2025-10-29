@@ -6,14 +6,14 @@ from datetime import datetime, timedelta
 from jose import jwt
 
 from app.utils.logger import get_logger
-from app.database import db
+from app.database.mongo_client import db
 from app.utils.email_sender import send_otp_email
-from app.config import settings
+from app.config import config
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(prefix='/auth', tags=["Authentication"])
 
 # --- Security and Configuration ---
-SECRET_KEY = settings.JWT_SECRET_KEY
+SECRET_KEY = config.settings.JWT_SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 hours
 
@@ -40,6 +40,13 @@ def create_access_token(data: dict):
 
 def generate_otp(length=6):
     return ''.join(random.choices(string.digits, k=length))
+
+
+@router.get("/test")
+async def auth_test():
+    logger.info("Auth test endpoint hit!")
+    return {"message": "Auth controller is working!"}
+# <<<------------------------------->>>
 
 # --- API Endpoints ---
 @router.post("/register")
