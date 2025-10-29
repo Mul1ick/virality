@@ -21,6 +21,9 @@ interface PlatformStatus {
   };
 }
 
+// 🔥 MOVE THIS OUTSIDE THE HOOK - it's a constant!
+const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
 export const usePlatformStatus = (userId: string | null) => {
   const [platformStatus, setPlatformStatus] = useState<PlatformStatus>({
     meta: { connected: false },
@@ -29,8 +32,6 @@ export const usePlatformStatus = (userId: string | null) => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
     const fetchPlatforms = async () => {
@@ -88,7 +89,7 @@ export const usePlatformStatus = (userId: string | null) => {
     };
 
     fetchPlatforms();
-  }, [userId, backendUrl]);
+  }, [userId]); // 🔥 REMOVED backendUrl from dependencies
 
   return { platformStatus, loading, error };
 };
