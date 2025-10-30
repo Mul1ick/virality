@@ -9,17 +9,34 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { MetaCampaign } from "@/hooks/useMetaData";
+import { DateRange } from "react-day-picker";
 
 interface MetaCampaignsTableProps {
   campaigns: MetaCampaign[];
   isLoading?: boolean;
+  dateRange?: string;
+  customRange?: DateRange;
 }
 
 export const MetaCampaignsTable = ({
   campaigns,
   isLoading = false,
+  dateRange = "30days",
+  customRange,
 }: MetaCampaignsTableProps) => {
-  // Format currency
+  const getDateRangeText = () => {
+    if (dateRange === "custom" && customRange?.from && customRange?.to) {
+      return `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`;
+    }
+    const labels: Record<string, string> = {
+      today: "Today",
+      "7days": "Last 7 days",
+      "30days": "Last 30 days",
+      "90days": "Last 90 days",
+    };
+    return labels[dateRange] || "Last 30 days";
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -29,17 +46,14 @@ export const MetaCampaignsTable = ({
     }).format(value);
   };
 
-  // Format large numbers
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat("en-US").format(value);
   };
 
-  // Format percentage
   const formatPercentage = (value: number) => {
     return `${value.toFixed(2)}%`;
   };
 
-  // Get status badge styling
   const getStatusStyle = (status: string) => {
     const statusUpper = status.toUpperCase();
     if (statusUpper === "ACTIVE") {
@@ -52,7 +66,6 @@ export const MetaCampaignsTable = ({
     return "bg-gray-500/10 text-gray-700 border-gray-500/20";
   };
 
-  // Format objective text
   const formatObjective = (objective: string) => {
     return objective
       .replace("OUTCOME_", "")
@@ -61,7 +74,6 @@ export const MetaCampaignsTable = ({
       .join(" ");
   };
 
-  // Format status text
   const formatStatus = (status: string) => {
     return status.charAt(0) + status.slice(1).toLowerCase();
   };
@@ -96,7 +108,7 @@ export const MetaCampaignsTable = ({
           <div>
             <h3 className="text-lg font-semibold">Meta Campaigns</h3>
             <p className="text-sm text-muted-foreground">
-              {campaigns.length} campaigns • Last 30 days
+              {campaigns.length} campaigns • {getDateRangeText()}
             </p>
           </div>
         </div>
@@ -133,10 +145,7 @@ export const MetaCampaignsTable = ({
                   key={campaign.id}
                   className="hover:bg-muted/30 transition-colors"
                 >
-                  {/* Campaign Name */}
                   <TableCell className="font-medium">{campaign.name}</TableCell>
-
-                  {/* Status Badge */}
                   <TableCell>
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(
@@ -146,15 +155,11 @@ export const MetaCampaignsTable = ({
                       {formatStatus(campaign.status)}
                     </span>
                   </TableCell>
-
-                  {/* Objective */}
                   <TableCell>
                     <Badge variant="outline" className="text-xs">
                       {formatObjective(campaign.objective)}
                     </Badge>
                   </TableCell>
-
-                  {/* Insights Data */}
                   {campaign.insights ? (
                     <>
                       <TableCell className="text-right font-semibold">
@@ -188,14 +193,12 @@ export const MetaCampaignsTable = ({
                       </TableCell>
                     </>
                   ) : (
-                    <>
-                      <TableCell
-                        colSpan={7}
-                        className="text-center text-muted-foreground text-sm"
-                      >
-                        No insights available
-                      </TableCell>
-                    </>
+                    <TableCell
+                      colSpan={7}
+                      className="text-center text-muted-foreground text-sm"
+                    >
+                      No insights available
+                    </TableCell>
                   )}
                 </TableRow>
               ))}
@@ -203,7 +206,6 @@ export const MetaCampaignsTable = ({
           </Table>
         </div>
 
-        {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
           <div>
             <p className="text-xs text-muted-foreground">Total Spend</p>

@@ -5,40 +5,11 @@ import { ShopifyProductsTable } from "@/components/dashboard/ShopifyProductsTabl
 import { ShopifyCustomersTable } from "@/components/dashboard/ShopifyCustomersTable";
 import { ShoppingCart, RefreshCw } from "lucide-react";
 import { DateRange } from "react-day-picker";
-
-interface ShopifyOrder {
-  id: string;
-  name: string;
-  email?: string;
-  created_at: string;
-  total_price: string;
-  financial_status: string;
-  fulfillment_status: string;
-  line_items?: any[];
-}
-
-interface ShopifyProduct {
-  id: string;
-  title: string;
-  vendor?: string;
-  product_type?: string;
-  created_at: string;
-  updated_at: string;
-  status?: string;
-  variants?: any[];
-  image?: { src: string };
-}
-
-interface ShopifyCustomer {
-  id: string;
-  email: string;
-  first_name?: string;
-  last_name?: string;
-  orders_count?: number;
-  total_spent?: string;
-  created_at: string;
-  updated_at: string;
-}
+import {
+  ShopifyOrder,
+  ShopifyProduct,
+  ShopifyCustomer,
+} from "@/hooks/useShopifyData";
 
 interface ShopifyTabProps {
   orders: ShopifyOrder[];

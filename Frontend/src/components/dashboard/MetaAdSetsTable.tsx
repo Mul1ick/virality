@@ -8,17 +8,34 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { MetaAdSet } from "@/hooks/useMetaData";
+import { DateRange } from "react-day-picker";
 
 interface MetaAdSetsTableProps {
   adsets: MetaAdSet[];
   isLoading?: boolean;
+  dateRange?: string;
+  customRange?: DateRange;
 }
 
 export const MetaAdSetsTable = ({
   adsets,
   isLoading = false,
+  dateRange = "30days",
+  customRange,
 }: MetaAdSetsTableProps) => {
-  // Format currency
+  const getDateRangeText = () => {
+    if (dateRange === "custom" && customRange?.from && customRange?.to) {
+      return `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`;
+    }
+    const labels: Record<string, string> = {
+      today: "Today",
+      "7days": "Last 7 days",
+      "30days": "Last 30 days",
+      "90days": "Last 90 days",
+    };
+    return labels[dateRange] || "Last 30 days";
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -28,22 +45,18 @@ export const MetaAdSetsTable = ({
     }).format(value);
   };
 
-  // Format budget (comes in cents from Meta)
   const formatBudget = (budgetCents: string) => {
     return formatCurrency(parseInt(budgetCents) / 100);
   };
 
-  // Format large numbers
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat("en-US").format(value);
   };
 
-  // Format percentage
   const formatPercentage = (value: number) => {
     return `${value.toFixed(2)}%`;
   };
 
-  // Get status badge styling
   const getStatusStyle = (status: string) => {
     const statusUpper = status.toUpperCase();
     if (statusUpper === "ACTIVE") {
@@ -54,7 +67,6 @@ export const MetaAdSetsTable = ({
     return "bg-gray-500/10 text-gray-700 border-gray-500/20";
   };
 
-  // Format status text
   const formatStatus = (status: string) => {
     return status.charAt(0) + status.slice(1).toLowerCase();
   };
@@ -89,7 +101,7 @@ export const MetaAdSetsTable = ({
           <div>
             <h3 className="text-lg font-semibold">Meta Ad Sets</h3>
             <p className="text-sm text-muted-foreground">
-              {adsets.length} ad sets • Last 30 days
+              {adsets.length} ad sets • {getDateRangeText()}
             </p>
           </div>
         </div>
@@ -128,10 +140,7 @@ export const MetaAdSetsTable = ({
                   key={adset.id}
                   className="hover:bg-muted/30 transition-colors"
                 >
-                  {/* Ad Set Name */}
                   <TableCell className="font-medium">{adset.name}</TableCell>
-
-                  {/* Status Badge */}
                   <TableCell>
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(
@@ -141,13 +150,9 @@ export const MetaAdSetsTable = ({
                       {formatStatus(adset.status)}
                     </span>
                   </TableCell>
-
-                  {/* Daily Budget */}
                   <TableCell className="text-right font-medium text-muted-foreground">
                     {formatBudget(adset.daily_budget)}
                   </TableCell>
-
-                  {/* Insights Data */}
                   {adset.insights ? (
                     <>
                       <TableCell className="text-right font-semibold">
@@ -181,14 +186,12 @@ export const MetaAdSetsTable = ({
                       </TableCell>
                     </>
                   ) : (
-                    <>
-                      <TableCell
-                        colSpan={7}
-                        className="text-center text-muted-foreground text-sm"
-                      >
-                        No insights available
-                      </TableCell>
-                    </>
+                    <TableCell
+                      colSpan={7}
+                      className="text-center text-muted-foreground text-sm"
+                    >
+                      No insights available
+                    </TableCell>
                   )}
                 </TableRow>
               ))}
@@ -196,7 +199,6 @@ export const MetaAdSetsTable = ({
           </Table>
         </div>
 
-        {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
           <div>
             <p className="text-xs text-muted-foreground">Total Budget</p>

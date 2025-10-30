@@ -16,7 +16,6 @@ import { MetaTab } from "@/components/dashboard/tabs/MetaTab";
 import { GoogleTab } from "@/components/dashboard/tabs/GoogleTab";
 import { ShopifyTab } from "@/components/dashboard/tabs/ShopifyTab";
 import { usePlatformStatus } from "@/hooks/usePlatformStatus";
-import { useMetaData } from "@/hooks/useMetaData";
 import { useGoogleData } from "@/hooks/useGoogleData";
 import { useShopifyData } from "@/hooks/useShopifyData";
 
@@ -36,22 +35,6 @@ const Index = () => {
     loading: platformsLoading,
     error: platformsError,
   } = usePlatformStatus(userId);
-
-  // Fetch Meta data
-  const {
-    campaigns: metaCampaigns,
-    adSets: metaAdSets,
-    ads: metaAds,
-    loading: metaLoading,
-    error: metaError,
-    refreshAll: refreshMeta,
-  } = useMetaData(
-    userId,
-    platformStatus.meta.ad_account_id,
-    platformStatus.meta.connected,
-    !platformsLoading,
-    dateRange
-  );
 
   // Fetch Google data
   const {
@@ -106,14 +89,7 @@ const Index = () => {
   });
 
   // Update notifications based on hook states
-  // Update notifications based on hook states
   useEffect(() => {
-    const anyMetaLoading =
-      metaLoading.campaigns || metaLoading.adSets || metaLoading.ads;
-    const anyMetaError =
-      metaError.campaigns || metaError.adSets || metaError.ads;
-
-    // 🔥 ADD THIS - Handle Shopify's multiple loading states
     const anyShopifyLoading =
       shopifyLoading.orders ||
       shopifyLoading.products ||
@@ -121,7 +97,6 @@ const Index = () => {
     const anyShopifyError =
       shopifyError.orders || shopifyError.products || shopifyError.customers;
 
-    // 🔥 ADD THIS - Handle Google's multiple loading states
     const anyGoogleLoading =
       googleLoading.campaigns || googleLoading.adGroups || googleLoading.ads;
     const anyGoogleError =
@@ -130,22 +105,18 @@ const Index = () => {
     setNotifications({
       loading: {
         platforms: platformsLoading,
-        meta: anyMetaLoading,
-        google: anyGoogleLoading, // 🔥 CHANGED
-        shopify: anyShopifyLoading, // 🔥 CHANGED
+        meta: false, // Meta manages its own loading now
+        google: anyGoogleLoading,
+        shopify: anyShopifyLoading,
       },
       error: {
         platforms: platformsError,
-        meta: anyMetaError,
-        google: anyGoogleError, // 🔥 CHANGED
+        meta: null, // Meta manages its own errors now
+        google: anyGoogleError,
         shopify: anyShopifyError,
       },
       success: {
-        meta:
-          !anyMetaLoading &&
-          !anyMetaError &&
-          metaCampaigns.length > 0 &&
-          platformStatus.meta.connected,
+        meta: false, // Meta manages its own success now
         google:
           !anyGoogleLoading &&
           !anyGoogleError &&
@@ -161,28 +132,20 @@ const Index = () => {
   }, [
     platformsLoading,
     platformsError,
-    metaLoading.campaigns,
-    metaLoading.adSets,
-    metaLoading.ads,
-    metaError.campaigns,
-    metaError.adSets,
-    metaError.ads,
-    metaCampaigns.length,
-    googleLoading.campaigns, // 🔥 ADD MORE
-    googleLoading.adGroups, // 🔥 ADD MORE
-    googleLoading.ads, // 🔥 ADD MORE
+    googleLoading.campaigns,
+    googleLoading.adGroups,
+    googleLoading.ads,
     googleError.campaigns,
-    googleError.adGroups, // 🔥 ADD MORE
-    googleError.ads, // 🔥 ADD MORE
+    googleError.adGroups,
+    googleError.ads,
     googleCampaigns.length,
-    shopifyLoading.orders, // 🔥 CHANGED
-    shopifyLoading.products, // 🔥 CHANGED
-    shopifyLoading.customers, // 🔥 CHANGED
-    shopifyError.orders, // 🔥 CHANGED
-    shopifyError.products, // 🔥 CHANGED
-    shopifyError.customers, // 🔥 CHANGED
+    shopifyLoading.orders,
+    shopifyLoading.products,
+    shopifyLoading.customers,
+    shopifyError.orders,
+    shopifyError.products,
+    shopifyError.customers,
     shopifyOrders.length,
-    platformStatus.meta.connected,
     platformStatus.google.connected,
     platformStatus.shopify.connected,
   ]);
@@ -220,22 +183,6 @@ const Index = () => {
       return () => clearTimeout(timer);
     }
   }, [notifications]);
-
-  // Handle Meta refresh
-  const handleRefreshMeta = async () => {
-    setIsRefreshing(true);
-    try {
-      await refreshMeta();
-      setNotifications((prev) => ({
-        ...prev,
-        success: { ...prev.success, meta: true },
-      }));
-    } catch (e) {
-      console.error("Refresh failed:", e);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
 
   // Handle Google refresh
   const handleRefreshGoogle = async () => {
@@ -281,9 +228,9 @@ const Index = () => {
           error={notifications.error}
           success={notifications.success}
           counts={{
-            metaCampaigns: metaCampaigns.length,
-            metaAdSets: metaAdSets.length,
-            metaAds: metaAds.length,
+            metaCampaigns: 0, // Meta manages its own counts now
+            metaAdSets: 0,
+            metaAds: 0,
             googleCampaigns: googleCampaigns.length,
             shopifyOrders: shopifyOrders.length,
           }}
@@ -323,7 +270,7 @@ const Index = () => {
             </TabsTrigger>
             <TabsTrigger value="meta" className="gap-2">
               <Facebook className="h-4 w-4" />
-              Meta {metaCampaigns.length > 0 && `(${metaCampaigns.length})`}
+              Meta
             </TabsTrigger>
             <TabsTrigger value="google" className="gap-2">
               <Search className="h-4 w-4" />
@@ -341,24 +288,20 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="meta">
+            {/* 🔥 SIMPLIFIED - MetaTab manages everything itself */}
             <MetaTab
-              campaigns={metaCampaigns}
-              adSets={metaAdSets}
-              ads={metaAds}
-              loading={metaLoading}
+              userId={userId}
+              adAccountId={platformStatus.meta.ad_account_id}
               isConnected={platformStatus.meta.connected}
-              isRefreshing={isRefreshing}
-              onRefresh={handleRefreshMeta}
-              // dateRange={dateRange}
-              // customRange={customRange}
+              platformsLoaded={!platformsLoading}
             />
           </TabsContent>
 
           <TabsContent value="google">
             <GoogleTab
               campaigns={googleCampaigns}
-              adGroups={googleAdGroups} // 🔥 NEW
-              ads={googleAds} // 🔥 NEW
+              adGroups={googleAdGroups}
+              ads={googleAds}
               isConnected={platformStatus.google.connected}
               loading={googleLoading}
               isRefreshing={isRefreshing}

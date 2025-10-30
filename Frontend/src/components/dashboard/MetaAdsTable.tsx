@@ -10,14 +10,34 @@ import {
 } from "@/components/ui/table";
 import { Image, Video, FileText } from "lucide-react";
 import { MetaAd } from "@/hooks/useMetaData";
+import { DateRange } from "react-day-picker";
 
 interface MetaAdsTableProps {
   ads: MetaAd[];
   isLoading?: boolean;
+  dateRange?: string;
+  customRange?: DateRange;
 }
 
-export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
-  // Format currency
+export const MetaAdsTable = ({
+  ads,
+  isLoading = false,
+  dateRange = "30days",
+  customRange,
+}: MetaAdsTableProps) => {
+  const getDateRangeText = () => {
+    if (dateRange === "custom" && customRange?.from && customRange?.to) {
+      return `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`;
+    }
+    const labels: Record<string, string> = {
+      today: "Today",
+      "7days": "Last 7 days",
+      "30days": "Last 30 days",
+      "90days": "Last 90 days",
+    };
+    return labels[dateRange] || "Last 30 days";
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -27,17 +47,14 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
     }).format(value);
   };
 
-  // Format large numbers
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat("en-US").format(value);
   };
 
-  // Format percentage
   const formatPercentage = (value: number) => {
     return `${value.toFixed(2)}%`;
   };
 
-  // Get status badge styling
   const getStatusStyle = (status: string) => {
     const statusUpper = status.toUpperCase();
     if (statusUpper === "ACTIVE") {
@@ -48,12 +65,10 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
     return "bg-gray-500/10 text-gray-700 border-gray-500/20";
   };
 
-  // Format status text
   const formatStatus = (status: string) => {
     return status.charAt(0) + status.slice(1).toLowerCase();
   };
 
-  // Detect creative type
   const getCreativeType = (ad: MetaAd) => {
     if (ad.creative?.image_url) {
       return { type: "image", icon: Image };
@@ -64,7 +79,6 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
     }
   };
 
-  // Truncate text
   const truncateText = (text: string, maxLength: number = 60) => {
     if (!text) return "N/A";
     return text.length > maxLength
@@ -102,7 +116,7 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
           <div>
             <h3 className="text-lg font-semibold">Meta Ads</h3>
             <p className="text-sm text-muted-foreground">
-              {ads.length} ads • Last 30 days
+              {ads.length} ads • {getDateRangeText()}
             </p>
           </div>
         </div>
@@ -143,10 +157,7 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
                     key={ad.id}
                     className="hover:bg-muted/30 transition-colors"
                   >
-                    {/* Ad Name */}
                     <TableCell className="font-medium">{ad.name}</TableCell>
-
-                    {/* Creative Type */}
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <CreativeIcon className="h-4 w-4 text-muted-foreground" />
@@ -162,8 +173,6 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
                         </Badge>
                       </div>
                     </TableCell>
-
-                    {/* Ad Copy */}
                     <TableCell className="text-sm">
                       <div className="max-w-[250px]">
                         <p className="text-muted-foreground line-clamp-2">
@@ -171,8 +180,6 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
                         </p>
                       </div>
                     </TableCell>
-
-                    {/* Status Badge */}
                     <TableCell>
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(
@@ -182,8 +189,6 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
                         {formatStatus(ad.status)}
                       </span>
                     </TableCell>
-
-                    {/* Insights Data */}
                     {ad.insights ? (
                       <>
                         <TableCell className="text-right font-semibold">
@@ -214,14 +219,12 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
                         </TableCell>
                       </>
                     ) : (
-                      <>
-                        <TableCell
-                          colSpan={6}
-                          className="text-center text-muted-foreground text-sm"
-                        >
-                          No insights available
-                        </TableCell>
-                      </>
+                      <TableCell
+                        colSpan={6}
+                        className="text-center text-muted-foreground text-sm"
+                      >
+                        No insights available
+                      </TableCell>
                     )}
                   </TableRow>
                 );
@@ -230,7 +233,6 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
           </Table>
         </div>
 
-        {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
           <div>
             <p className="text-xs text-muted-foreground">Total Spend</p>
