@@ -39,6 +39,7 @@ export const ShopifyOrdersTable = ({
   // Format currency
   const formatCurrency = (value: string) => {
     const num = parseFloat(value);
+    if (isNaN(num)) return "$0.00";
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -46,12 +47,18 @@ export const ShopifyOrdersTable = ({
   };
 
   // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return "N/A";
+    try {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch (error) {
+      console.error("Error formatting date:", dateString, error);
+      return "Invalid Date";
+    }
   };
 
   // Get financial status badge styling
@@ -81,7 +88,7 @@ export const ShopifyOrdersTable = ({
   };
 
   // Format status text
-  const formatStatus = (status: string) => {
+  const formatStatus = (status: string | undefined) => {
     if (!status) return "Unfulfilled";
     return status.charAt(0) + status.slice(1).toLowerCase();
   };
@@ -141,44 +148,83 @@ export const ShopifyOrdersTable = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentOrders.map((order) => (
-                <TableRow
-                  key={order.id}
-                  className="hover:bg-muted/30 transition-colors"
-                >
-                  <TableCell className="font-medium">{order.name}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(order.created_at)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {order.email || "Guest"}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {formatCurrency(order.total_price || "0")}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getFinancialStatusStyle(
-                        order.financial_status
-                      )}`}
-                    >
-                      {formatStatus(order.financial_status)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getFulfillmentStatusStyle(
-                        order.fulfillment_status
-                      )}`}
-                    >
-                      {formatStatus(order.fulfillment_status)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {order.line_items?.length || 0}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {currentOrders.map((order) => {
+                // Extract values with fallbacks
+                const orderName = order.name || order.orderNumber || order.id;
+                const orderDate = order.created_at || order.createdAt;
+                const customerEmail =
+                  order.email || order.customer?.email || "Guest";
+
+                // Try ALL possible price fields
+                const totalPrice =
+                  order.total_price ||
+                  order.totalPrice ||
+                  order.currentTotalPrice?.amount ||
+                  (order as any).totalPriceSet?.shopMoney?.amount ||
+                  (order as any).total ||
+                  (order as any).amount ||
+                  (order as any).price ||
+                  (order as any).subtotal_price ||
+                  "0";
+
+                const financialStatus =
+                  order.financial_status ||
+                  order.financialStatus ||
+                  order.displayFinancialStatus ||
+                  "";
+
+                const fulfillmentStatus =
+                  order.fulfillment_status ||
+                  order.fulfillmentStatus ||
+                  order.displayFulfillmentStatus ||
+                  "";
+
+                const lineItemsCount =
+                  order.line_items?.length ||
+                  (Array.isArray(order.lineItems)
+                    ? order.lineItems.length
+                    : order.lineItems?.edges?.length) ||
+                  0;
+
+                return (
+                  <TableRow
+                    key={order.id}
+                    className="hover:bg-muted/30 transition-colors"
+                  >
+                    <TableCell className="font-medium">{orderName}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatDate(orderDate)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {customerEmail}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(totalPrice)}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getFinancialStatusStyle(
+                          financialStatus
+                        )}`}
+                      >
+                        {formatStatus(financialStatus)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getFulfillmentStatusStyle(
+                          fulfillmentStatus
+                        )}`}
+                      >
+                        {formatStatus(fulfillmentStatus)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {lineItemsCount}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -225,7 +271,17 @@ export const ShopifyOrdersTable = ({
             <p className="text-lg font-semibold text-green-600">
               {formatCurrency(
                 orders
-                  .reduce((sum, o) => sum + parseFloat(o.total_price || "0"), 0)
+                  .reduce((sum, o) => {
+                    const price =
+                      o.total_price ||
+                      o.totalPrice ||
+                      o.currentTotalPrice?.amount ||
+                      (o as any).totalPriceSet?.shopMoney?.amount ||
+                      (o as any).total ||
+                      (o as any).amount ||
+                      "0";
+                    return sum + parseFloat(price);
+                  }, 0)
                   .toString()
               )}
             </p>
@@ -234,9 +290,14 @@ export const ShopifyOrdersTable = ({
             <p className="text-xs text-muted-foreground">Paid Orders</p>
             <p className="text-lg font-semibold text-green-600">
               {
-                orders.filter(
-                  (o) => o.financial_status?.toUpperCase() === "PAID"
-                ).length
+                orders.filter((o) => {
+                  const status =
+                    o.financial_status ||
+                    o.financialStatus ||
+                    o.displayFinancialStatus ||
+                    "";
+                  return status.toUpperCase() === "PAID";
+                }).length
               }
             </p>
           </div>
@@ -244,9 +305,14 @@ export const ShopifyOrdersTable = ({
             <p className="text-xs text-muted-foreground">Fulfilled</p>
             <p className="text-lg font-semibold">
               {
-                orders.filter(
-                  (o) => o.fulfillment_status?.toUpperCase() === "FULFILLED"
-                ).length
+                orders.filter((o) => {
+                  const status =
+                    o.fulfillment_status ||
+                    o.fulfillmentStatus ||
+                    o.displayFulfillmentStatus ||
+                    "";
+                  return status.toUpperCase() === "FULFILLED";
+                }).length
               }
             </p>
           </div>

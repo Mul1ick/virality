@@ -6,13 +6,41 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 export interface ShopifyOrder {
   id: string;
-  name: string;
+
+  // Order number - both formats
+  name?: string;
+  orderNumber?: string;
+
+  // Email
   email?: string;
-  created_at: string;
-  total_price: string;
-  financial_status: string;
-  fulfillment_status: string;
+  customer?: {
+    email?: string;
+  };
+
+  // Date - both formats
+  created_at?: string;
+  createdAt?: string;
+
+  // Total price - both formats
+  total_price?: string;
+  totalPrice?: string;
+  currentTotalPrice?: {
+    amount: string;
+  };
+
+  // Financial status - both formats
+  financial_status?: string;
+  financialStatus?: string;
+  displayFinancialStatus?: string;
+
+  // Fulfillment status - both formats
+  fulfillment_status?: string;
+  fulfillmentStatus?: string;
+  displayFulfillmentStatus?: string;
+
+  // Line items
   line_items?: any[];
+  lineItems?: any[] | { edges?: any[] };
 }
 
 export interface ShopifyProduct {
@@ -76,9 +104,11 @@ export const useShopifyData = (
           token ? { headers: { Authorization: `Bearer ${token}` } } : {}
         );
 
-        setOrders(res.data.data || res.data.orders || []);
+        const ordersData = res.data.data || res.data.orders || [];
+        console.log("🔍 Orders data:", ordersData);
+        setOrders(ordersData);
         setError((prev) => ({ ...prev, orders: null }));
-        console.log(`✅ Fetched ${res.data.data?.length || 0} orders`);
+        console.log(`✅ Fetched ${ordersData.length} orders`);
       } catch (e: any) {
         console.error("❌ Shopify orders error:", e);
         setError((prev) => ({
