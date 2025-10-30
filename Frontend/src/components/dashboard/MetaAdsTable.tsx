@@ -9,35 +9,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Image, Video, FileText } from "lucide-react";
-
-interface AdInsights {
-  spend: number;
-  impressions: number;
-  reach: number;
-  clicks: number;
-  ctr: number;
-  cpm: number;
-  frequency: number;
-  cpc: number;
-}
-
-interface AdCreative {
-  image_url?: string;
-  body?: string;
-  id: string;
-}
-
-interface Ad {
-  id: string;
-  name: string;
-  status: string;
-  adset_id: string;
-  creative: AdCreative;
-  insights: AdInsights | null;
-}
+import { MetaAd } from "@/hooks/useMetaData";
 
 interface MetaAdsTableProps {
-  ads: Ad[];
+  ads: MetaAd[];
   isLoading?: boolean;
 }
 
@@ -79,8 +54,8 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
   };
 
   // Detect creative type
-  const getCreativeType = (ad: Ad) => {
-    if (ad.creative.image_url) {
+  const getCreativeType = (ad: MetaAd) => {
+    if (ad.creative?.image_url) {
       return { type: "image", icon: Image };
     } else if (ad.name.toLowerCase().includes("video")) {
       return { type: "video", icon: Video };
@@ -154,9 +129,6 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
                   Clicks
                 </TableHead>
                 <TableHead className="font-semibold text-right">CTR</TableHead>
-                {/* <TableHead className="font-semibold text-right">
-                  Frequency
-                </TableHead> */}
                 <TableHead className="font-semibold text-right">CPM</TableHead>
                 <TableHead className="font-semibold text-right">CPC</TableHead>
               </TableRow>
@@ -178,7 +150,7 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <CreativeIcon className="h-4 w-4 text-muted-foreground" />
-                        {ad.creative.image_url && (
+                        {ad.creative?.image_url && (
                           <img
                             src={ad.creative.image_url}
                             alt="Ad creative"
@@ -195,7 +167,7 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
                     <TableCell className="text-sm">
                       <div className="max-w-[250px]">
                         <p className="text-muted-foreground line-clamp-2">
-                          {truncateText(ad.creative.body || "No copy", 80)}
+                          {truncateText(ad.creative?.body || "No copy", 80)}
                         </p>
                       </div>
                     </TableCell>
@@ -234,9 +206,6 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
                             {formatPercentage(ad.insights.ctr)}
                           </span>
                         </TableCell>
-                        {/* <TableCell className="text-right">
-                          {ad.insights.frequency.toFixed(2)}
-                        </TableCell> */}
                         <TableCell className="text-right">
                           {formatCurrency(ad.insights.cpm)}
                         </TableCell>
@@ -247,7 +216,7 @@ export const MetaAdsTable = ({ ads, isLoading = false }: MetaAdsTableProps) => {
                     ) : (
                       <>
                         <TableCell
-                          colSpan={7}
+                          colSpan={6}
                           className="text-center text-muted-foreground text-sm"
                         >
                           No insights available

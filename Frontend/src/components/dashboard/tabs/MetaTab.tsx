@@ -19,8 +19,8 @@ interface MetaTabProps {
   isConnected: boolean;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
-  dateRange: string;
-  customRange?: DateRange;
+  // dateRange: string;
+  // customRange?: DateRange;
 }
 
 export const MetaTab = ({
@@ -31,9 +31,9 @@ export const MetaTab = ({
   isConnected,
   isRefreshing,
   onRefresh,
-  dateRange,
-  customRange,
-}: MetaTabProps) => {
+}: // dateRange,
+// customRange,
+MetaTabProps) => {
   const hasData = campaigns.length > 0 || adSets.length > 0 || ads.length > 0;
 
   return (

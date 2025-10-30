@@ -8,29 +8,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowUpRight, ArrowDownRight } from "lucide-react";
-
-interface CampaignInsights {
-  spend: number;
-  impressions: number;
-  reach: number;
-  clicks: number;
-  ctr: number;
-  cpm: number;
-  cpc: number;
-  frequency: number;
-}
-
-interface Campaign {
-  id: string;
-  name: string;
-  status: string;
-  objective: string;
-  insights: CampaignInsights | null;
-}
+import { MetaCampaign } from "@/hooks/useMetaData";
 
 interface MetaCampaignsTableProps {
-  campaigns: Campaign[];
+  campaigns: MetaCampaign[];
   isLoading?: boolean;
 }
 
@@ -142,9 +123,6 @@ export const MetaCampaignsTable = ({
                   Clicks
                 </TableHead>
                 <TableHead className="font-semibold text-right">CTR</TableHead>
-                {/* <TableHead className="font-semibold text-right">
-                  Frequency
-                </TableHead> */}
                 <TableHead className="font-semibold text-right">CPM</TableHead>
                 <TableHead className="font-semibold text-right">CPC</TableHead>
               </TableRow>
@@ -202,10 +180,6 @@ export const MetaCampaignsTable = ({
                           {formatPercentage(campaign.insights.ctr)}
                         </span>
                       </TableCell>
-                      {/* <TableCell className="text-right">
-                        {" "}
-                        {campaign.insights.frequency.toFixed(2)}
-                      </TableCell> */}
                       <TableCell className="text-right">
                         {formatCurrency(campaign.insights.cpm)}
                       </TableCell>
@@ -216,11 +190,9 @@ export const MetaCampaignsTable = ({
                   ) : (
                     <>
                       <TableCell
-                        colSpan={8}
+                        colSpan={7}
                         className="text-center text-muted-foreground text-sm"
                       >
-                        {" "}
-                        {/* ✅ Change from 7 to 8 */}
                         No insights available
                       </TableCell>
                     </>

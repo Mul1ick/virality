@@ -1,5 +1,4 @@
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -8,29 +7,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-interface AdSetInsights {
-  spend: number;
-  impressions: number;
-  reach: number;
-  clicks: number;
-  ctr: number;
-  cpm: number;
-  frequency: number;
-  cpc: number;
-}
-
-interface AdSet {
-  id: string;
-  name: string;
-  status: string;
-  daily_budget: string;
-  campaign_id: string;
-  insights: AdSetInsights | null;
-}
+import { MetaAdSet } from "@/hooks/useMetaData";
 
 interface MetaAdSetsTableProps {
-  adsets: AdSet[];
+  adsets: MetaAdSet[];
   isLoading?: boolean;
 }
 
@@ -138,9 +118,6 @@ export const MetaAdSetsTable = ({
                   Clicks
                 </TableHead>
                 <TableHead className="font-semibold text-right">CTR</TableHead>
-                {/* <TableHead className="font-semibold text-right">
-                  Frequency
-                </TableHead> */}
                 <TableHead className="font-semibold text-right">CPM</TableHead>
                 <TableHead className="font-semibold text-right">CPC</TableHead>
               </TableRow>
@@ -196,9 +173,6 @@ export const MetaAdSetsTable = ({
                           {formatPercentage(adset.insights.ctr)}
                         </span>
                       </TableCell>
-                      {/* <TableCell className="text-right">
-                        {adset.insights.frequency.toFixed(2)}
-                      </TableCell> */}
                       <TableCell className="text-right">
                         {formatCurrency(adset.insights.cpm)}
                       </TableCell>
@@ -209,7 +183,7 @@ export const MetaAdSetsTable = ({
                   ) : (
                     <>
                       <TableCell
-                        colSpan={8}
+                        colSpan={7}
                         className="text-center text-muted-foreground text-sm"
                       >
                         No insights available
