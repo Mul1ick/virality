@@ -337,24 +337,23 @@ def shopify_callback(
     # Exchange code for access token
     access_token = shopify_service.exchange_code_for_token(shop, code)
 
-    # Save connection (temporarily, until user confirms)
+    # 🔥 SAVE WITH SCOPES - This ensures permissions are tracked
     save_or_update_platform_connection(
         user_id=user_id,
         platform="shopify",
         platform_data={
             "access_token": access_token,
             "shop_url": shop,
-            "connected": True
+            "connected": True,
+            "scopes": SCOPES,  # 🔥 ADD THIS LINE
         }
     )
 
     logger.info(f"[Shopify Callback] ✅ Saved connection for user={user_id}, shop={shop}")
     
-    # Redirect to selection page (like Meta/Google)
     return RedirectResponse(
         url=f"http://localhost:8080/select-shopify?user_id={user_id}"
     )
-
 
 # ---------------------------------------------------------------------------
 # 🏪 Shop Confirmation
@@ -388,9 +387,8 @@ def confirm_shop(
     }
 
 
-# ---------------------------------------------------------------------------
-# 📊 Data Fetch Endpoints
-# ---------------------------------------------------------------------------
+# --------------------------- Data Endpoints --------------------------- #
+
 @router.get("/orders/{user_id}")
 def fetch_orders(
     user_id: str,
@@ -401,10 +399,17 @@ def fetch_orders(
         raise HTTPException(status_code=403, detail="Forbidden")
     
     details = shopify_service.get_connection_or_403(user_id, current_user_id)
-    return shopify_service.fetch_and_save(
+    result = shopify_service.fetch_and_save(
         "orders", user_id, shopify_service.get_all_orders,
         details["shop_url"], details["access_token"]
     )
+    
+    # 🔥 FIX: Return data in expected format
+    return {
+        "data": result.get("data", []),     # ✅ Add "data" key
+        "count": result.get("count", 0),
+        "user_id": user_id
+    }
 
 
 @router.get("/products/{user_id}")
@@ -417,10 +422,17 @@ def fetch_products(
         raise HTTPException(status_code=403, detail="Forbidden")
     
     details = shopify_service.get_connection_or_403(user_id, current_user_id)
-    return shopify_service.fetch_and_save(
+    result = shopify_service.fetch_and_save(
         "products", user_id, shopify_service.get_all_products,
         details["shop_url"], details["access_token"]
     )
+    
+    # 🔥 FIX: Return data in expected format
+    return {
+        "data": result.get("data", []),     # ✅ Add "data" key
+        "count": result.get("count", 0),
+        "user_id": user_id
+    }
 
 
 @router.get("/customers/{user_id}")
@@ -433,7 +445,14 @@ def fetch_customers(
         raise HTTPException(status_code=403, detail="Forbidden")
     
     details = shopify_service.get_connection_or_403(user_id, current_user_id)
-    return shopify_service.fetch_and_save(
+    result = shopify_service.fetch_and_save(
         "customers", user_id, shopify_service.get_all_customers,
         details["shop_url"], details["access_token"]
     )
+    
+    # 🔥 FIX: Return data in expected format
+    return {
+        "data": result.get("data", []),     # ✅ Add "data" key
+        "count": result.get("count", 0),
+        "user_id": user_id
+    }

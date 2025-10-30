@@ -75,7 +75,13 @@ def fetch_and_save(resource_type: str, user_id: str, func, shop_url: str, token:
         if data:
             save_items(f"shopify_{resource_type}", user_id, data, "shopify")
             logger.info(f"[Shopify {resource_type.title()}] Saved {len(data)} for {user_id}")
-        return {"count": len(data or []), "user_id": user_id}
+        
+        # 🔥 FIX: Return the actual data
+        return {
+            "data": data or [],           # ✅ ADD THIS
+            "count": len(data or []),
+            "user_id": user_id
+        }
     except Exception as e:
         logger.exception(f"[Shopify {resource_type.title()}] Failed: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching {resource_type}.")

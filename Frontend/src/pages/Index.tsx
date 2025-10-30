@@ -56,6 +56,8 @@ const Index = () => {
   // Fetch Google data
   const {
     campaigns: googleCampaigns,
+    adGroups: googleAdGroups,
+    ads: googleAds,
     loading: googleLoading,
     error: googleError,
     refreshAll: refreshGoogle,
@@ -71,8 +73,11 @@ const Index = () => {
   // Fetch Shopify data
   const {
     orders: shopifyOrders,
+    products: shopifyProducts,
+    customers: shopifyCustomers,
     loading: shopifyLoading,
     error: shopifyError,
+    refreshAll: refreshShopify,
   } = useShopifyData(
     userId,
     platformStatus.shopify.connected,
@@ -101,24 +106,39 @@ const Index = () => {
   });
 
   // Update notifications based on hook states
+  // Update notifications based on hook states
   useEffect(() => {
     const anyMetaLoading =
       metaLoading.campaigns || metaLoading.adSets || metaLoading.ads;
     const anyMetaError =
       metaError.campaigns || metaError.adSets || metaError.ads;
 
+    // 🔥 ADD THIS - Handle Shopify's multiple loading states
+    const anyShopifyLoading =
+      shopifyLoading.orders ||
+      shopifyLoading.products ||
+      shopifyLoading.customers;
+    const anyShopifyError =
+      shopifyError.orders || shopifyError.products || shopifyError.customers;
+
+    // 🔥 ADD THIS - Handle Google's multiple loading states
+    const anyGoogleLoading =
+      googleLoading.campaigns || googleLoading.adGroups || googleLoading.ads;
+    const anyGoogleError =
+      googleError.campaigns || googleError.adGroups || googleError.ads;
+
     setNotifications({
       loading: {
         platforms: platformsLoading,
         meta: anyMetaLoading,
-        google: googleLoading.campaigns,
-        shopify: shopifyLoading,
+        google: anyGoogleLoading, // 🔥 CHANGED
+        shopify: anyShopifyLoading, // 🔥 CHANGED
       },
       error: {
         platforms: platformsError,
         meta: anyMetaError,
-        google: googleError.campaigns,
-        shopify: shopifyError,
+        google: anyGoogleError, // 🔥 CHANGED
+        shopify: anyShopifyError,
       },
       success: {
         meta:
@@ -127,13 +147,13 @@ const Index = () => {
           metaCampaigns.length > 0 &&
           platformStatus.meta.connected,
         google:
-          !googleLoading.campaigns &&
-          !googleError.campaigns &&
+          !anyGoogleLoading &&
+          !anyGoogleError &&
           googleCampaigns.length > 0 &&
           platformStatus.google.connected,
         shopify:
-          !shopifyLoading &&
-          !shopifyError &&
+          !anyShopifyLoading &&
+          !anyShopifyError &&
           shopifyOrders.length > 0 &&
           platformStatus.shopify.connected,
       },
@@ -148,15 +168,23 @@ const Index = () => {
     metaError.adSets,
     metaError.ads,
     metaCampaigns.length,
-    googleLoading.campaigns,
+    googleLoading.campaigns, // 🔥 ADD MORE
+    googleLoading.adGroups, // 🔥 ADD MORE
+    googleLoading.ads, // 🔥 ADD MORE
     googleError.campaigns,
+    googleError.adGroups, // 🔥 ADD MORE
+    googleError.ads, // 🔥 ADD MORE
     googleCampaigns.length,
-    shopifyLoading,
-    shopifyError,
+    shopifyLoading.orders, // 🔥 CHANGED
+    shopifyLoading.products, // 🔥 CHANGED
+    shopifyLoading.customers, // 🔥 CHANGED
+    shopifyError.orders, // 🔥 CHANGED
+    shopifyError.products, // 🔥 CHANGED
+    shopifyError.customers, // 🔥 CHANGED
     shopifyOrders.length,
-    platformStatus.meta.connected, // 🔥 ONLY track specific properties
-    platformStatus.google.connected, // 🔥 NOT the whole object
-    platformStatus.shopify.connected, // 🔥 NOT the whole object
+    platformStatus.meta.connected,
+    platformStatus.google.connected,
+    platformStatus.shopify.connected,
   ]);
 
   // Auto-hide notifications after 3 seconds
@@ -321,14 +349,16 @@ const Index = () => {
               isConnected={platformStatus.meta.connected}
               isRefreshing={isRefreshing}
               onRefresh={handleRefreshMeta}
-              dateRange={dateRange}
-              customRange={customRange}
+              // dateRange={dateRange}
+              // customRange={customRange}
             />
           </TabsContent>
 
           <TabsContent value="google">
             <GoogleTab
               campaigns={googleCampaigns}
+              adGroups={googleAdGroups} // 🔥 NEW
+              ads={googleAds} // 🔥 NEW
               isConnected={platformStatus.google.connected}
               loading={googleLoading}
               isRefreshing={isRefreshing}
@@ -341,7 +371,12 @@ const Index = () => {
           <TabsContent value="shopify">
             <ShopifyTab
               orders={shopifyOrders}
+              products={shopifyProducts}
+              customers={shopifyCustomers}
               isConnected={platformStatus.shopify.connected}
+              loading={shopifyLoading}
+              isRefreshing={isRefreshing}
+              onRefresh={refreshShopify}
               dateRange={dateRange}
               customRange={customRange}
             />
