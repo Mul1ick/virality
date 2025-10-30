@@ -1,6 +1,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { CreativeGallery } from "@/components/dashboard/CreativeGallery";
+import { GoogleAdGroupsTable } from "@/components/dashboard/GoogleAdGroupsTable";
+import { GoogleAdsTable } from "@/components/dashboard/GoogleAdsTable";
 import { RefreshCw } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
@@ -11,10 +13,31 @@ interface GoogleCampaign {
   status?: string;
 }
 
+interface GoogleAdGroup {
+  id: string;
+  name: string;
+  status: string;
+  campaign_id: string;
+  campaign_name?: string;
+}
+
+interface GoogleAd {
+  id: string;
+  name: string;
+  status: string;
+  ad_group_id: string;
+  ad_group_name?: string;
+  type?: string;
+}
+
 interface GoogleTabProps {
   campaigns: GoogleCampaign[];
+  adGroups: GoogleAdGroup[];
+  ads: GoogleAd[];
   loading: {
     campaigns: boolean;
+    adGroups: boolean;
+    ads: boolean;
   };
   isConnected: boolean;
   isRefreshing: boolean;
@@ -25,6 +48,8 @@ interface GoogleTabProps {
 
 export const GoogleTab = ({
   campaigns,
+  adGroups,
+  ads,
   loading,
   isConnected,
   isRefreshing,
@@ -32,7 +57,7 @@ export const GoogleTab = ({
   dateRange,
   customRange,
 }: GoogleTabProps) => {
-  const hasData = campaigns.length > 0;
+  const hasData = campaigns.length > 0 || adGroups.length > 0 || ads.length > 0;
 
   return (
     <div className="bg-card rounded-lg border p-6">
@@ -56,7 +81,7 @@ export const GoogleTab = ({
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
             />
           </svg>
-          <h2 className="text-2xl font-bold">Google Ads Campaigns</h2>
+          <h2 className="text-2xl font-bold">Google Ads Campaigns & Ads</h2>
         </div>
         <Button
           onClick={onRefresh}
@@ -77,6 +102,12 @@ export const GoogleTab = ({
             <TabsTrigger value="campaigns">
               Campaigns {campaigns.length > 0 && `(${campaigns.length})`}
             </TabsTrigger>
+            <TabsTrigger value="adgroups">
+              Ad Groups {adGroups.length > 0 && `(${adGroups.length})`}
+            </TabsTrigger>
+            <TabsTrigger value="ads">
+              Ads {ads.length > 0 && `(${ads.length})`}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="campaigns">
@@ -84,6 +115,17 @@ export const GoogleTab = ({
               campaigns={campaigns}
               isLoading={loading.campaigns}
             />
+          </TabsContent>
+
+          <TabsContent value="adgroups">
+            <GoogleAdGroupsTable
+              adGroups={adGroups}
+              isLoading={loading.adGroups}
+            />
+          </TabsContent>
+
+          <TabsContent value="ads">
+            <GoogleAdsTable ads={ads} isLoading={loading.ads} />
           </TabsContent>
         </Tabs>
       ) : (

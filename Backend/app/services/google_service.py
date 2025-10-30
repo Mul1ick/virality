@@ -208,9 +208,36 @@ class GoogleService:
         resp = list_campaigns_for_child(token, customer_id, manager_id)
         if not resp or resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code if resp else 500, detail="Failed to fetch campaigns.")
-        data = resp.json().get("results", [])
-        save_items("campaigns", customer_id, data, GoogleService.PLATFORM_NAME)
-        return data
+        
+        raw_data = resp.json().get("results", [])
+        
+        # 🔥 FIX: Transform nested structure to flat structure
+        transformed_data = []
+        for item in raw_data:
+            campaign = item.get("campaign", {})
+            metrics = item.get("metrics", {})
+            budget = item.get("campaignBudget", {})
+            
+            transformed_data.append({
+                "id": campaign.get("id"),
+                "name": campaign.get("name"),
+                "status": campaign.get("status"),
+                "advertising_channel_type": campaign.get("advertisingChannelType"),
+                "bidding_strategy_type": campaign.get("biddingStrategyType"),
+                "start_date": campaign.get("startDate"),
+                "end_date": campaign.get("endDate"),
+                "resource_name": campaign.get("resourceName"),
+                # Metrics
+                "clicks": metrics.get("clicks", "0"),
+                "conversions": metrics.get("conversions", 0),
+                "cost_micros": metrics.get("costMicros", "0"),
+                "impressions": metrics.get("impressions", "0"),
+                # Budget
+                "budget_amount_micros": budget.get("amountMicros", "0"),
+            })
+        
+        save_items("campaigns", customer_id, transformed_data, GoogleService.PLATFORM_NAME)
+        return transformed_data
 
     @staticmethod
     def fetch_adgroups(user_id: str, customer_id: str, manager_id: str, campaign_id: str):
@@ -218,9 +245,31 @@ class GoogleService:
         resp = list_adgroups_for_campaign(token, customer_id, manager_id, campaign_id)
         if not resp or resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code if resp else 500, detail="Failed to fetch ad groups.")
-        data = resp.json().get("results", [])
-        save_items("adsets", customer_id, data, GoogleService.PLATFORM_NAME)
-        return data
+        
+        raw_data = resp.json().get("results", [])
+        
+        # 🔥 FIX: Transform nested structure to flat structure
+        transformed_data = []
+        for item in raw_data:
+            ad_group = item.get("adGroup", {})
+            metrics = item.get("metrics", {})
+            
+            transformed_data.append({
+                "id": ad_group.get("id"),
+                "name": ad_group.get("name"),
+                "status": ad_group.get("status"),
+                "type": ad_group.get("type"),
+                "resource_name": ad_group.get("resourceName"),
+                "campaign_id": campaign_id,  # 🔥 ADD campaign_id for reference
+                # Metrics
+                "clicks": metrics.get("clicks", "0"),
+                "conversions": metrics.get("conversions", 0),
+                "cost_micros": metrics.get("costMicros", "0"),
+                "impressions": metrics.get("impressions", "0"),
+            })
+        
+        save_items("adsets", customer_id, transformed_data, GoogleService.PLATFORM_NAME)
+        return transformed_data
 
     @staticmethod
     def fetch_ads(user_id: str, customer_id: str, manager_id: str, ad_group_id: str):
@@ -228,9 +277,37 @@ class GoogleService:
         resp = list_ads_for_adgroup(token, customer_id, manager_id, ad_group_id)
         if not resp or resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code if resp else 500, detail="Failed to fetch ads.")
-        data = resp.json().get("results", [])
-        save_items("ads", customer_id, data, GoogleService.PLATFORM_NAME)
-        return data
+        
+        raw_data = resp.json().get("results", [])
+        
+        # 🔥 FIX: Transform nested structure to flat structure
+        transformed_data = []
+        for item in raw_data:
+            ad = item.get("ad", {})
+            ad_group_ad = item.get("adGroupAd", {})
+            metrics = item.get("metrics", {})
+            
+            # Try to get ad name/headline
+            ad_name = ad.get("name") or ad.get("finalUrls", [""])[0] or f"Ad {ad.get('id', 'Unknown')}"
+            
+            transformed_data.append({
+                "id": ad.get("id"),
+                "name": ad_name,
+                "status": ad_group_ad.get("status") or ad.get("status"),
+                "type": ad.get("type"),
+                "resource_name": ad.get("resourceName"),
+                "ad_group_id": ad_group_id,  # 🔥 ADD ad_group_id for reference
+                # Headlines/descriptions (if available)
+                "final_urls": ad.get("finalUrls", []),
+                # Metrics
+                "clicks": metrics.get("clicks", "0"),
+                "conversions": metrics.get("conversions", 0),
+                "cost_micros": metrics.get("costMicros", "0"),
+                "impressions": metrics.get("impressions", "0"),
+            })
+        
+        save_items("ads", customer_id, transformed_data, GoogleService.PLATFORM_NAME)
+        return transformed_data
 
     @staticmethod
     def fetch_insights(user_id: str, customer_id: str, manager_id: Optional[str] = None):
