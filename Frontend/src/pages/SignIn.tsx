@@ -55,7 +55,10 @@ function SignIn() {
       });
     } catch (err: any) {
       console.error("Send OTP error:", err);
-      if (err.response?.status === 404) {
+      if (err.response?.status === 403) {
+        // This will now catch "pending approval" or "rejected"
+        setError(err.response.data.detail);
+      } else if (err.response?.status === 404) { 
         setError("Email not found. Please sign up first.");
       } else {
         setError(err.response?.data?.detail || "Failed to send OTP. Please try again.");

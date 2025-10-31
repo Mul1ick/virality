@@ -19,6 +19,7 @@ from app.controllers import (
     shopify_controller,
     user_controller,
     aggregation_controller,
+    admin_controller
 )
 
 logger = get_logger()
@@ -54,6 +55,7 @@ app.include_router(shopify_controller.router, prefix="/shopify", tags=["Shopify"
 app.include_router(analytics_controller.router, prefix="/analytics", tags=["Analytics"])
 app.include_router(user_controller.router, prefix="/user", tags=["User"])
 app.include_router(aggregation_controller.router, prefix="/aggregate", tags=["Aggregation"])
+app.include_router(admin_controller.router, prefix="/admin", tags=["Admin"]) # <-- ADDED
 
 logger.info("✅ All routers registered successfully.")
 

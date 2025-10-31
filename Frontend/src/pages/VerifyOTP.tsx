@@ -107,6 +107,7 @@ const handleVerify = async (e) => {
       //    Your backend returns 'access_token' and 'user_id' 
       localStorage.setItem("access_token", response.data.access_token);
       localStorage.setItem("user_id", response.data.user_id);
+      localStorage.setItem("isAdmin", response.data.isAdmin ? 'true' : 'false');
 
       // After successful verification, navigate to the profile page
       navigate("/profile"); 

@@ -59,6 +59,8 @@ def register_user(user: UserCreate):
         "name": user.name,
         "email": user.email,
         "created_at": datetime.utcnow(),
+        "status": "pending",  # <-- ADDED
+        "isAdmin": False      # <-- ADDED
     })
     return {"message": "Account created successfully! Please sign in to continue."}
 
@@ -68,6 +70,19 @@ def login_user(user: UserLogin):
     db_user = users_collection.find_one({"email": user.email})
     if not db_user:
         raise HTTPException(status_code=404, detail="Email not found. Please sign up first.")
+    
+    is_admin = db_user.get("isAdmin", False)
+    status = db_user.get("status", "pending")
+
+    if not is_admin and status != "approved":
+        if status == "pending":
+            # If pending, stop and send a 403 error.
+            raise HTTPException(status_code=403, detail="Your account is awaiting admin approval.")
+        if status == "rejected":
+            # If rejected, stop and send a 403 error.
+            raise HTTPException(status_code=403, detail="Your account has been rejected.")
+        # Catch-all for any other non-approved status
+        raise HTTPException(status_code=403, detail="Account is not active.")
 
     otp = generate_otp()
     otp_expiry = datetime.utcnow() + timedelta(minutes=10)
@@ -79,6 +94,16 @@ def login_user(user: UserLogin):
 
     if not send_otp_email(user.email, otp):
          raise HTTPException(status_code=500, detail="Failed to send OTP email. Please try again later.")
+    
+    is_admin = db_user.get("isAdmin", False)
+    status = db_user.get("status", "pending")
+
+    if not is_admin and status != "approved":
+        if status == "pending":
+            raise HTTPException(status_code=403, detail="Your account is awaiting admin approval.")
+        if status == "rejected":
+            raise HTTPException(status_code=403, detail="Your account has been rejected.")
+        raise HTTPException(status_code=403, detail="Account is not active.")
 
     return {"message": "OTP sent to your email. Please verify."}
 
@@ -99,6 +124,17 @@ def verify_otp(data: OtpVerify):
         {"$set": {"otp": None, "otp_expiry": None}}
     )
 
-    access_token = create_access_token(data={"sub": user["email"], "user_id": str(user["_id"])})
+    is_admin = user.get("isAdmin", False)
+    access_token = create_access_token(data={
+        "sub": user["email"], 
+        "user_id": str(user["_id"]),
+        "isAdmin": is_admin
+    })
+
     logger.info(f"Generated JWT for {user['email']}: {access_token}")
-    return {"access_token": access_token, "token_type": "bearer", "user_id": str(user["_id"])}
+    return {
+            "access_token": access_token, 
+            "token_type": "bearer", 
+            "user_id": str(user["_id"]),
+            "isAdmin": is_admin
+        }

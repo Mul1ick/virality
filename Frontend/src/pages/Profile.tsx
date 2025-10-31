@@ -25,6 +25,7 @@ import {
   Mail,
   Hash,
   Sparkles,
+  UserCheck, // <-- Add this line
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -120,6 +121,7 @@ const Profile = () => {
   const navigate = useNavigate();
 
   const [userData, setUserData] = useState<UserProfileData | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [platformStatusLoading, setPlatformStatusLoading] = useState(true);
@@ -159,6 +161,10 @@ const Profile = () => {
         setProfileLoading(false);
       }
     };
+
+    if (localStorage.getItem("isAdmin") === 'true') {
+      setIsAdmin(true);
+    }
     fetchUserProfile();
   }, []);
 
@@ -518,17 +524,30 @@ const Profile = () => {
                 Manage your account and connect advertising platforms
               </p>
             </div>
-            {hasAnyConnection && (
-              <Button
-                onClick={handleGoToDashboard}
-                size="lg"
-                className="hidden md:flex"
-              >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                View Dashboard
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            )}
+            <div className="flex items-center gap-3">
+              {isAdmin && (
+                <Button
+                  onClick={() => navigate('/admin')}
+                  size="lg"
+                  variant="outline"
+                  className="hidden md:flex"
+                >
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  Admin Portal
+                </Button>
+              )}
+              {hasAnyConnection && (
+                <Button
+                  onClick={handleGoToDashboard}
+                  size="lg"
+                  className="hidden md:flex" 
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  View Dashboard
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                [cite_start]</Button> 
+              )}
+            </div>
           </div>
         </div>
       </div>

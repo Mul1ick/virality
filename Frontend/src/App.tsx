@@ -13,6 +13,8 @@ import VerifyOTP from "./pages/VerifyOTP";
 import SelectMetaAccount from "./pages/SelectMetaAccount";
 import SelectGoogleAccount from "./pages/SelectGoogleAccount";
 import SelectShopifyAccount from "@/pages/SelectShopifyAccount";
+import Admin from "./pages/Admin";
+import AdminRoute from "./components/auth/AdminRoute";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +36,15 @@ const App = () => (
             element={<SelectGoogleAccount />}
           />
           <Route path="/select-shopify" element={<SelectShopifyAccount />} />
+
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <Admin />
+              </AdminRoute>
+            }
+          />
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
