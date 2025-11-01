@@ -52,7 +52,7 @@ class AggregationService:
         # --- 1. Match Stage ---
         match_stage = {
             "$match": {
-                "user_id": user_object_id,
+                "user_id": user_id,
                 "ad_account_id": ad_account_id,
                 "platform": platform,
                 "date_start": {"$gte": start_date, "$lte": end_date},

@@ -107,11 +107,30 @@ async def fetch_paginated_insights(start_url: str, params: Dict[str, Any]) -> Li
                 next_url = data.get("paging", {}).get("next", None)
                 params = {}  # clear params after first request
 
+                await asyncio.sleep(1)
+
             except httpx.ReadTimeout:
                 logger.warning(f"[Meta API] Read timeout. Retrying in 15s.")
                 await asyncio.sleep(15)
             except httpx.HTTPStatusError as e:
                 logger.error(f"[Meta API] HTTP error {e.response.status_code}: {e.response.text}")
+
+                is_rate_limit = False
+                if e.response.status_code == 403:
+                    try:
+                        error_data = e.response.json()
+                        error_type = error_data.get("error", {}).get("type")
+                        is_transient = error_data.get("error", {}).get("is_transient")
+                        if error_type == "OAuthException" and is_transient:
+                            is_rate_limit = True
+                    except Exception:
+                        pass # Not a JSON response, not a rate limit we can parse
+
+                if is_rate_limit:
+                    logger.warning("[Meta API] Rate limit hit. Sleeping for 60 seconds...")
+                    await asyncio.sleep(60) # Sleep for 1 minute
+                    continue # Retry the same request (next_url hasn't changed)
+
                 if e.response.status_code in [401, 403]:
                     raise HTTPException(status_code=e.response.status_code, detail="Meta auth failure.")
                 break

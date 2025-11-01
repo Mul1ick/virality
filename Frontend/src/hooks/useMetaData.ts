@@ -175,6 +175,10 @@ export const useMetaData = (
     )
       return;
 
+      if (dateRange === "custom" && (!customRange?.from || !customRange?.to)) {
+      return;
+    }
+
     // 🔥 Check if custom range is selected and valid
     const isCustomRange =
       dateRange === "custom" && customRange?.from && customRange?.to;
