@@ -1,4 +1,3 @@
-# FILE: app/services/google_service.py
 """
 Google Ads Service Layer
 -------------------------
@@ -14,13 +13,12 @@ Responsibilities:
 
 from __future__ import annotations
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import requests
 import urllib.parse
 
 from fastapi import HTTPException
 from app.utils.logger import get_logger
-# ✅ FIXED IMPORT — point directly to settings inside app/config/config.py
 from app.config.config import settings
 
 from app.database.mongo_client import (
@@ -42,7 +40,6 @@ from app.utils.google_api import (
 )
 
 logger = get_logger()
-
 
 
 class GoogleService:
@@ -161,20 +158,35 @@ class GoogleService:
             raise HTTPException(status_code=404, detail="Google Ads connection not found.")
 
         access_token = details["access_token"]
-        client_accounts = get_direct_client_accounts(access_token, manager_id)
+        selected = next((a for a in details.get("accounts", []) if str(a.get("id")) == str(manager_id)), None)
+        if not selected:
+            raise HTTPException(status_code=404, detail="Selected account not found.")
 
-        save_or_update_platform_connection(user_id, GoogleService.PLATFORM_NAME, {
-            "selected_manager_id": manager_id,
-            "client_accounts": client_accounts,
-        })
-        return client_accounts
+        if selected.get("isManager", False):
+            client_accounts = get_direct_client_accounts(access_token, manager_id)
+            save_or_update_platform_connection(user_id, GoogleService.PLATFORM_NAME, {
+                "selected_manager_id": manager_id,
+                "client_accounts": client_accounts,
+                "mode": "manager",
+            })
+            return client_accounts
+        else:
+            save_or_update_platform_connection(user_id, GoogleService.PLATFORM_NAME, {
+                "client_customer_id": manager_id,
+                "mode": "direct",
+            })
+            logger.info(f"[GoogleService] Direct client {manager_id} selected for user {user_id}")
+            return [{"id": manager_id, "name": selected.get("name"), "isManager": False}]
 
     @staticmethod
     def save_client_selection(user_id: str, client_id: str):
+        details = get_platform_connection_details(user_id, GoogleService.PLATFORM_NAME) or {}
+        mode = details.get("mode", "direct")
         save_or_update_platform_connection(user_id, GoogleService.PLATFORM_NAME, {
-            "client_customer_id": client_id
+            "client_customer_id": client_id,
+            "mode": mode,
         })
-        logger.info(f"✅ Saved Google client {client_id} for user {user_id}")
+        logger.info(f"✅ Saved Google client {client_id} for user {user_id} (mode={mode})")
 
     # ---------------------- TOKEN ----------------------
     @staticmethod
@@ -185,39 +197,82 @@ class GoogleService:
 
         access_token = details.get("access_token")
         expiry = details.get("token_expiry")
-        if not expiry:
-            expiry_dt = None
-        else:
+
+        expiry_dt = None
+        if expiry:
             try:
                 expiry_dt = datetime.fromisoformat(str(expiry).replace("Z", "+00:00"))
+                # ensure timezone-aware
+                if expiry_dt.tzinfo is None:
+                    expiry_dt = expiry_dt.replace(tzinfo=timezone.utc)
             except Exception:
                 expiry_dt = None
 
-        if (not access_token) or (expiry_dt and expiry_dt <= datetime.utcnow()):
+        now_utc = datetime.now(timezone.utc)
+
+        # ✅ Safe comparison between aware datetimes
+        if (not access_token) or (expiry_dt and expiry_dt <= now_utc):
             logger.info(f"[Google] Token expired, refreshing for user {user_id}")
             new_token = refresh_google_access_token(user_id)
             if not new_token:
                 raise HTTPException(status_code=401, detail="Token refresh failed")
             return new_token
+
         return access_token
+
 
     # ---------------------- DATA FETCH ----------------------
     @staticmethod
-    def fetch_campaigns(user_id: str, customer_id: str, manager_id: str):
+    def fetch_campaigns(user_id: str, customer_id: str, manager_id: Optional[str] = None,date_range: str = "LAST_30_DAYS"):
+        """
+        Fetch all campaigns and metrics for a Google Ads customer account.
+        Automatically determines correct login-customer-id for both
+        manager and direct client accounts.
+        """
+        # ✅ Step 1: Get (or refresh) token
         token = GoogleService._maybe_refresh_token(user_id)
-        resp = list_campaigns_for_child(token, customer_id, manager_id)
-        if not resp or resp.status_code != 200:
-            raise HTTPException(status_code=resp.status_code if resp else 500, detail="Failed to fetch campaigns.")
-        
+
+        # ✅ Step 2: Pull connection details from Mongo
+        details = get_platform_connection_details(user_id, GoogleService.PLATFORM_NAME) or {}
+        mode = details.get("mode", "direct")
+
+        # ✅ Step 3: Determine the correct login-customer-id context
+        # - If the user has a manager selected, use it.
+        # - Otherwise, fallback to the direct client’s own ID.
+        ctx_manager_id = (
+            manager_id
+            or details.get("selected_manager_id")
+            or details.get("client_customer_id")
+            or customer_id
+        )
+
+        logger.info(
+            f"[GoogleService] Fetching campaigns for user={user_id}, "
+            f"customer_id={customer_id}, login_id={ctx_manager_id}, mode={mode}"
+        )
+
+        # ✅ Step 4: Make the API call with correct headers (login-customer-id)
+        resp = list_campaigns_for_child(token, customer_id, ctx_manager_id, date_range)
+
+
+        # ✅ Step 5: Handle API errors early
+        if not resp:
+            raise HTTPException(status_code=500, detail="Google API returned no response.")
+        if resp.status_code != 200:
+            logger.error(f"[GoogleService] Campaign API failed → {resp.status_code}: {resp.text[:300]}")
+            raise HTTPException(status_code=resp.status_code, detail="Failed to fetch campaigns.")
+
+        # ✅ Step 6: Parse JSON response
         raw_data = resp.json().get("results", [])
-        
-        # 🔥 FIX: Transform nested structure to flat structure
+        logger.info(f"[GoogleService] Retrieved {len(raw_data)} campaigns for {customer_id}")
+
+        # ✅ Step 7: Transform & persist campaigns
         transformed_data = []
         for item in raw_data:
             campaign = item.get("campaign", {})
             metrics = item.get("metrics", {})
             budget = item.get("campaignBudget", {})
-            
+
             transformed_data.append({
                 "id": campaign.get("id"),
                 "name": campaign.get("name"),
@@ -227,91 +282,168 @@ class GoogleService:
                 "start_date": campaign.get("startDate"),
                 "end_date": campaign.get("endDate"),
                 "resource_name": campaign.get("resourceName"),
-                # Metrics
                 "clicks": metrics.get("clicks", "0"),
                 "conversions": metrics.get("conversions", 0),
                 "cost_micros": metrics.get("costMicros", "0"),
                 "impressions": metrics.get("impressions", "0"),
-                # Budget
                 "budget_amount_micros": budget.get("amountMicros", "0"),
             })
-        
+
         save_items("campaigns", customer_id, transformed_data, GoogleService.PLATFORM_NAME)
+        logger.info(f"[GoogleService] ✅ Saved {len(transformed_data)} campaigns for {customer_id}")
         return transformed_data
 
+
     @staticmethod
-    def fetch_adgroups(user_id: str, customer_id: str, manager_id: str, campaign_id: str):
+    def fetch_adgroups(user_id: str, customer_id: str, manager_id: Optional[str], campaign_id: str, date_range: str = "LAST_30_DAYS"):
         token = GoogleService._maybe_refresh_token(user_id)
-        resp = list_adgroups_for_campaign(token, customer_id, manager_id, campaign_id)
+        details = get_platform_connection_details(user_id, GoogleService.PLATFORM_NAME) or {}
+        mode = details.get("mode", "direct")
+        ctx_manager_id = manager_id or (details.get("selected_manager_id") if mode == "manager" else None)
+
+        resp = list_adgroups_for_campaign(token, customer_id, ctx_manager_id, campaign_id, date_range)
+
         if not resp or resp.status_code != 200:
+            logger.error(f"[GoogleService] AdGroup API failed → {resp.status_code if resp else 'NO RESP'}")
             raise HTTPException(status_code=resp.status_code if resp else 500, detail="Failed to fetch ad groups.")
-        
+
         raw_data = resp.json().get("results", [])
-        
-        # 🔥 FIX: Transform nested structure to flat structure
         transformed_data = []
         for item in raw_data:
             ad_group = item.get("adGroup", {})
             metrics = item.get("metrics", {})
-            
             transformed_data.append({
                 "id": ad_group.get("id"),
                 "name": ad_group.get("name"),
                 "status": ad_group.get("status"),
                 "type": ad_group.get("type"),
-                "resource_name": ad_group.get("resourceName"),
-                "campaign_id": campaign_id,  # 🔥 ADD campaign_id for reference
-                # Metrics
+                "campaign_id": campaign_id,
                 "clicks": metrics.get("clicks", "0"),
                 "conversions": metrics.get("conversions", 0),
                 "cost_micros": metrics.get("costMicros", "0"),
                 "impressions": metrics.get("impressions", "0"),
             })
-        
+
         save_items("adsets", customer_id, transformed_data, GoogleService.PLATFORM_NAME)
         return transformed_data
 
     @staticmethod
-    def fetch_ads(user_id: str, customer_id: str, manager_id: str, ad_group_id: str):
+    def fetch_ads(user_id: str, customer_id: str, manager_id: Optional[str], ad_group_id: str, date_range: str = "LAST_30_DAYS"):
         token = GoogleService._maybe_refresh_token(user_id)
-        resp = list_ads_for_adgroup(token, customer_id, manager_id, ad_group_id)
+        details = get_platform_connection_details(user_id, GoogleService.PLATFORM_NAME) or {}
+        mode = details.get("mode", "direct")
+        ctx_manager_id = manager_id or (details.get("selected_manager_id") if mode == "manager" else None)
+
+        resp = list_ads_for_adgroup(token, customer_id, ctx_manager_id, ad_group_id, date_range)
+
         if not resp or resp.status_code != 200:
+            logger.error(f"[GoogleService] Ads API failed → {resp.status_code if resp else 'NO RESP'}")
             raise HTTPException(status_code=resp.status_code if resp else 500, detail="Failed to fetch ads.")
-        
+
         raw_data = resp.json().get("results", [])
-        
-        # 🔥 FIX: Transform nested structure to flat structure
         transformed_data = []
         for item in raw_data:
-            ad = item.get("ad", {})
-            ad_group_ad = item.get("adGroupAd", {})
+            ad = item.get("adGroupAd", {}).get("ad", {})
             metrics = item.get("metrics", {})
-            
-            # Try to get ad name/headline
-            ad_name = ad.get("name") or ad.get("finalUrls", [""])[0] or f"Ad {ad.get('id', 'Unknown')}"
-            
             transformed_data.append({
                 "id": ad.get("id"),
-                "name": ad_name,
-                "status": ad_group_ad.get("status") or ad.get("status"),
-                "type": ad.get("type"),
-                "resource_name": ad.get("resourceName"),
-                "ad_group_id": ad_group_id,  # 🔥 ADD ad_group_id for reference
-                # Headlines/descriptions (if available)
+                "name": ad.get("name") or f"Ad {ad.get('id', '')}",
+                "status": item.get("adGroupAd", {}).get("status"),
+                "ad_group_id": ad_group_id,
                 "final_urls": ad.get("finalUrls", []),
-                # Metrics
                 "clicks": metrics.get("clicks", "0"),
                 "conversions": metrics.get("conversions", 0),
                 "cost_micros": metrics.get("costMicros", "0"),
                 "impressions": metrics.get("impressions", "0"),
             })
-        
+
         save_items("ads", customer_id, transformed_data, GoogleService.PLATFORM_NAME)
         return transformed_data
 
+
     @staticmethod
-    def fetch_insights(user_id: str, customer_id: str, manager_id: Optional[str] = None):
+    def fetch_campaign_insights(user_id, customer_id, manager_id, date_range, campaign_id=None):
+        from app.utils.google_api import get_campaign_insights
         token = GoogleService._maybe_refresh_token(user_id)
-        insights = get_campaign_insights(token, customer_id, manager_id)
-        count = save_google_daily_insights(user_id, customer_id, insights)
-        return {"count": count, "data": insights}
+        return get_campaign_insights(token, customer_id, manager_id, date_range, campaign_id)
+
+    @staticmethod
+    def fetch_adgroup_insights(user_id, customer_id, manager_id, date_range, campaign_id=None):
+        from app.utils.google_api import get_adgroup_insights
+        token = GoogleService._maybe_refresh_token(user_id)
+        return get_adgroup_insights(token, customer_id, manager_id, date_range, campaign_id)
+
+    @staticmethod
+    def fetch_ad_insights(user_id, customer_id, manager_id, date_range, ad_group_id=None):
+        from app.utils.google_api import get_ad_insights
+        token = GoogleService._maybe_refresh_token(user_id)
+        return get_ad_insights(token, customer_id, manager_id, date_range, ad_group_id)
+
+    @staticmethod
+    def fetch_all_adgroups(user_id: str, customer_id: str, manager_id: Optional[str], date_range: str = "LAST_30_DAYS"):
+        """
+        Fetch all ad groups for a customer across the specified date range.
+        Compatible with new list_all_adgroups_for_customer() which returns list[dict].
+        """
+        token = GoogleService._maybe_refresh_token(user_id)
+        details = get_platform_connection_details(user_id, GoogleService.PLATFORM_NAME) or {}
+        ctx_manager_id = manager_id or details.get("selected_manager_id")
+
+        from app.utils.google_api import list_all_adgroups_for_customer
+        adgroups = list_all_adgroups_for_customer(token, customer_id, ctx_manager_id, date_range)
+
+        if not adgroups:
+            logger.warning(f"[GoogleService] No ad groups found for customer {customer_id}")
+            return []
+
+        data = [
+            {
+                "id": i.get("adGroup", {}).get("id"),
+                "name": i.get("adGroup", {}).get("name"),
+                "campaign_id": i.get("campaign", {}).get("id"),
+                "status": i.get("adGroup", {}).get("status"),
+                "type": i.get("adGroup", {}).get("type"),
+                "impressions": int(i.get("metrics", {}).get("impressions", 0) or 0),
+                "clicks": int(i.get("metrics", {}).get("clicks", 0) or 0),
+                "cost_micros": int(i.get("metrics", {}).get("costMicros", 0) or i.get("metrics", {}).get("cost_micros", 0) or 0),
+                "conversions": float(i.get("metrics", {}).get("conversions", 0) or 0),
+            }
+            for i in adgroups
+        ]
+        save_items("adsets", customer_id, data, GoogleService.PLATFORM_NAME)
+        return data
+
+
+    @staticmethod
+    def fetch_all_ads(user_id: str, customer_id: str, manager_id: Optional[str], date_range: str = "LAST_30_DAYS"):
+        """
+        Fetch all ads for a customer across the specified date range.
+        Compatible with new list_all_ads_for_customer() which returns list[dict].
+        """
+        token = GoogleService._maybe_refresh_token(user_id)
+        details = get_platform_connection_details(user_id, GoogleService.PLATFORM_NAME) or {}
+        ctx_manager_id = manager_id or details.get("selected_manager_id")
+
+        from app.utils.google_api import list_all_ads_for_customer
+        ads = list_all_ads_for_customer(token, customer_id, ctx_manager_id, date_range)
+
+        if not ads:
+            logger.warning(f"[GoogleService] No ads found for customer {customer_id}")
+            return []
+
+        data = [
+            {
+                "id": i.get("adGroupAd", {}).get("ad", {}).get("id"),
+                "name": i.get("adGroupAd", {}).get("ad", {}).get("name"),
+                "ad_group_id": i.get("adGroup", {}).get("id"),
+                "campaign_id": i.get("campaign", {}).get("id"),
+                "status": i.get("adGroupAd", {}).get("status"),
+                "clicks": int(i.get("metrics", {}).get("clicks", 0) or 0),
+                "impressions": int(i.get("metrics", {}).get("impressions", 0) or 0),
+                "cost_micros": int(i.get("metrics", {}).get("costMicros", 0) or i.get("metrics", {}).get("cost_micros", 0) or 0),
+                "conversions": float(i.get("metrics", {}).get("conversions", 0) or 0),
+            }
+            for i in ads
+        ]
+        save_items("ads", customer_id, data, GoogleService.PLATFORM_NAME)
+        return data

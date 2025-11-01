@@ -1,15 +1,12 @@
-# FILE: app/controllers/google_controller.py
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
-import re
 from app.services.google_service import GoogleService
 from app.utils.security import get_current_user_id
 from app.utils.logger import get_logger
-import requests
 
-router = APIRouter( tags=["Google Ads"])
+router = APIRouter(tags=["Google Ads"])
 logger = get_logger()
 
 
@@ -63,7 +60,12 @@ def save_client(user_id: str, payload: ClientPayload, current_user_id: str = Dep
 
 # -------------------- Data Fetch --------------------
 @router.get("/campaigns/{user_id}")
-def get_campaigns(user_id: str, customer_id: str = Query(...), manager_id: str = Query(...), current_user_id: str = Depends(get_current_user_id)):
+def get_campaigns(
+    user_id: str,
+    customer_id: str = Query(...),
+    manager_id: Optional[str] = Query(None),
+    current_user_id: str = Depends(get_current_user_id),
+):
     if user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Forbidden")
     data = GoogleService.fetch_campaigns(user_id, customer_id, manager_id)
@@ -71,7 +73,13 @@ def get_campaigns(user_id: str, customer_id: str = Query(...), manager_id: str =
 
 
 @router.get("/adgroups/{user_id}")
-def get_adgroups(user_id: str, customer_id: str = Query(...), manager_id: str = Query(...), campaign_id: str = Query(...), current_user_id: str = Depends(get_current_user_id)):
+def get_adgroups(
+    user_id: str,
+    customer_id: str = Query(...),
+    manager_id: Optional[str] = Query(None),
+    campaign_id: str = Query(...),
+    current_user_id: str = Depends(get_current_user_id),
+):
     if user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Forbidden")
     data = GoogleService.fetch_adgroups(user_id, customer_id, manager_id, campaign_id)
@@ -79,14 +87,102 @@ def get_adgroups(user_id: str, customer_id: str = Query(...), manager_id: str = 
 
 
 @router.get("/ads/{user_id}")
-def get_ads(user_id: str, customer_id: str = Query(...), manager_id: str = Query(...), ad_group_id: str = Query(...), current_user_id: str = Depends(get_current_user_id)):
+def get_ads(
+    user_id: str,
+    customer_id: str = Query(...),
+    manager_id: Optional[str] = Query(None),
+    ad_group_id: str = Query(...),
+    current_user_id: str = Depends(get_current_user_id),
+):
     if user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Forbidden")
     data = GoogleService.fetch_ads(user_id, customer_id, manager_id, ad_group_id)
     return {"ad_group_id": ad_group_id, "count": len(data), "ads": data}
 
 
-@router.get("/insights/{user_id}")
-def get_insights(user_id: str, customer_id: str, manager_id: Optional[str] = None):
-    result = GoogleService.fetch_insights(user_id, customer_id, manager_id)
-    return {"user_id": user_id, "customer_id": customer_id, "insight_count": result["count"], "insights": result["data"][:10]}
+@router.get("/insights/campaigns")
+def get_campaign_insights_endpoint(
+    customer_id: str = Query(...),
+    manager_id: Optional[str] = Query(None),
+    date_range: str = Query("LAST_30_DAYS"),
+    campaign_id: Optional[str] = Query(None),
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """
+    JWT-protected endpoint to fetch campaign insights.
+    """
+    data = GoogleService.fetch_campaign_insights(current_user_id, customer_id, manager_id, date_range, campaign_id)
+    return {
+        "user_id": current_user_id,
+        "customer_id": customer_id,
+        "insight_count": len(data),
+        "insights": data,
+    }
+
+
+@router.get("/insights/adgroups")
+def get_adgroup_insights_endpoint(
+    customer_id: str = Query(...),
+    manager_id: Optional[str] = Query(None),
+    date_range: str = Query("LAST_30_DAYS"),
+    campaign_id: Optional[str] = Query(None),
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """
+    JWT-protected endpoint to fetch ad group insights.
+    """
+    data = GoogleService.fetch_adgroup_insights(current_user_id, customer_id, manager_id, date_range, campaign_id)
+    return {
+        "user_id": current_user_id,
+        "customer_id": customer_id,
+        "insight_count": len(data),
+        "insights": data,
+    }
+
+
+@router.get("/insights/ads")
+def get_ad_insights_endpoint(
+    customer_id: str = Query(...),
+    manager_id: Optional[str] = Query(None),
+    date_range: str = Query("LAST_30_DAYS"),
+    ad_group_id: Optional[str] = Query(None),
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """
+    JWT-protected endpoint to fetch ad-level insights.
+    """
+    data = GoogleService.fetch_ad_insights(current_user_id, customer_id, manager_id, date_range, ad_group_id)
+    return {
+        "user_id": current_user_id,
+        "customer_id": customer_id,
+        "insight_count": len(data),
+        "insights": data,
+    }
+
+
+@router.get("/adgroups/all/{user_id}")
+def get_all_adgroups(
+    user_id: str,
+    customer_id: str = Query(...),
+    manager_id: Optional[str] = Query(None),
+    date_range: str = Query("LAST_30_DAYS"),
+    current_user_id: str = Depends(get_current_user_id),
+):
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    data = GoogleService.fetch_all_adgroups(user_id, customer_id, manager_id, date_range)
+    return {"customer_id": customer_id, "count": len(data), "adgroups": data}
+
+
+@router.get("/ads/all/{user_id}")
+def get_all_ads(
+    user_id: str,
+    customer_id: str = Query(...),
+    manager_id: Optional[str] = Query(None),
+    date_range: str = Query("LAST_30_DAYS"),
+    current_user_id: str = Depends(get_current_user_id),
+):
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    data = GoogleService.fetch_all_ads(user_id, customer_id, manager_id, date_range)
+    return {"customer_id": customer_id, "count": len(data), "ads": data}
