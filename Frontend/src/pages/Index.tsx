@@ -18,6 +18,7 @@ import { ShopifyTab } from "@/components/dashboard/tabs/ShopifyTab";
 import { usePlatformStatus } from "@/hooks/usePlatformStatus";
 import { useGoogleData } from "@/hooks/useGoogleData";
 import { useShopifyData } from "@/hooks/useShopifyData";
+import { useOverviewData } from "@/hooks/useOverviewData";
 
 const Index = () => {
   const [dateRange, setDateRange] = useState("30days");
@@ -35,6 +36,21 @@ const Index = () => {
     loading: platformsLoading,
     error: platformsError,
   } = usePlatformStatus(userId);
+
+  const {
+    chartData: overviewChartData,
+    loading: overviewLoading,
+    error: overviewError,
+  } = useOverviewData(
+    userId,
+    platformStatus.meta.ad_account_id,
+    platformStatus.meta.connected,
+    !platformsLoading,
+    dateRange,
+    customRange
+  );
+
+  
 
   // Fetch Google data
   const {
@@ -284,7 +300,13 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="overview">
-            <OverviewTab dateRange={dateRange} customRange={customRange} />
+            <OverviewTab
+              dateRange={dateRange}
+              customRange={customRange}
+              chartData={overviewChartData}
+              isLoading={overviewLoading}
+              error={overviewError}
+            />
           </TabsContent>
 
           <TabsContent value="meta">

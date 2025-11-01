@@ -154,8 +154,10 @@ class AggregationService:
 
         # --- 5. Sort Stage ---
         sort_field = "totalSpend"
-        if group_by in ["month", "date"]:
-            sort_field = "_id"
+        if group_by == "month":
+            sort_field = "yearMonth" # Match the $project stage [cite: 261]
+        elif group_by == "date":
+            sort_field = "date" # Match the $project stage [cite: 262]
         pipeline.append({"$sort": {sort_field: 1 if group_by in ["month", "date"] else -1}})
 
         logger.info(f"[AggregationService] Built pipeline for {platform}: {pipeline}")

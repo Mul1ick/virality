@@ -9,96 +9,31 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { DailyChartData } from "@/hooks/useOverviewData"; // <-- Import type
+import { Skeleton } from "@/components/ui/skeleton"; // <-- Import Skeleton
+import { AlertCircle } from "lucide-react"; // <-- Import icon for error
 import { useMemo } from "react";
 
-interface DateRangeSelectorProps {
-  dateRange: string;
+
+
+interface TrendChartProps {
+  dateRange: string; // Used for the title
+  data: DailyChartData[]; // <-- Real data
+  isLoading: boolean; // <-- Loading state
+  error: string | null; // <-- Error state
 }
 
-export const TrendChart = ({ dateRange }: DateRangeSelectorProps) => {
+export const TrendChart = ({ dateRange,
+  data,
+  isLoading,
+  error, }: TrendChartProps) => {
   // Generate data based on selected date range
-  const chartData = useMemo(() => {
-    const today = new Date();
-    const data = [];
-
-    let daysToShow = 30; // default
-    let dataPoints = 10; // number of points on chart
-
-    switch (dateRange) {
-      case "today":
-        daysToShow = 1;
-        dataPoints = 24; // hourly data for today
-        break;
-      case "7days":
-        daysToShow = 7;
-        dataPoints = 7;
-        break;
-      case "30days":
-        daysToShow = 30;
-        dataPoints = 10;
-        break;
-      case "90days":
-        daysToShow = 90;
-        dataPoints = 12;
-        break;
-      case "lifetime":
-        daysToShow = 180;
-        dataPoints = 18;
-        break;
-      default:
-        daysToShow = 30;
-        dataPoints = 7;
-    }
-
-    // Generate sample data points
-    if (dateRange === "today") {
-      // Hourly data for today
-      for (let i = 0; i < 24; i++) {
-        const hour = i;
-        const spend = Math.floor(Math.random() * 200) + 100;
-        const revenue = spend * (Math.random() * 1.5 + 1.5); // ROAS between 1.5-3
-        const impressions = Math.floor(Math.random() * 5000) + 3000;
-
-        data.push({
-          date: `${hour}:00`,
-          spend: Math.round(spend),
-          revenue: Math.round(revenue),
-          impressions: impressions,
-        });
-      }
-    } else {
-      // Daily data
-      const interval = Math.floor(daysToShow / dataPoints);
-
-      for (let i = dataPoints - 1; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i * interval);
-
-        const baseSpend = 4000 + Math.random() * 2000;
-        const spend = Math.floor(baseSpend);
-        const revenue = Math.floor(spend * (Math.random() * 1 + 2)); // ROAS 2-3x
-        const impressions = Math.floor(Math.random() * 50000) + 100000;
-
-        data.push({
-          date: date.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-          }),
-          spend: spend,
-          revenue: revenue,
-          impressions: impressions,
-        });
-      }
-    }
-
-    return data;
-  }, [dateRange]);
 
   // Format currency for tooltip
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: "INR",
       minimumFractionDigits: 0,
     }).format(value);
   };
@@ -124,7 +59,7 @@ export const TrendChart = ({ dateRange }: DateRangeSelectorProps) => {
                 {entry.name}:
               </span>
               <span className="font-semibold">
-                {entry.name === "impressions"
+                {entry.name === "Impressions"
                   ? formatNumber(entry.value)
                   : formatCurrency(entry.value)}
               </span>
@@ -164,7 +99,7 @@ export const TrendChart = ({ dateRange }: DateRangeSelectorProps) => {
           </p>
         </div>
         <ResponsiveContainer width="100%" height={350}>
-          <LineChart data={chartData}>
+          <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis
               dataKey="date"
@@ -177,17 +112,10 @@ export const TrendChart = ({ dateRange }: DateRangeSelectorProps) => {
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
+            
             <Line
               type="monotone"
-              dataKey="revenue"
-              stroke="hsl(var(--chart-1))"
-              strokeWidth={2}
-              dot={{ fill: "hsl(var(--chart-1))" }}
-              name="Revenue"
-            />
-            <Line
-              type="monotone"
-              dataKey="spend"
+              dataKey="totalSpend"
               stroke="hsl(var(--chart-2))"
               strokeWidth={2}
               dot={{ fill: "hsl(var(--chart-2))" }}
@@ -195,11 +123,19 @@ export const TrendChart = ({ dateRange }: DateRangeSelectorProps) => {
             />
             <Line
               type="monotone"
-              dataKey="impressions"
+              dataKey="totalImpressions"
               stroke="hsl(var(--chart-3))"
               strokeWidth={2}
               dot={{ fill: "hsl(var(--chart-3))" }}
               name="Impressions"
+              yAxisId="impressions" // <-- Add a separate Y-axis for impressions
+            />
+            <YAxis
+              yAxisId="impressions"
+              orientation="right"
+              stroke="hsl(var(--muted-foreground))"
+              style={{ fontSize: "12px" }}
+              tickFormatter={formatNumber}
             />
           </LineChart>
         </ResponsiveContainer>

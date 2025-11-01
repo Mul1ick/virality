@@ -1,13 +1,19 @@
 import { KPICard } from "@/components/dashboard/KPICard";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { DateRange } from "react-day-picker";
+import { DailyChartData } from "@/hooks/useOverviewData"; // <-- Import type
 
 interface OverviewTabProps {
   dateRange: string;
   customRange?: DateRange;
+  chartData: DailyChartData[];
+  isLoading: boolean;
+  error: string | null;
 }
 
-export const OverviewTab = ({ dateRange, customRange }: OverviewTabProps) => {
+export const OverviewTab = ({ dateRange, customRange,chartData,
+  isLoading,
+  error, }: OverviewTabProps) => {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
@@ -43,7 +49,12 @@ export const OverviewTab = ({ dateRange, customRange }: OverviewTabProps) => {
       </div>
 
       {/* Trend Chart */}
-      <TrendChart dateRange={dateRange} />
+      <TrendChart
+        dateRange={dateRange}
+        data={chartData}
+        isLoading={isLoading}
+        error={error}
+      />
     </div>
   );
 };
