@@ -46,20 +46,54 @@ DATA_SCHEMAS = {
     },
 
     "meta": {
-        "collection": "campaigns",
+        "collection": "meta_daily_campaign_insights",
         "fields": [
-            "id", "name", "status", "objective",
-            "insights.spend", "insights.impressions", "insights.reach",
-            "insights.frequency", "insights.cpm", "insights.inline_link_clicks",
-            "insights.ctr", "ad_account_id", "platform"
+            "campaign_id", "campaign_name", "date_start", "date_stop",
+            "spend", "impressions", "reach", "clicks", "ctr", "cpm", "cpc",
+            "ad_account_id", 
         ],
-        "description": "Meta campaigns with performance insights for the last 30 days.",
+        "description": "Meta campaigns with daily performance insights. Use this for questions about daily campaign spend, clicks, etc.",
         "field_examples": {
-            "objective": ["CONVERSIONS", "TRAFFIC", "AWARENESS"],
+            "campaign_name": ["Holiday Sale Campaign", "Spring Promo"],
             "status": ["ACTIVE", "PAUSED"],
-            "insights.spend": [50.0, 200.0, 1200.5],
-            "insights.impressions": [5000, 20000],
+            "spend": [50.0, 200.0, 1200.5],
+            "impressions": [5000, 20000],
+            "date_start": ["2025-10-20", "2025-10-21"]
         },
+    },
+
+    "meta_adsets": {
+        "collection": "meta_daily_insights",
+        "fields": [
+            "adset_id", "adset_name", "campaign_id","campaign_name", "date_start", "date_stop",
+            "spend", "impressions", "reach", "clicks", "ctr", "cpm", "cpc",
+            "ad_account_id", 
+        ],
+        "description": "Meta Ad Sets (groups of ads) with daily performance insights.",
+        "field_examples": {
+            "campaign_name": ["Holiday Sale Campaign", "Spring Promo"],
+            "adset_name": ["Lookalike Audience 1", "Retargeting US"],
+            "spend": [50.0, 200.0],
+            "clicks": [10, 150],
+            "date_start": ["2025-10-20", "2025-10-21"]
+        }
+    },
+
+    "meta_ads": {
+        "collection": "meta_daily_ad_insights",
+        "fields": [
+            "ad_id", "ad_name", "adset_id", "campaign_id","campaign_name", "date_start", "date_stop",
+            "spend", "impressions", "reach", "clicks", "ctr", "cpm", "cpc",
+            "ad_account_id", 
+        ],
+        "description": "Individual Meta Ads with daily performance insights.",
+        "field_examples": {
+            "campaign_name": ["Holiday Sale Campaign", "Spring Promo"],
+            "ad_name": ["Video Ad 1 - Blue", "Carousel Ad - Main"],
+            "spend": [10.0, 50.0],
+            "ctr": [1.5, 3.2],
+            "date_start": ["2025-10-20", "2025-10-21"]
+        }
     },
 
     "shopify": {

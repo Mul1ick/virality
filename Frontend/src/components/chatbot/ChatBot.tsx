@@ -60,8 +60,15 @@ export const ChatBot = () => {
 
   // Simple Platform Detection (enhance as needed)
   if (lowerInput.includes("meta") || lowerInput.includes("facebook") || lowerInput.includes("instagram")) {
-    detectedPlatform = "meta"; // Match the collection name used in DATA_SCHEMAS
-  } else if (lowerInput.includes("google")) {
+      if (lowerInput.includes("ad set") || lowerInput.includes("adset")) {
+         detectedPlatform = "meta_adsets"; // <-- NEW
+      } else if (lowerInput.includes("ad") && !lowerInput.includes("ad set")) {
+         detectedPlatform = "meta_ads"; // <-- NEW
+      } else {
+         detectedPlatform = "meta"; // Default to campaigns
+      }
+      }
+      else if (lowerInput.includes("google")) {
     // Decide which Google collection is most likely, or enhance detection.
     // Let's default to campaigns for now if just "google" is mentioned.
     if (lowerInput.includes("ad group") || lowerInput.includes("adset")) {
@@ -91,22 +98,51 @@ export const ChatBot = () => {
       const { explanation, results } = response.data;
 
       if (results && results.length > 0) {
+        let resultsSummary = "Here's what I found for you:\n";
         // Format the results (simple example: list top 3)
-        let resultsSummary = "Here's what I found:\n";
-        results.slice(0, 3).forEach((item: any, index: number) => {
-          // Try to find a 'name' or use the first few fields
-          const name = item.name || item.campaign_name || item.ad_name || `Result ${index + 1}`;
-          const valueKey = Object.keys(item).find(k => k.includes('spend') || k.includes('clicks') || k.includes('impressions') || k.includes('revenue') || k.includes('costMicros'));
-          const value = valueKey ? item[valueKey] : '(details in data)';
-          resultsSummary += `- ${name}: ${value}\n`;
-        });
-         botResponseText = `${explanation}\n\n${resultsSummary}`;
-         if (results.length > 3) {
-             botResponseText += `(...and ${results.length - 3} more results)`;
-         }
+        results.slice(0, 5).forEach((item: any) => {
+            // 1. Find the "name" field (e.g., ad_name, campaign_name)
+            const nameKey = Object.keys(item).find(k => 
+              k.toLowerCase().includes('name')
+            );
+            const name = nameKey ? item[nameKey] : "Result";
+            
+            // 2. Find all *other* keys that are metrics (not the name, not an id)
+            const metricKeys = Object.keys(item).filter(k => 
+              k !== nameKey && k !== 'id' && k !== '_id'
+            );
+
+            let metricsString = "";
+            if (metricKeys.length > 0) {
+              // 3. Loop over all found metrics and format them
+              metricsString = metricKeys.map(key => {
+                let value = item[key];
+                let formattedKey = key.replace(/_/g, ' '); // e.g., overall_ctr -> overall ctr
+
+                // Basic Formatting
+                if (typeof value === 'number') {
+                  if (key.toLowerCase().includes('ctr')) {
+                    value = `${value.toFixed(2)}%`;
+                  } else if (key.toLowerCase().includes('spend') || key.toLowerCase().includes('revenue') || key.toLowerCase().includes('cost')) {
+                    value = `$${value.toFixed(2)}`; // Simple currency
+                  } else if (Number.isInteger(value)) {
+                    value = value.toLocaleString(); // Add commas to 10000
+                  } else {
+                    value = value.toFixed(2); // Default for other decimals
+                  }
+                }
+                return `${formattedKey}: ${value}`; // e.g., "overall ctr: 2.50%"
+              }).join(', '); // Join if there are multiple metrics
+            } else {
+              metricsString = "(details in data)";
+            }
+
+            resultsSummary += `- ${name}: ${metricsString}\n`;
+          });
+          botResponseText = resultsSummary
 
       } else if (explanation) {
-         botResponseText = explanation + "\n\nHowever, I couldn't find any specific data matching your question.";
+         botResponseText = `I understood you were asking about: "${explanation}"\n\nHowever, I couldn't find any specific data matching your question.`;
       }
        else {
         botResponseText = "I understood the question, but I couldn't find any specific data for that.";

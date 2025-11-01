@@ -41,24 +41,45 @@ class AnalyticsService:
         examples_text = ""
 
         if schema.get("field_examples"):
-            examples_text += "\n\nFIELD EXAMPLES:\n"
+            examples_text += "\n\n--- FIELD EXAMPLES (DO NOT USE AS FILTERS) ---\n"
             for field, examples in schema["field_examples"].items():
-                examples_text += f"- '{field}' can contain values like: {examples}\n"
+                examples_text += f"- Example values for '{field}': {examples}\n"
 
         return """
 You are a MongoDB data analyst.
 Convert this natural language question into a SECURE, READ-ONLY aggregation pipeline.
 
 RULES:
-1️⃣ Only aggregation stages. No writes/deletes.
-2️⃣ Output JSON array ONLY (no markdown).
-3️⃣ If irrelevant (e.g. weather question), return [].
-4️⃣ Map synonyms & typos to schema fields.
+1.  **Output JSON array ONLY.** No text, no markdown, no explanations.
+2.  Only use read-only aggregation stages (e.g., $match, $group, $sort, $limit, $project).
+3.  If the question is irrelevant, vague, or cannot be answered by the schema, return [].
+4.  **CRITICAL DATE RULE:** ONLY filter by a date (e.g., 'date_start') if the user's question contains explicit date words (e.g., "today", "last week", "September", "in 2024"). If no date is mentioned, DO NOT add a date filter.
+5.  **CRITICAL FILTER RULE:** Do NOT use any values from the field examples as filters. They are for context only.
+6.  **NUMERIC CONVERSION RULE:** The fields 'spend', 'clicks', and 'impressions' are stored as STRINGS. You MUST convert them to numbers before doing any math.
+    * Use an `$addFields` stage at the beginning of the pipeline:
+        `{{"$addFields": {{"numericSpend": {{"$toDouble": {{"$ifNull": ["$spend", "0"]}} }}, "numericClicks": {{"$toInt": {{"$ifNull": ["$clicks", "0"]}} }}, "numericImpressions": {{"$toInt": {{"$ifNull": ["$impressions", "0"]}} }} }} }}`
+    * Then, perform all math on the new fields (e.g., `numericClicks`, `numericSpend`).
 
-DATA SCHEMA ({collection}):
+7.  **METRICS CALCULATION RULE:** For derived metrics like CTR, CPC, or CPM, you MUST calculate them manually using the new numeric fields.
+    * **To get CTR:** Calculate as `{{"$multiply": [{{"$divide": [{{"$sum": "$numericClicks"}}, {{"$sum": "$numericImpressions"}}]}}, 100]}}`.
+    * **To get CPC:** Calculate as `{{"$divide": [{{"$sum": "$numericSpend"}}, {{"$sum": "$numericClicks"}}]}}`.
+    * **To get CPM:** Calculate as `{{"$multiply": [{{"$divide": [{{"$sum": "$numericSpend"}}, {{"$sum": "$numericImpressions"}}]}}, 1000]}}`.
+    * **Always** use `$cond` to prevent division by zero. Do NOT sum the 'ctr', 'cpc', or 'cpm' fields directly.
+
+8.  **OUTPUT FIELDS RULE:** The final $project stage MUST be user-friendly.
+    * **ALWAYS include** name fields like 'ad_name', 'adset_name', or 'campaign_name' if they are in the schema.
+    * **NEVER include** ID fields (e.g., 'ad_id', 'campaign_id', 'adset_id') in the final $project stage. The user does not want to see them.
+    * **ALWAYS include** the calculated metric (e.g., 'calculated_ctr', 'total_spend').
+    * **Example good output:** `{{"$project": {{"_id": 0, "ad_name": "$_id.ad_name", "campaign_name": "$_id.campaign_name", "calculated_ctr": 1}} }}`
+    * **Example bad output:** `{{"$project": {{"_id": 0, "ad_id": "$_id.ad_id", "calculated_ctr": 1}} }}`
+
+
+--- DATA SCHEMA ---
+Collection: {collection}
 Fields: {fields}
 Description: {description}
 {examples}
+--- END SCHEMA ---
 
 USER QUESTION:
 "{question}"
@@ -81,6 +102,7 @@ USER QUESTION:
             raw = response.text.strip()
             cleaned = re.sub(r'```json\s*|\s*```', '', raw, flags=re.DOTALL)
             pipeline = json.loads(cleaned)
+            logger.info(f"[AnalyticsService] Generated Pipeline: {pipeline}")
             if not isinstance(pipeline, list):
                 raise ValueError("Generated output is not a valid list.")
             return pipeline
@@ -94,9 +116,35 @@ USER QUESTION:
     # ------------------------------------------------------------
     # Execute Mongo Query
     # ------------------------------------------------------------
-    def _execute_query(self, platform: str, pipeline: list):
+    def _execute_query(self, platform: str, pipeline: list,user_id:str):
         """Run aggregation and sanitize ObjectIds."""
         try:
+
+            platform_value = platform  # Default
+            if platform.startswith("meta"):
+                platform_value = "meta"
+            elif platform.startswith("google"):
+                platform_value = "google"
+            elif platform.startswith("shopify"):
+                platform_value = "shopify"
+            
+            security_match = {
+                "platform": platform_value,
+                "user_id": user_id
+            }
+
+            match_stage_index = -1
+            for i, stage in enumerate(pipeline):
+                if "$match" in stage:
+                    match_stage_index = i
+                    break
+            
+            if match_stage_index != -1:
+                pipeline[match_stage_index]["$match"].update(security_match)
+            else:
+                pipeline.insert(0, {"$match": security_match})
+            
+            logger.info(f"[AnalyticsService] Executing Secure Pipeline: {pipeline}")
             collection = self.db[DATA_SCHEMAS[platform]["collection"]]
             results = list(collection.aggregate(pipeline))
 
@@ -119,10 +167,15 @@ USER QUESTION:
     def _generate_explanation(self, pipeline: list) -> str:
         """Ask Gemini for a one-line plain-English explanation."""
         explain_prompt = f"""
-Explain in one short, user-friendly sentence what this query does.
-Avoid terms like 'pipeline', 'aggregation', or 'group'.
-Example Input: [{{"$group": {{"_id": "$campaign_name", "totalClicks": {{"$sum": "$clicks"}}}}}}]
-Example Output: "This query calculates the total number of clicks for each campaign."
+Summarize what this MongoDB query is looking for in one simple, non-technical sentence.
+Do not mention MongoDB, 'query', 'pipeline', or any field names.
+
+Example Input: [{{"$match": {{"spend": {{"$gt": 100}}}}}}, {{"$sort": {{"clicks": -1}}}}]
+Example Output: "Looking for all items with a spend over 100, sorted by the most clicks."
+
+Example Input: [{{"$match": {{"status": "ACTIVE"}}}}, {{"$group": {{"_id": "$ad_name", "totalSpend": {{"$sum": "$spend"}}}}}}]
+Example Output: "Calculating the total spend for all active ads, grouped by ad name."
+
 Your Input: {json.dumps(pipeline)}
 """
         try:
@@ -142,7 +195,7 @@ Your Input: {json.dumps(pipeline)}
         logger.info(f"[AnalyticsService] User={user_id}, Platform={platform}, Q='{question}'")
 
         pipeline = self._generate_pipeline(platform, question)
-        results = self._execute_query(platform, pipeline)
+        results = self._execute_query(platform, pipeline, user_id)
         explanation = self._generate_explanation(pipeline)
 
         return {
