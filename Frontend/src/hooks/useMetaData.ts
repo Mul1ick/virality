@@ -1,4 +1,5 @@
 // Frontend/src/hooks/useMetaData.ts
+// MINIMAL FIX - Just increase timeout and fix one thing
 import { useState, useEffect, useCallback, useMemo } from "react";
 import apiClient from "@/lib/api";
 import { DateRange } from "react-day-picker";
@@ -56,7 +57,7 @@ export const useMetaData = (
   isConnected: boolean,
   platformsLoaded: boolean,
   dateRange: string,
-  customRange?: DateRange // 🔥 NEW PARAM
+  customRange?: DateRange
 ) => {
   // State for basic data
   const [campaignsBasic, setCampaignsBasic] = useState<
@@ -175,11 +176,19 @@ export const useMetaData = (
     )
       return;
 
-      if (dateRange === "custom" && (!customRange?.from || !customRange?.to)) {
+    if (dateRange === "custom" && (!customRange?.from || !customRange?.to)) {
+      console.log("⏭️ Skipping insights: custom range incomplete");
       return;
     }
 
-    // 🔥 Check if custom range is selected and valid
+    // 🔧 DEBUG LOG
+    console.log("📊 [Meta] Fetching insights:", {
+      dateRange,
+      isCustom: dateRange === "custom",
+      from: customRange?.from?.toISOString(),
+      to: customRange?.to?.toISOString(),
+    });
+
     const isCustomRange =
       dateRange === "custom" && customRange?.from && customRange?.to;
 
@@ -193,44 +202,63 @@ export const useMetaData = (
 
     try {
       if (isCustomRange) {
-        // 🔥 USE POST ENDPOINT FOR CUSTOM DATE RANGE
+        // 🔧 USE POST ENDPOINT FOR CUSTOM DATE RANGE
         const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
+        console.log("📊 [Meta] Using POST with custom dates");
+
         const [campaignsInsRes, adsetsInsRes, adsInsRes] = await Promise.all([
-          apiClient.post(`/aggregate/meta`, {
-            ad_account_id: adAccountId,
-            start_date: formatDate(customRange.from!),
-            end_date: formatDate(customRange.to!),
-            group_by: "campaign",
-          }),
-          apiClient.post(`/aggregate/meta`, {
-            ad_account_id: adAccountId,
-            start_date: formatDate(customRange.from!),
-            end_date: formatDate(customRange.to!),
-            group_by: "adset",
-          }),
-          apiClient.post(`/aggregate/meta`, {
-            ad_account_id: adAccountId,
-            start_date: formatDate(customRange.from!),
-            end_date: formatDate(customRange.to!),
-            group_by: "ad",
-          }),
+          apiClient.post(
+            `/aggregate/meta`,
+            {
+              ad_account_id: adAccountId,
+              start_date: formatDate(customRange.from!),
+              end_date: formatDate(customRange.to!),
+              group_by: "campaign",
+            },
+            { timeout: 60000 } // 🔧 60 second timeout
+          ),
+          apiClient.post(
+            `/aggregate/meta`,
+            {
+              ad_account_id: adAccountId,
+              start_date: formatDate(customRange.from!),
+              end_date: formatDate(customRange.to!),
+              group_by: "adset",
+            },
+            { timeout: 60000 }
+          ),
+          apiClient.post(
+            `/aggregate/meta`,
+            {
+              ad_account_id: adAccountId,
+              start_date: formatDate(customRange.from!),
+              end_date: formatDate(customRange.to!),
+              group_by: "ad",
+            },
+            { timeout: 60000 }
+          ),
         ]);
 
         setCampaignInsights(campaignsInsRes.data || {});
         setAdSetInsights(adsetsInsRes.data || {});
         setAdInsights(adsInsRes.data || {});
       } else {
-        // 🔥 USE GET ENDPOINT FOR PRESET DATE RANGES
+        // 🔧 USE GET ENDPOINT FOR PRESET DATE RANGES
+        console.log("📊 [Meta] Using GET with preset:", dateRange);
+
         const [campaignsInsRes, adsetsInsRes, adsInsRes] = await Promise.all([
           apiClient.get(`/aggregate/meta/insights/campaign`, {
             params: { ad_account_id: adAccountId, date_preset: dateRange },
+            timeout: 60000, // 🔧 60 second timeout
           }),
           apiClient.get(`/aggregate/meta/insights/adset`, {
             params: { ad_account_id: adAccountId, date_preset: dateRange },
+            timeout: 60000,
           }),
           apiClient.get(`/aggregate/meta/insights/ad`, {
             params: { ad_account_id: adAccountId, date_preset: dateRange },
+            timeout: 60000,
           }),
         ]);
 
@@ -238,6 +266,8 @@ export const useMetaData = (
         setAdSetInsights(adsetsInsRes.data || {});
         setAdInsights(adsInsRes.data || {});
       }
+
+      console.log("✅ [Meta] Insights loaded successfully");
 
       setError((prev) => ({
         ...prev,
@@ -268,7 +298,7 @@ export const useMetaData = (
     platformsLoaded,
     dateRange,
     customRange,
-  ]); // 🔥 ADDED customRange
+  ]);
 
   // --- Trigger Fetches ---
   useEffect(() => {

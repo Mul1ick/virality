@@ -162,7 +162,7 @@ const Profile = () => {
       }
     };
 
-    if (localStorage.getItem("isAdmin") === 'true') {
+    if (localStorage.getItem("isAdmin") === "true") {
       setIsAdmin(true);
     }
     fetchUserProfile();
@@ -527,7 +527,7 @@ const Profile = () => {
             <div className="flex items-center gap-3">
               {isAdmin && (
                 <Button
-                  onClick={() => navigate('/admin')}
+                  onClick={() => navigate("/admin")}
                   size="lg"
                   variant="outline"
                   className="hidden md:flex"
@@ -540,12 +540,12 @@ const Profile = () => {
                 <Button
                   onClick={handleGoToDashboard}
                   size="lg"
-                  className="hidden md:flex" 
+                  className="hidden md:flex"
                 >
                   <BarChart3 className="h-4 w-4 mr-2" />
                   View Dashboard
                   <ArrowRight className="h-4 w-4 ml-2" />
-                [cite_start]</Button> 
+                </Button>
               )}
             </div>
           </div>

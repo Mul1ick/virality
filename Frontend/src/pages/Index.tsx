@@ -16,7 +16,6 @@ import { MetaTab } from "@/components/dashboard/tabs/MetaTab";
 import { GoogleTab } from "@/components/dashboard/tabs/GoogleTab";
 import { ShopifyTab } from "@/components/dashboard/tabs/ShopifyTab";
 import { usePlatformStatus } from "@/hooks/usePlatformStatus";
-import { useGoogleData } from "@/hooks/useGoogleData";
 import { useShopifyData } from "@/hooks/useShopifyData";
 import { useOverviewData } from "@/hooks/useOverviewData";
 
@@ -50,25 +49,6 @@ const Index = () => {
     customRange
   );
 
-  
-
-  // Fetch Google data
-  const {
-    campaigns: googleCampaigns,
-    adGroups: googleAdGroups,
-    ads: googleAds,
-    loading: googleLoading,
-    error: googleError,
-    refreshAll: refreshGoogle,
-  } = useGoogleData(
-    userId,
-    platformStatus.google.selected_manager_id ||
-      platformStatus.google.manager_id,
-    platformStatus.google.client_customer_id,
-    platformStatus.google.connected,
-    !platformsLoading
-  );
-
   // Fetch Shopify data
   const {
     orders: shopifyOrders,
@@ -83,23 +63,17 @@ const Index = () => {
     !platformsLoading
   );
 
-  // Notification state
+  // Notification state (removed Google - it manages itself)
   const [notifications, setNotifications] = useState({
     loading: {
       platforms: false,
-      meta: false,
-      google: false,
       shopify: false,
     },
     error: {
       platforms: null as string | null,
-      meta: null as string | null,
-      google: null as string | null,
       shopify: null as string | null,
     },
     success: {
-      meta: false,
-      google: false,
       shopify: false,
     },
   });
@@ -113,31 +87,16 @@ const Index = () => {
     const anyShopifyError =
       shopifyError.orders || shopifyError.products || shopifyError.customers;
 
-    const anyGoogleLoading =
-      googleLoading.campaigns || googleLoading.adGroups || googleLoading.ads;
-    const anyGoogleError =
-      googleError.campaigns || googleError.adGroups || googleError.ads;
-
     setNotifications({
       loading: {
         platforms: platformsLoading,
-        meta: false, // Meta manages its own loading now
-        google: anyGoogleLoading,
         shopify: anyShopifyLoading,
       },
       error: {
         platforms: platformsError,
-        meta: null, // Meta manages its own errors now
-        google: anyGoogleError,
         shopify: anyShopifyError,
       },
       success: {
-        meta: false, // Meta manages its own success now
-        google:
-          !anyGoogleLoading &&
-          !anyGoogleError &&
-          googleCampaigns.length > 0 &&
-          platformStatus.google.connected,
         shopify:
           !anyShopifyLoading &&
           !anyShopifyError &&
@@ -148,13 +107,6 @@ const Index = () => {
   }, [
     platformsLoading,
     platformsError,
-    googleLoading.campaigns,
-    googleLoading.adGroups,
-    googleLoading.ads,
-    googleError.campaigns,
-    googleError.adGroups,
-    googleError.ads,
-    googleCampaigns.length,
     shopifyLoading.orders,
     shopifyLoading.products,
     shopifyLoading.customers,
@@ -162,7 +114,6 @@ const Index = () => {
     shopifyError.products,
     shopifyError.customers,
     shopifyOrders.length,
-    platformStatus.google.connected,
     platformStatus.shopify.connected,
   ]);
 
@@ -178,19 +129,13 @@ const Index = () => {
         setNotifications((prev) => ({
           loading: {
             platforms: false,
-            meta: false,
-            google: false,
             shopify: false,
           },
           error: {
             platforms: null,
-            meta: null,
-            google: null,
             shopify: null,
           },
           success: {
-            meta: false,
-            google: false,
             shopify: false,
           },
         }));
@@ -199,22 +144,6 @@ const Index = () => {
       return () => clearTimeout(timer);
     }
   }, [notifications]);
-
-  // Handle Google refresh
-  const handleRefreshGoogle = async () => {
-    setIsRefreshing(true);
-    try {
-      await refreshGoogle();
-      setNotifications((prev) => ({
-        ...prev,
-        success: { ...prev.success, google: true },
-      }));
-    } catch (e) {
-      console.error("Google refresh failed:", e);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
 
   // Handle date range change
   const handleDateRangeChange = (value: string) => {
@@ -244,10 +173,10 @@ const Index = () => {
           error={notifications.error}
           success={notifications.success}
           counts={{
-            metaCampaigns: 0, // Meta manages its own counts now
+            metaCampaigns: 0,
             metaAdSets: 0,
             metaAds: 0,
-            googleCampaigns: googleCampaigns.length,
+            googleCampaigns: 0, // GoogleTab manages its own counts
             shopifyOrders: shopifyOrders.length,
           }}
         />
@@ -290,8 +219,7 @@ const Index = () => {
             </TabsTrigger>
             <TabsTrigger value="google" className="gap-2">
               <Search className="h-4 w-4" />
-              Google{" "}
-              {googleCampaigns.length > 0 && `(${googleCampaigns.length})`}
+              Google
             </TabsTrigger>
             <TabsTrigger value="shopify" className="gap-2">
               <ShoppingCart className="h-4 w-4" />
@@ -310,7 +238,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="meta">
-            {/* 🔥 SIMPLIFIED - MetaTab manages everything itself */}
+            {/* MetaTab manages everything itself */}
             <MetaTab
               userId={userId}
               adAccountId={platformStatus.meta.ad_account_id}
@@ -320,16 +248,16 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="google">
+            {/* GoogleTab now manages everything itself */}
             <GoogleTab
-              campaigns={googleCampaigns}
-              adGroups={googleAdGroups}
-              ads={googleAds}
+              userId={userId}
+              managerId={
+                platformStatus.google.selected_manager_id ||
+                platformStatus.google.manager_id
+              }
+              customerId={platformStatus.google.client_customer_id}
               isConnected={platformStatus.google.connected}
-              loading={googleLoading}
-              isRefreshing={isRefreshing}
-              onRefresh={handleRefreshGoogle}
-              dateRange={dateRange}
-              customRange={customRange}
+              platformsLoaded={!platformsLoading}
             />
           </TabsContent>
 

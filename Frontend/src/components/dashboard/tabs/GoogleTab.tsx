@@ -1,63 +1,45 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { CreativeGallery } from "@/components/dashboard/CreativeGallery";
+import { GoogleCampaignsTable } from "@/components/dashboard/GoogleCampaignsTable";
 import { GoogleAdGroupsTable } from "@/components/dashboard/GoogleAdGroupsTable";
 import { GoogleAdsTable } from "@/components/dashboard/GoogleAdsTable";
 import { RefreshCw } from "lucide-react";
-import { DateRange } from "react-day-picker";
-
-interface GoogleCampaign {
-  id: string;
-  name: string;
-  objective: string;
-  status?: string;
-}
-
-interface GoogleAdGroup {
-  id: string;
-  name: string;
-  status: string;
-  campaign_id: string;
-  campaign_name?: string;
-}
-
-interface GoogleAd {
-  id: string;
-  name: string;
-  status: string;
-  ad_group_id: string;
-  ad_group_name?: string;
-  type?: string;
-}
+import { useState } from "react";
+import { useGoogleData } from "@/hooks/useGoogleData";
 
 interface GoogleTabProps {
-  campaigns: GoogleCampaign[];
-  adGroups: GoogleAdGroup[];
-  ads: GoogleAd[];
-  loading: {
-    campaigns: boolean;
-    adGroups: boolean;
-    ads: boolean;
-  };
+  userId: string | null;
+  managerId: string | null | undefined;
+  customerId: string | null | undefined;
   isConnected: boolean;
-  isRefreshing: boolean;
-  onRefresh: () => Promise<void>;
-  dateRange: string;
-  customRange?: DateRange;
+  platformsLoaded: boolean;
 }
 
 export const GoogleTab = ({
-  campaigns,
-  adGroups,
-  ads,
-  loading,
+  userId,
+  managerId,
+  customerId,
   isConnected,
-  isRefreshing,
-  onRefresh,
-  dateRange,
-  customRange,
+  platformsLoaded,
 }: GoogleTabProps) => {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const { campaigns, adGroups, ads, loading, error, refreshAll } =
+    useGoogleData(userId, managerId, customerId, isConnected, platformsLoaded);
+
   const hasData = campaigns.length > 0 || adGroups.length > 0 || ads.length > 0;
+
+  const handleRefresh = async () => {
+    console.log("🔄 [Google] Manual refresh clicked");
+    setIsRefreshing(true);
+    try {
+      await refreshAll();
+    } catch (e) {
+      console.error("❌ [Google] Refresh failed:", e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   return (
     <div className="bg-card rounded-lg border p-6">
@@ -81,20 +63,48 @@ export const GoogleTab = ({
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
             />
           </svg>
-          <h2 className="text-2xl font-bold">Google Ads Campaigns & Ads</h2>
+          <div>
+            <h2 className="text-2xl font-bold">Google Ads Campaigns & Ads</h2>
+            <p className="text-sm text-muted-foreground">
+              Recent performance data
+            </p>
+          </div>
         </div>
-        <Button
-          onClick={onRefresh}
-          disabled={isRefreshing || !isConnected}
-          variant="outline"
-          size="sm"
-        >
-          <RefreshCw
-            className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
-          />
-          {isRefreshing ? "Refreshing..." : "Refresh Data"}
-        </Button>
+
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={handleRefresh}
+            disabled={isRefreshing || !isConnected}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Button>
+        </div>
       </div>
+
+      {(loading.campaigns || loading.adGroups || loading.ads) && (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-muted-foreground">
+            Loading Google Ads data...
+          </p>
+        </div>
+      )}
+
+      {(error.campaigns || error.adGroups || error.ads) && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-800 font-semibold">
+            Error loading Google Ads data
+          </p>
+          <p className="text-red-600 text-sm">
+            {error.campaigns || error.adGroups || error.ads}
+          </p>
+        </div>
+      )}
 
       {hasData ? (
         <Tabs defaultValue="campaigns" className="w-full">
@@ -111,7 +121,7 @@ export const GoogleTab = ({
           </TabsList>
 
           <TabsContent value="campaigns">
-            <CreativeGallery
+            <GoogleCampaignsTable
               campaigns={campaigns}
               isLoading={loading.campaigns}
             />
@@ -128,13 +138,18 @@ export const GoogleTab = ({
             <GoogleAdsTable ads={ads} isLoading={loading.ads} />
           </TabsContent>
         </Tabs>
-      ) : (
-        <p className="text-muted-foreground">
+      ) : !loading.campaigns &&
+        !loading.adGroups &&
+        !loading.ads &&
+        !error.campaigns &&
+        !error.adGroups &&
+        !error.ads ? (
+        <p className="text-muted-foreground text-center py-8">
           {isConnected
-            ? "No Google Ads data available. Try refreshing or check your ad account."
-            : "Google Ads not connected. Connect your Google Ads account in the Profile page."}
+            ? "No Google Ads data available. Try refreshing or check your account."
+            : "Google Ads not connected. Connect your account in the Profile page."}
         </p>
-      )}
+      ) : null}
     </div>
   );
 };

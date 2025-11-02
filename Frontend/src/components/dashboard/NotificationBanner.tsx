@@ -1,22 +1,16 @@
 // components/dashboard/NotificationBanner.tsx
-import { BarChart3, Facebook, Search, ShoppingCart } from "lucide-react";
+import { BarChart3, ShoppingCart } from "lucide-react";
 
 interface NotificationState {
   loading: {
     platforms: boolean;
-    meta: boolean;
-    google: boolean;
     shopify: boolean;
   };
   error: {
     platforms: string | null;
-    meta: string | null;
-    google: string | null;
     shopify: string | null;
   };
   success: {
-    meta: boolean;
-    google: boolean;
     shopify: boolean;
   };
   counts: {
@@ -56,26 +50,6 @@ export const NotificationBanner = ({
         </div>
       )}
 
-      {/* Meta Loading */}
-      {loading.meta && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <Facebook className="h-4 w-4 text-blue-600 animate-spin" />
-            <p className="text-blue-700">Loading Meta data...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Google Loading */}
-      {loading.google && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-blue-600 animate-spin" />
-            <p className="text-blue-700">Loading Google campaigns...</p>
-          </div>
-        </div>
-      )}
-
       {/* Shopify Loading */}
       {loading.shopify && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -86,57 +60,12 @@ export const NotificationBanner = ({
         </div>
       )}
 
-      {/* Meta Error */}
-      {error.meta && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <Facebook className="h-4 w-4 text-red-600" />
-            <p className="text-red-700">Meta: {error.meta}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Google Error */}
-      {error.google && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-red-600" />
-            <p className="text-red-700">Google: {error.google}</p>
-          </div>
-        </div>
-      )}
-
       {/* Shopify Error */}
       {error.shopify && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-center gap-2">
             <ShoppingCart className="h-4 w-4 text-red-600" />
             <p className="text-red-700">Shopify: {error.shopify}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Meta Success */}
-      {success.meta && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <Facebook className="h-4 w-4 text-green-600" />
-            <p className="text-green-700">
-              ✅ Meta data loaded! {counts.metaCampaigns} campaigns,{" "}
-              {counts.metaAdSets} ad sets, {counts.metaAds} ads
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Google Success */}
-      {success.google && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-green-600" />
-            <p className="text-green-700">
-              ✅ {counts.googleCampaigns} Google campaigns loaded!
-            </p>
           </div>
         </div>
       )}

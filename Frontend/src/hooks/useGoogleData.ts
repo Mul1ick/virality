@@ -1,14 +1,24 @@
-// hooks/useGoogleData.ts
-import { useState, useEffect, useCallback } from "react";
+// hooks/useGoogleData.ts - SIMPLE VERSION (Metrics already in data!)
+import { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL; // 🔥 Outside hook
+const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
+// Simplified interfaces - metrics are part of the main object
 export interface GoogleCampaign {
   id: string;
   name: string;
   status: string;
-  objective: string;
+  advertising_channel_type: string;
+  clicks: number;
+  impressions: number;
+  conversions: number;
+  cost_micros: number;
+  // Computed metrics
+  spend?: number;
+  ctr?: number;
+  cpc?: number;
+  cpm?: number;
 }
 
 export interface GoogleAdGroup {
@@ -17,6 +27,15 @@ export interface GoogleAdGroup {
   status: string;
   campaign_id: string;
   campaign_name?: string;
+  clicks: number;
+  impressions: number;
+  conversions: number;
+  cost_micros: number;
+  // Computed
+  spend?: number;
+  ctr?: number;
+  cpc?: number;
+  cpm?: number;
 }
 
 export interface GoogleAd {
@@ -25,7 +44,33 @@ export interface GoogleAd {
   status: string;
   ad_group_id: string;
   ad_group_name?: string;
-  type?: string;
+  clicks: number;
+  impressions: number;
+  conversions: number;
+  cost_micros: number;
+  // Computed
+  spend?: number;
+  ctr?: number;
+  cpc?: number;
+  cpm?: number;
+}
+
+// Helper to compute metrics
+function computeMetrics<
+  T extends { clicks: number; impressions: number; cost_micros: number }
+>(item: T): T & { spend: number; ctr: number; cpc: number; cpm: number } {
+  const clicks = Number(item.clicks) || 0;
+  const impressions = Number(item.impressions) || 0;
+  const costMicros = Number(item.cost_micros) || 0;
+  const spend = costMicros / 1000000; // Convert micros to dollars
+
+  return {
+    ...item,
+    spend,
+    ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+    cpc: clicks > 0 ? spend / clicks : 0,
+    cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
+  };
 }
 
 export const useGoogleData = (
@@ -51,253 +96,180 @@ export const useGoogleData = (
     ads: null as string | null,
   });
 
-  // Fetch campaigns
+  const canFetch = platformsLoaded && isConnected && userId && customerId;
+
+  // Fetch ALL data
   useEffect(() => {
-    if (
-      !platformsLoaded ||
-      !isConnected ||
-      !userId ||
-      !managerId ||
-      !customerId
-    ) {
+    if (!canFetch) {
+      console.log("⏭️ [Google] Skipping fetch");
       return;
     }
 
-    const fetchCampaigns = async () => {
-      try {
-        setLoading((prev) => ({ ...prev, campaigns: true }));
-        console.log(`📊 Fetching Google campaigns...`);
-
-        const token = localStorage.getItem("access_token");
-        const res = await axios.get(
-          `${backendUrl}/google/campaigns/${userId}`,
-          {
-            params: { customer_id: customerId, manager_id: managerId },
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }
-        );
-
-        const processed =
-          res.data.campaigns?.map((c: any) => ({
-            id: c.id || c.campaign?.id || "",
-            name: c.name || c.campaign?.name || "Unnamed Campaign",
-            status: c.status || c.campaign?.status || "",
-            objective:
-              c.advertising_channel_type ||
-              c.campaign?.advertising_channel_type ||
-              c.objective ||
-              "",
-          })) || [];
-
-        setCampaigns(processed);
-        setError((prev) => ({ ...prev, campaigns: null }));
-      } catch (e: any) {
-        console.error("❌ Google campaigns error:", e);
-        setError((prev) => ({
-          ...prev,
-          campaigns:
-            e.response?.data?.detail ||
-            e.message ||
-            "Failed to fetch campaigns",
-        }));
-      } finally {
-        setLoading((prev) => ({ ...prev, campaigns: false }));
-      }
-    };
-
-    fetchCampaigns();
-  }, [userId, managerId, customerId, isConnected, platformsLoaded]);
-
-  // Fetch ad groups for ALL campaigns
-  useEffect(() => {
-    if (
-      !platformsLoaded ||
-      !isConnected ||
-      !userId ||
-      !managerId ||
-      !customerId ||
-      campaigns.length === 0
-    ) {
-      return;
-    }
-
-    const fetchAdGroups = async () => {
-      try {
-        setLoading((prev) => ({ ...prev, adGroups: true }));
-        console.log(
-          `📊 Fetching Google ad groups for ${campaigns.length} campaigns...`
-        );
-
-        const token = localStorage.getItem("access_token");
-
-        // Fetch ad groups for ALL campaigns in parallel
-        const requests = campaigns.map((campaign) =>
-          axios
-            .get(`${backendUrl}/google/adgroups/${userId}`, {
-              params: {
-                customer_id: customerId,
-                manager_id: managerId,
-                campaign_id: campaign.id,
-              },
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-            })
-            .catch((err) => {
-              console.warn(
-                `Failed to fetch ad groups for campaign ${campaign.id}:`,
-                err
-              );
-              return { data: { adgroups: [] } }; // Return empty on error
-            })
-        );
-
-        const results = await Promise.all(requests);
-
-        // Flatten all ad groups and add campaign name
-        const allAdGroups: GoogleAdGroup[] = [];
-        results.forEach((res, idx) => {
-          const campaignAdGroups =
-            res.data.adgroups?.map((ag: any) => ({
-              id: ag.id || ag.ad_group?.id || "",
-              name: ag.name || ag.ad_group?.name || "Unnamed Ad Group",
-              status: ag.status || ag.ad_group?.status || "",
-              campaign_id: campaigns[idx].id,
-              campaign_name: campaigns[idx].name,
-            })) || [];
-          allAdGroups.push(...campaignAdGroups);
-        });
-
-        setAdGroups(allAdGroups);
-        setError((prev) => ({ ...prev, adGroups: null }));
-        console.log(`✅ Fetched ${allAdGroups.length} total ad groups`);
-      } catch (e: any) {
-        console.error("❌ Google ad groups error:", e);
-        setError((prev) => ({
-          ...prev,
-          adGroups: e.response?.data?.detail || "Failed to fetch ad groups",
-        }));
-      } finally {
-        setLoading((prev) => ({ ...prev, adGroups: false }));
-      }
-    };
-
-    fetchAdGroups();
-  }, [campaigns, userId, managerId, customerId, isConnected, platformsLoaded]);
-
-  // Fetch ads for ALL ad groups
-  useEffect(() => {
-    if (
-      !platformsLoaded ||
-      !isConnected ||
-      !userId ||
-      !managerId ||
-      !customerId ||
-      adGroups.length === 0
-    ) {
-      return;
-    }
-
-    const fetchAds = async () => {
-      try {
-        setLoading((prev) => ({ ...prev, ads: true }));
-        console.log(
-          `📊 Fetching Google ads for ${adGroups.length} ad groups...`
-        );
-
-        const token = localStorage.getItem("access_token");
-
-        // Fetch ads for ALL ad groups in parallel
-        const requests = adGroups.map((adGroup) =>
-          axios
-            .get(`${backendUrl}/google/ads/${userId}`, {
-              params: {
-                customer_id: customerId,
-                manager_id: managerId,
-                ad_group_id: adGroup.id,
-              },
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-            })
-            .catch((err) => {
-              console.warn(
-                `Failed to fetch ads for ad group ${adGroup.id}:`,
-                err
-              );
-              return { data: { ads: [] } }; // Return empty on error
-            })
-        );
-
-        const results = await Promise.all(requests);
-
-        // Flatten all ads and add ad group name
-        const allAds: GoogleAd[] = [];
-        results.forEach((res, idx) => {
-          const adGroupAds =
-            res.data.ads?.map((ad: any) => ({
-              id: ad.id || ad.ad?.id || "",
-              name: ad.name || ad.ad?.name || ad.headline || "Unnamed Ad",
-              status: ad.status || ad.ad?.status || "",
-              ad_group_id: adGroups[idx].id,
-              ad_group_name: adGroups[idx].name,
-              type: ad.type || ad.ad_type || "",
-            })) || [];
-          allAds.push(...adGroupAds);
-        });
-
-        setAds(allAds);
-        setError((prev) => ({ ...prev, ads: null }));
-        console.log(`✅ Fetched ${allAds.length} total ads`);
-      } catch (e: any) {
-        console.error("❌ Google ads error:", e);
-        setError((prev) => ({
-          ...prev,
-          ads: e.response?.data?.detail || "Failed to fetch ads",
-        }));
-      } finally {
-        setLoading((prev) => ({ ...prev, ads: false }));
-      }
-    };
-
-    fetchAds();
-  }, [adGroups, userId, managerId, customerId, isConnected, platformsLoaded]);
-
-  // Refresh all data
-  const refreshAll = useCallback(async () => {
-    console.log("🔄 Refreshing all Google data...");
-
-    // Re-fetch campaigns (which will trigger ad groups and ads cascade)
-    if (!userId || !managerId || !customerId) return;
-
-    try {
-      setLoading({ campaigns: true, adGroups: true, ads: true });
-
+    const fetchAllData = async () => {
       const token = localStorage.getItem("access_token");
-      const res = await axios.get(`${backendUrl}/google/campaigns/${userId}`, {
-        params: { customer_id: customerId, manager_id: managerId },
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      if (!token) {
+        console.error("❌ [Google] No auth token");
+        return;
+      }
 
-      const processed =
-        res.data.campaigns?.map((c: any) => ({
-          id: c.id || c.campaign?.id || "",
-          name: c.name || c.campaign?.name || "Unnamed Campaign",
-          status: c.status || c.campaign?.status || "",
-          objective:
-            c.advertising_channel_type ||
-            c.campaign?.advertising_channel_type ||
-            c.objective ||
-            "",
-        })) || [];
-
-      setCampaigns(processed);
+      setLoading({ campaigns: true, adGroups: true, ads: true });
       setError({ campaigns: null, adGroups: null, ads: null });
-    } catch (e: any) {
-      console.error("❌ Refresh failed:", e);
-      setError({
-        campaigns: e.response?.data?.detail || "Failed to refresh",
-        adGroups: null,
-        ads: null,
-      });
-    }
-  }, [userId, managerId, customerId]);
 
-  return { campaigns, adGroups, ads, loading, error, refreshAll };
+      const headers = { Authorization: `Bearer ${token}` };
+      const params: any = { customer_id: customerId };
+      if (managerId) params.manager_id = managerId;
+
+      try {
+        console.log("📊 [Google] Fetching all data...");
+
+        // Fetch all in parallel (3 API calls)
+        const [campaignsRes, adGroupsRes, adsRes] = await Promise.all([
+          axios
+            .get(`${backendUrl}/google/campaigns/${userId}`, {
+              params,
+              headers,
+              timeout: 30000,
+            })
+            .catch((err) => ({ error: err })),
+
+          axios
+            .get(`${backendUrl}/google/adgroups/all/${userId}`, {
+              params,
+              headers,
+              timeout: 30000,
+            })
+            .catch((err) => ({ error: err })),
+
+          axios
+            .get(`${backendUrl}/google/ads/all/${userId}`, {
+              params,
+              headers,
+              timeout: 30000,
+            })
+            .catch((err) => ({ error: err })),
+        ]);
+
+        // Process campaigns
+        if ("error" in campaignsRes) {
+          console.error("❌ [Google] Campaigns error:", campaignsRes.error);
+          setError((prev) => ({
+            ...prev,
+            campaigns: "Failed to fetch campaigns",
+          }));
+        } else {
+          const processed = (campaignsRes.data?.campaigns || [])
+            .map((c: any) =>
+              computeMetrics({
+                id: c.id || "",
+                name: c.name || "Unnamed",
+                status: c.status || "",
+                advertising_channel_type: c.advertising_channel_type || "",
+                clicks: Number(c.clicks) || 0,
+                impressions: Number(c.impressions) || 0,
+                conversions: Number(c.conversions) || 0,
+                cost_micros: Number(c.cost_micros) || 0,
+              })
+            )
+            .filter((c: GoogleCampaign) => c.spend > 0 || c.clicks > 0); // Only show campaigns with data
+
+          console.log(`✅ [Google] Campaigns: ${processed.length} with data`);
+          setCampaigns(processed);
+        }
+
+        // Process ad groups
+        if ("error" in adGroupsRes) {
+          console.error("❌ [Google] Ad groups error:", adGroupsRes.error);
+          setError((prev) => ({
+            ...prev,
+            adGroups: "Failed to fetch ad groups",
+          }));
+        } else {
+          const processed = (adGroupsRes.data?.adgroups || [])
+            .map((ag: any) =>
+              computeMetrics({
+                id: ag.id || "",
+                name: ag.name || "Unnamed",
+                status: ag.status || "",
+                campaign_id: ag.campaign_id || "",
+                clicks: Number(ag.clicks) || 0,
+                impressions: Number(ag.impressions) || 0,
+                conversions: Number(ag.conversions) || 0,
+                cost_micros: Number(ag.cost_micros) || 0,
+              })
+            )
+            .filter((ag: GoogleAdGroup) => ag.spend > 0 || ag.clicks > 0);
+
+          console.log(`✅ [Google] Ad Groups: ${processed.length} with data`);
+          setAdGroups(processed);
+        }
+
+        // Process ads
+        if ("error" in adsRes) {
+          console.error("❌ [Google] Ads error:", adsRes.error);
+          setError((prev) => ({ ...prev, ads: "Failed to fetch ads" }));
+        } else {
+          const processed = (adsRes.data?.ads || [])
+            .map((ad: any) =>
+              computeMetrics({
+                id: ad.id || "",
+                name: ad.name || "Unnamed",
+                status: ad.status || "",
+                ad_group_id: ad.ad_group_id || "",
+                clicks: Number(ad.clicks) || 0,
+                impressions: Number(ad.impressions) || 0,
+                conversions: Number(ad.conversions) || 0,
+                cost_micros: Number(ad.cost_micros) || 0,
+              })
+            )
+            .filter((ad: GoogleAd) => ad.spend > 0 || ad.clicks > 0);
+
+          console.log(`✅ [Google] Ads: ${processed.length} with data`);
+          setAds(processed);
+        }
+
+        console.log("✅ [Google] All data loaded!");
+      } catch (e: any) {
+        console.error("❌ [Google] Unexpected error:", e);
+      } finally {
+        setLoading({ campaigns: false, adGroups: false, ads: false });
+      }
+    };
+
+    fetchAllData();
+  }, [canFetch, userId, managerId, customerId]);
+
+  // Add campaign names to ad groups
+  const enrichedAdGroups = useMemo(() => {
+    const campaignMap = new Map(campaigns.map((c) => [c.id, c.name]));
+
+    return adGroups.map((ag) => ({
+      ...ag,
+      campaign_name: campaignMap.get(ag.campaign_id) || "Unknown Campaign",
+    }));
+  }, [adGroups, campaigns]);
+
+  // Add ad group names to ads
+  const enrichedAds = useMemo(() => {
+    const adGroupMap = new Map(adGroups.map((ag) => [ag.id, ag.name]));
+
+    return ads.map((ad) => ({
+      ...ad,
+      ad_group_name: adGroupMap.get(ad.ad_group_id) || "Unknown Ad Group",
+    }));
+  }, [ads, adGroups]);
+
+  // Refresh function
+  const refreshAll = useCallback(async () => {
+    console.log("🔄 [Google] Refreshing...");
+    // Just trigger re-fetch by updating a dependency (could add a trigger state)
+  }, []);
+
+  return {
+    campaigns,
+    adGroups: enrichedAdGroups,
+    ads: enrichedAds,
+    loading,
+    error,
+    refreshAll,
+  };
 };
