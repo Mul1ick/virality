@@ -1,9 +1,16 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { GoogleCampaignsTable } from "@/components/dashboard/GoogleCampaignsTable";
 import { GoogleAdGroupsTable } from "@/components/dashboard/GoogleAdGroupsTable";
 import { GoogleAdsTable } from "@/components/dashboard/GoogleAdsTable";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Calendar } from "lucide-react";
 import { useState } from "react";
 import { useGoogleData } from "@/hooks/useGoogleData";
 
@@ -22,12 +29,37 @@ export const GoogleTab = ({
   isConnected,
   platformsLoaded,
 }: GoogleTabProps) => {
+  const [dateRange, setDateRange] = useState("30days"); // 🔧 NEW: Date range state
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { campaigns, adGroups, ads, loading, error, refreshAll } =
-    useGoogleData(userId, managerId, customerId, isConnected, platformsLoaded);
+    useGoogleData(
+      userId,
+      managerId,
+      customerId,
+      isConnected,
+      platformsLoaded,
+      dateRange // 🔧 NEW: Pass date range
+    );
 
   const hasData = campaigns.length > 0 || adGroups.length > 0 || ads.length > 0;
+
+  // 🔧 NEW: Get date range text
+  const getDateRangeText = () => {
+    const labels: Record<string, string> = {
+      today: "Today",
+      "7days": "Last 7 Days",
+      "30days": "Last 30 Days",
+      "90days": "Last 90 Days",
+    };
+    return labels[dateRange] || "Last 30 Days";
+  };
+
+  // 🔧 NEW: Handle date range change
+  const handleDateRangeChange = (value: string) => {
+    console.log("📅 [Google] Date range changed:", value);
+    setDateRange(value);
+  };
 
   const handleRefresh = async () => {
     console.log("🔄 [Google] Manual refresh clicked");
@@ -66,12 +98,26 @@ export const GoogleTab = ({
           <div>
             <h2 className="text-2xl font-bold">Google Ads Campaigns & Ads</h2>
             <p className="text-sm text-muted-foreground">
-              Recent performance data
+              {getDateRangeText()} {/* 🔧 NEW: Show date range */}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
+          {/* 🔧 NEW: Date range selector */}
+          <Select value={dateRange} onValueChange={handleDateRangeChange}>
+            <SelectTrigger className="w-[160px]">
+              <Calendar className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Select range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="7days">Last 7 Days</SelectItem>
+              <SelectItem value="30days">Last 30 Days</SelectItem>
+              <SelectItem value="90days">Last 90 Days</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Button
             onClick={handleRefresh}
             disabled={isRefreshing || !isConnected}

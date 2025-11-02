@@ -28,6 +28,13 @@ class MetaAggregationRequest(BaseModel):
     group_by: Optional[str] = None
 
 
+class GoogleAggregationRequest(BaseModel):
+    start_date: date
+    end_date: date
+    customer_id: str
+    group_by: Optional[str] = None
+
+
 @router.post("/meta", summary="Aggregate Meta Ads Data")
 async def aggregate_meta_data(request: MetaAggregationRequest, user_id: str = Depends(get_current_user_id)):
     """
@@ -46,7 +53,6 @@ async def aggregate_meta_data(request: MetaAggregationRequest, user_id: str = De
         results_list = raw_result.get("results", [])
         group_by = request.group_by
 
-        # 🔧 FIX: Use snake_case field names to match MongoDB
         if group_by == "campaign":
             id_field = "campaign_id"
         elif group_by == "adset":
@@ -54,18 +60,15 @@ async def aggregate_meta_data(request: MetaAggregationRequest, user_id: str = De
         elif group_by == "ad":
             id_field = "ad_id"
         elif group_by == "date":
-            # Return array for date grouping (chart data)
             return results_list
         else:
-            # Default behavior for ungrouped data
             return results_list
         
-        # Convert to dict keyed by ID (for campaign/adset/ad grouping)
         results_dict = {}
         for item in results_list:
             if id_field in item:
-                item_id = item.pop(id_field)  # Remove the ID field from the object
-                results_dict[item_id] = item  # Use ID as key
+                item_id = item.pop(id_field)
+                results_dict[item_id] = item
 
         logger.info(f"[Aggregation] Returned {len(results_dict)} {group_by} insights for account {request.ad_account_id}")
         return results_dict
@@ -74,6 +77,48 @@ async def aggregate_meta_data(request: MetaAggregationRequest, user_id: str = De
         raise
     except Exception as e:
         logger.error(f"[Aggregation] Meta aggregation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal aggregation error")
+
+
+@router.post("/google", summary="Aggregate Google Ads Data")
+async def aggregate_google_data(request: GoogleAggregationRequest, user_id: str = Depends(get_current_user_id)):
+    """
+    Aggregates Google Ads campaign data.
+    
+    Note: Currently returns totals since daily breakdown isn't stored yet.
+    Returns single aggregated result for the date range.
+    """
+    logger.info(f"[Aggregation] Google request: user={user_id}, customer={request.customer_id}, group_by={request.group_by}")
+
+    try:
+        raw_result = AggregationService.run_google_aggregation(
+            user_id=user_id,
+            customer_id=request.customer_id,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            group_by=request.group_by,
+        )
+        results_list = raw_result.get("results", [])
+        
+        # For now, just return the totals (single result)
+        if results_list:
+            logger.info(f"[Aggregation] Returned Google totals for customer {request.customer_id}")
+            return results_list[0]  # Return single aggregated result
+        else:
+            return {
+                "totalSpend": 0,
+                "totalClicks": 0,
+                "totalImpressions": 0,
+                "totalConversions": 0,
+                "avgCTR": 0,
+                "avgCPC": 0,
+                "avgCPM": 0
+            }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Aggregation] Google aggregation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal aggregation error")
 
 
@@ -90,7 +135,6 @@ async def get_aggregated_meta_insights(
     if level not in ["campaign", "adset", "ad"]:
         raise HTTPException(status_code=400, detail="Invalid level. Must be 'campaign', 'adset', or 'ad'.")
 
-    # Calculate date range
     today = date.today()
     days_back = DATE_RANGE_PRESETS.get(date_preset)
     
@@ -107,11 +151,10 @@ async def get_aggregated_meta_insights(
     logger.info(f"[Aggregation] Meta {level} insights: user={user_id}, account={ad_account_id}, range={start_date} to {end_date}")
 
     try:
-        # 🔧 FIX: Use correct collection names from mongo_client.py
         collection_map = {
-            "campaign": "meta_daily_campaign_insights",  # ✅ Fixed
-            "adset": "meta_daily_insights",              # ✅ Fixed  
-            "ad": "meta_daily_ad_insights"               # ✅ Fixed
+            "campaign": "meta_daily_campaign_insights",
+            "adset": "meta_daily_insights",
+            "ad": "meta_daily_ad_insights"
         }
         
         collection = db[collection_map[level]]
@@ -150,7 +193,7 @@ async def get_aggregated_meta_insights(
             {
                 "$project": {
                     "_id": 0,
-                    "id": "$_id",  # Temporary ID field
+                    "id": "$_id",
                     "spend": "$totalSpend",
                     "impressions": "$totalImpressions",
                     "clicks": "$totalClicks",
@@ -182,11 +225,10 @@ async def get_aggregated_meta_insights(
 
         results = list(collection.aggregate(pipeline))
 
-        # Convert to dict with ID as key (remove ID from object)
         results_dict = {}
         for item in results:
-            item_id = item.pop("id")  # Remove temporary ID field
-            results_dict[item_id] = item  # Use as dict key
+            item_id = item.pop("id")
+            results_dict[item_id] = item
 
         logger.info(f"[Aggregation] Returned {len(results_dict)} {level} insights for account {ad_account_id}")
         return results_dict

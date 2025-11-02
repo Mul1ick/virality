@@ -18,6 +18,7 @@ import { ShopifyTab } from "@/components/dashboard/tabs/ShopifyTab";
 import { usePlatformStatus } from "@/hooks/usePlatformStatus";
 import { useShopifyData } from "@/hooks/useShopifyData";
 import { useOverviewData } from "@/hooks/useOverviewData";
+import { useGoogleOverviewData } from "@/hooks/useGoogleOverviewData";
 
 const Index = () => {
   const [dateRange, setDateRange] = useState("30days");
@@ -36,6 +37,7 @@ const Index = () => {
     error: platformsError,
   } = usePlatformStatus(userId);
 
+  // Fetch Meta overview data
   const {
     chartData: overviewChartData,
     loading: overviewLoading,
@@ -44,6 +46,20 @@ const Index = () => {
     userId,
     platformStatus.meta.ad_account_id,
     platformStatus.meta.connected,
+    !platformsLoading,
+    dateRange,
+    customRange
+  );
+
+  // Fetch Google overview data
+  const {
+    aggregatedData: googleOverviewData,
+    loading: googleOverviewLoading,
+    error: googleOverviewError,
+  } = useGoogleOverviewData(
+    userId,
+    platformStatus.google.client_customer_id,
+    platformStatus.google.connected,
     !platformsLoading,
     dateRange,
     customRange
@@ -63,7 +79,7 @@ const Index = () => {
     !platformsLoading
   );
 
-  // Notification state (removed Google - it manages itself)
+  // Notification state
   const [notifications, setNotifications] = useState({
     loading: {
       platforms: false,
@@ -176,7 +192,7 @@ const Index = () => {
             metaCampaigns: 0,
             metaAdSets: 0,
             metaAds: 0,
-            googleCampaigns: 0, // GoogleTab manages its own counts
+            googleCampaigns: 0,
             shopifyOrders: shopifyOrders.length,
           }}
         />
@@ -234,11 +250,13 @@ const Index = () => {
               chartData={overviewChartData}
               isLoading={overviewLoading}
               error={overviewError}
+              googleData={googleOverviewData}
+              googleLoading={googleOverviewLoading}
+              googleError={googleOverviewError}
             />
           </TabsContent>
 
           <TabsContent value="meta">
-            {/* MetaTab manages everything itself */}
             <MetaTab
               userId={userId}
               adAccountId={platformStatus.meta.ad_account_id}
@@ -248,7 +266,6 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="google">
-            {/* GoogleTab now manages everything itself */}
             <GoogleTab
               userId={userId}
               managerId={

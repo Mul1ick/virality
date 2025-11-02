@@ -1,4 +1,4 @@
-// hooks/useGoogleData.ts - SIMPLE VERSION (Metrics already in data!)
+// hooks/useGoogleData.ts - WITH DATE RANGE SUPPORT
 import { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 
@@ -78,7 +78,8 @@ export const useGoogleData = (
   managerId: string | null | undefined,
   customerId: string | null | undefined,
   isConnected: boolean,
-  platformsLoaded: boolean
+  platformsLoaded: boolean,
+  dateRange: string = "30days" // 🔧 NEW: Accept date range
 ) => {
   const [campaigns, setCampaigns] = useState<GoogleCampaign[]>([]);
   const [adGroups, setAdGroups] = useState<GoogleAdGroup[]>([]);
@@ -98,6 +99,17 @@ export const useGoogleData = (
 
   const canFetch = platformsLoaded && isConnected && userId && customerId;
 
+  // Map frontend date range to Google Ads API format
+  const getGoogleDateRange = (range: string): string => {
+    const rangeMap: Record<string, string> = {
+      today: "TODAY",
+      "7days": "LAST_7_DAYS",
+      "30days": "LAST_30_DAYS",
+      "90days": "LAST_90_DAYS",
+    };
+    return rangeMap[range] || "LAST_30_DAYS";
+  };
+
   // Fetch ALL data
   useEffect(() => {
     if (!canFetch) {
@@ -116,11 +128,19 @@ export const useGoogleData = (
       setError({ campaigns: null, adGroups: null, ads: null });
 
       const headers = { Authorization: `Bearer ${token}` };
-      const params: any = { customer_id: customerId };
+      const params: any = {
+        customer_id: customerId,
+        date_range: getGoogleDateRange(dateRange),
+      };
       if (managerId) params.manager_id = managerId;
 
       try {
-        console.log("📊 [Google] Fetching all data...");
+        console.log(
+          "📊 [Google] Fetching all data with date range:",
+          dateRange,
+          "→",
+          getGoogleDateRange(dateRange)
+        );
 
         // Fetch all in parallel (3 API calls)
         const [campaignsRes, adGroupsRes, adsRes] = await Promise.all([
@@ -236,7 +256,7 @@ export const useGoogleData = (
     };
 
     fetchAllData();
-  }, [canFetch, userId, managerId, customerId]);
+  }, [canFetch, userId, managerId, customerId, dateRange]); // 🔧 Added dateRange
 
   // Add campaign names to ad groups
   const enrichedAdGroups = useMemo(() => {
@@ -261,7 +281,6 @@ export const useGoogleData = (
   // Refresh function
   const refreshAll = useCallback(async () => {
     console.log("🔄 [Google] Refreshing...");
-    // Just trigger re-fetch by updating a dependency (could add a trigger state)
   }, []);
 
   return {
