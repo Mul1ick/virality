@@ -60,6 +60,8 @@ const Index = () => {
   } = useGoogleOverviewData(
     userId,
     platformStatus.google.client_customer_id,
+    platformStatus.google.selected_manager_id ||
+      platformStatus.google.manager_id,
     platformStatus.google.connected,
     !platformsLoading,
     dateRange,

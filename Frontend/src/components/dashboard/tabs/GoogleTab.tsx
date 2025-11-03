@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { DateRange } from "react-day-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,9 +12,10 @@ import {
 import { GoogleCampaignsTable } from "@/components/dashboard/GoogleCampaignsTable";
 import { GoogleAdGroupsTable } from "@/components/dashboard/GoogleAdGroupsTable";
 import { GoogleAdsTable } from "@/components/dashboard/GoogleAdsTable";
+import { GoogleSyncStatus } from "@/components/dashboard/GoogleSyncStatus";
 import { RefreshCw, Calendar } from "lucide-react";
-import { useState } from "react";
 import { useGoogleData } from "@/hooks/useGoogleData";
+import { useGoogleOverviewData } from "@/hooks/useGoogleOverviewData";
 
 interface GoogleTabProps {
   userId: string | null;
@@ -29,9 +32,11 @@ export const GoogleTab = ({
   isConnected,
   platformsLoaded,
 }: GoogleTabProps) => {
-  const [dateRange, setDateRange] = useState("30days"); // 🔧 NEW: Date range state
+  const [dateRange, setDateRange] = useState("30days");
+  const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Fetch campaigns, ad groups, ads data
   const { campaigns, adGroups, ads, loading, error, refreshAll } =
     useGoogleData(
       userId,
@@ -39,12 +44,23 @@ export const GoogleTab = ({
       customerId,
       isConnected,
       platformsLoaded,
-      dateRange // 🔧 NEW: Pass date range
+      dateRange
+    );
+
+  // Fetch overview data with auto-sync
+  const { syncing, syncComplete, syncError, checkAndSync } =
+    useGoogleOverviewData(
+      userId,
+      customerId,
+      managerId,
+      isConnected,
+      platformsLoaded,
+      dateRange,
+      customRange
     );
 
   const hasData = campaigns.length > 0 || adGroups.length > 0 || ads.length > 0;
 
-  // 🔧 NEW: Get date range text
   const getDateRangeText = () => {
     const labels: Record<string, string> = {
       today: "Today",
@@ -55,7 +71,6 @@ export const GoogleTab = ({
     return labels[dateRange] || "Last 30 Days";
   };
 
-  // 🔧 NEW: Handle date range change
   const handleDateRangeChange = (value: string) => {
     console.log("📅 [Google] Date range changed:", value);
     setDateRange(value);
@@ -72,6 +87,16 @@ export const GoogleTab = ({
       setIsRefreshing(false);
     }
   };
+
+  if (!isConnected) {
+    return (
+      <div className="bg-card rounded-lg border p-6">
+        <p className="text-muted-foreground text-center py-8">
+          Google Ads not connected. Connect your account in the Profile page.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-card rounded-lg border p-6">
@@ -98,13 +123,12 @@ export const GoogleTab = ({
           <div>
             <h2 className="text-2xl font-bold">Google Ads Campaigns & Ads</h2>
             <p className="text-sm text-muted-foreground">
-              {getDateRangeText()} {/* 🔧 NEW: Show date range */}
+              {getDateRangeText()}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* 🔧 NEW: Date range selector */}
           <Select value={dateRange} onValueChange={handleDateRangeChange}>
             <SelectTrigger className="w-[160px]">
               <Calendar className="h-4 w-4 mr-2" />
@@ -120,7 +144,7 @@ export const GoogleTab = ({
 
           <Button
             onClick={handleRefresh}
-            disabled={isRefreshing || !isConnected}
+            disabled={isRefreshing || !isConnected || syncing}
             variant="outline"
             size="sm"
           >
@@ -132,7 +156,16 @@ export const GoogleTab = ({
         </div>
       </div>
 
-      {(loading.campaigns || loading.adGroups || loading.ads) && (
+      {/* Sync Status - Shows during initial sync */}
+      <GoogleSyncStatus
+        syncing={syncing}
+        syncComplete={syncComplete}
+        syncError={syncError}
+        onRetry={checkAndSync}
+      />
+
+      {/* Show loading state */}
+      {(loading.campaigns || loading.adGroups || loading.ads) && !syncing && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
           <p className="text-sm text-muted-foreground">
@@ -141,7 +174,8 @@ export const GoogleTab = ({
         </div>
       )}
 
-      {(error.campaigns || error.adGroups || error.ads) && (
+      {/* Show errors */}
+      {(error.campaigns || error.adGroups || error.ads) && !syncing && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <p className="text-red-800 font-semibold">
             Error loading Google Ads data
@@ -152,50 +186,55 @@ export const GoogleTab = ({
         </div>
       )}
 
-      {hasData ? (
-        <Tabs defaultValue="campaigns" className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="campaigns">
-              Campaigns {campaigns.length > 0 && `(${campaigns.length})`}
-            </TabsTrigger>
-            <TabsTrigger value="adgroups">
-              Ad Groups {adGroups.length > 0 && `(${adGroups.length})`}
-            </TabsTrigger>
-            <TabsTrigger value="ads">
-              Ads {ads.length > 0 && `(${ads.length})`}
-            </TabsTrigger>
-          </TabsList>
+      {/* Main Content - Only show after sync is complete */}
+      {syncComplete && !syncing && (
+        <>
+          {/* Tabs for Campaigns, Ad Groups, Ads */}
+          {hasData ? (
+            <Tabs defaultValue="campaigns" className="w-full">
+              <TabsList className="mb-6">
+                <TabsTrigger value="campaigns">
+                  Campaigns {campaigns.length > 0 && `(${campaigns.length})`}
+                </TabsTrigger>
+                <TabsTrigger value="adgroups">
+                  Ad Groups {adGroups.length > 0 && `(${adGroups.length})`}
+                </TabsTrigger>
+                <TabsTrigger value="ads">
+                  Ads {ads.length > 0 && `(${ads.length})`}
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="campaigns">
-            <GoogleCampaignsTable
-              campaigns={campaigns}
-              isLoading={loading.campaigns}
-            />
-          </TabsContent>
+              <TabsContent value="campaigns">
+                <GoogleCampaignsTable
+                  campaigns={campaigns}
+                  isLoading={loading.campaigns}
+                />
+              </TabsContent>
 
-          <TabsContent value="adgroups">
-            <GoogleAdGroupsTable
-              adGroups={adGroups}
-              isLoading={loading.adGroups}
-            />
-          </TabsContent>
+              <TabsContent value="adgroups">
+                <GoogleAdGroupsTable
+                  adGroups={adGroups}
+                  isLoading={loading.adGroups}
+                />
+              </TabsContent>
 
-          <TabsContent value="ads">
-            <GoogleAdsTable ads={ads} isLoading={loading.ads} />
-          </TabsContent>
-        </Tabs>
-      ) : !loading.campaigns &&
-        !loading.adGroups &&
-        !loading.ads &&
-        !error.campaigns &&
-        !error.adGroups &&
-        !error.ads ? (
-        <p className="text-muted-foreground text-center py-8">
-          {isConnected
-            ? "No Google Ads data available. Try refreshing or check your account."
-            : "Google Ads not connected. Connect your account in the Profile page."}
-        </p>
-      ) : null}
+              <TabsContent value="ads">
+                <GoogleAdsTable ads={ads} isLoading={loading.ads} />
+              </TabsContent>
+            </Tabs>
+          ) : !loading.campaigns &&
+            !loading.adGroups &&
+            !loading.ads &&
+            !error.campaigns &&
+            !error.adGroups &&
+            !error.ads ? (
+            <p className="text-muted-foreground text-center py-8">
+              No Google Ads data available. Try refreshing or check your
+              account.
+            </p>
+          ) : null}
+        </>
+      )}
     </div>
   );
 };

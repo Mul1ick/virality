@@ -47,14 +47,12 @@ const getDatesFromPreset = (dateRange: string) => {
   };
 };
 
-// Helper function to safely convert values to numbers
 const toNumber = (value: any): number => {
   if (typeof value === "number") return value;
   if (typeof value === "string") return parseFloat(value) || 0;
   return 0;
 };
 
-// Helper function to convert cost_micros to currency
 const microsToActual = (micros: any): number => {
   return toNumber(micros) / 1_000_000;
 };
@@ -62,6 +60,7 @@ const microsToActual = (micros: any): number => {
 export const useGoogleOverviewData = (
   userId: string | null,
   customerId: string | null | undefined,
+  managerId: string | null | undefined,
   isConnected: boolean,
   platformsLoaded: boolean,
   dateRange: string,
@@ -79,6 +78,11 @@ export const useGoogleOverviewData = (
   const [chartData, setChartData] = useState<GoogleDailyChartData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync state
+  const [syncing, setSyncing] = useState(false);
+  const [syncComplete, setSyncComplete] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const fetchGoogleData = useCallback(async () => {
     if (!platformsLoaded || !isConnected || !customerId || !userId) {
@@ -118,24 +122,20 @@ export const useGoogleOverviewData = (
     try {
       console.log("📊 [Google Overview] Fetching data:", dateParams);
 
-      // Fetch daily chart data (group_by: "date")
       const chartResponse = await apiClient.post(`/aggregate/google`, {
         ad_account_id: customerId,
         start_date: dateParams.start_date,
         end_date: dateParams.end_date,
-        group_by: "date", // Get daily breakdown
+        group_by: "date",
       });
 
       console.log("📊 [Google Overview] Raw response:", chartResponse.data);
 
-      // Transform daily data for chart
       const rawData = Array.isArray(chartResponse.data)
         ? chartResponse.data
         : [];
 
-      // Transform the data to handle backend format
       const transformedData = rawData.map((day: any) => {
-        // Handle both possible response formats
         const spend =
           day.totalSpend !== undefined
             ? toNumber(day.totalSpend)
@@ -169,7 +169,6 @@ export const useGoogleOverviewData = (
 
       setChartData(transformedData);
 
-      // Calculate totals from transformed data
       const totals = transformedData.reduce(
         (acc, day) => ({
           totalSpend: acc.totalSpend + (day.totalSpend || 0),
@@ -219,15 +218,93 @@ export const useGoogleOverviewData = (
     customRange,
   ]);
 
+  // Auto-sync on first connection
+  const checkAndSync = useCallback(async () => {
+    if (!userId || !customerId || !isConnected || !platformsLoaded) {
+      console.log("⏸️ [Google Sync] Not ready");
+      return;
+    }
+
+    // Check if we have any data in MongoDB
+    try {
+      const testParams = getDatesFromPreset("30days");
+      const testFetch = await apiClient.post(`/aggregate/google`, {
+        ad_account_id: customerId,
+        start_date: testParams.start_date,
+        end_date: testParams.end_date,
+        group_by: "date",
+      });
+
+      const testData = Array.isArray(testFetch.data) ? testFetch.data : [];
+
+      // If we have data, skip sync
+      if (testData.length > 0) {
+        console.log("📦 [Google Sync] Data exists, loading...");
+        setSyncComplete(true);
+        await fetchGoogleData();
+        return;
+      }
+
+      // No data found - trigger full sync
+      console.log("🔄 [Google Sync] No data found, starting initial sync...");
+      setSyncing(true);
+      setSyncError(null);
+
+      const syncResponse = await apiClient.post(
+        `/google/sync/${userId}`,
+        {
+          customer_id: customerId,
+          manager_id: managerId || undefined,
+          days_back: 90, // Default 90 days
+        },
+        { timeout: 300000 } // 5 minute timeout
+      );
+
+      console.log("✅ [Google Sync] Complete:", syncResponse.data);
+      setSyncComplete(true);
+
+      // Now fetch the data
+      await fetchGoogleData();
+    } catch (e: any) {
+      console.error("❌ [Google Sync] Failed:", e);
+      setSyncError(
+        e.response?.data?.detail || "Sync failed. Please try again."
+      );
+    } finally {
+      setSyncing(false);
+    }
+  }, [
+    userId,
+    customerId,
+    managerId,
+    isConnected,
+    platformsLoaded,
+    fetchGoogleData,
+  ]);
+
+  // Initial check and sync on mount
   useEffect(() => {
-    fetchGoogleData();
-  }, [fetchGoogleData]);
+    if (platformsLoaded && isConnected && userId && customerId) {
+      checkAndSync();
+    }
+  }, [userId, customerId, isConnected, platformsLoaded]);
+
+  // Refetch when date range changes (but only if sync is complete)
+  useEffect(() => {
+    if (syncComplete && !syncing) {
+      fetchGoogleData();
+    }
+  }, [dateRange, customRange, syncComplete, syncing]);
 
   return {
     aggregatedData,
     chartData,
     loading,
     error,
+    syncing,
+    syncComplete,
+    syncError,
     refresh: fetchGoogleData,
+    checkAndSync,
   };
 };

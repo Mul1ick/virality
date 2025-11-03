@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import axios from "axios";
+import apiClient from "@/lib/api";
 
 interface ChartDataPoint {
   date: string;
@@ -49,18 +50,13 @@ const GoogleTrendChart: React.FC<GoogleTrendChartProps> = ({
         .split("T")[0];
 
       // Call aggregation endpoint with date grouping
-      const response = await axios.post(
-        "/api/aggregation/google",
+      const response = await apiClient.post(
+        `/aggregate/google`, // ✅ Correct path
         {
           start_date: startDate,
           end_date: endDate,
           ad_account_id: customerId,
-          group_by: "date", // This will group by date for trend data
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          group_by: "date",
         }
       );
 

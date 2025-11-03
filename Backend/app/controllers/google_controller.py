@@ -319,3 +319,52 @@ def backfill_daily_insights(
     except Exception as e:
         logger.error(f"[Google Backfill] Failed: {e}")
         raise HTTPException(status_code=500, detail=f"Backfill failed: {str(e)}")
+    
+@router.post("/sync/{user_id}")
+def sync_google_data(
+    user_id: str,
+    payload: DailyInsightsRequest,
+    current_user_id: str = Depends(get_current_user_id)
+):
+    """
+    One-click sync for all Google Ads data (campaigns, ad groups, ads).
+    Use this on first connection or for full refresh.
+    """
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
+    logger.info(f"[Google Sync] Starting full sync for {payload.customer_id}, {payload.days_back} days")
+    
+    try:
+        # Backfill all levels in parallel for speed
+        campaign_records = GoogleService.fetch_and_store_daily_campaign_insights(
+            user_id, payload.customer_id, payload.manager_id,
+            payload.start_date, payload.end_date, payload.days_back
+        )
+        
+        adgroup_records = GoogleService.fetch_and_store_daily_adgroup_insights(
+            user_id, payload.customer_id, payload.manager_id,
+            payload.start_date, payload.end_date, payload.days_back
+        )
+        
+        ad_records = GoogleService.fetch_and_store_daily_ad_insights(
+            user_id, payload.customer_id, payload.manager_id,
+            payload.start_date, payload.end_date, payload.days_back
+        )
+        
+        total = len(campaign_records) + len(adgroup_records) + len(ad_records)
+        
+        logger.info(f"[Google Sync] ✅ Complete: {total} total records")
+        
+        return {
+            "message": "Google Ads data synced successfully",
+            "customer_id": payload.customer_id,
+            "campaigns_saved": len(campaign_records),
+            "adgroups_saved": len(adgroup_records),
+            "ads_saved": len(ad_records),
+            "total_records": total,
+            "days_back": payload.days_back
+        }
+    except Exception as e:
+        logger.error(f"[Google Sync] Failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
