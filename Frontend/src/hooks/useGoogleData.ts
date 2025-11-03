@@ -208,7 +208,7 @@ export const useGoogleData = (
             .map((ag: any) =>
               computeMetrics({
                 id: ag.id || "",
-                name: ag.name || "Unnamed",
+                name: ag.name || ag.ad_name || ag.adName || `Ad ${ag.id}`,
                 status: ag.status || "",
                 campaign_id: ag.campaign_id || "",
                 clicks: Number(ag.clicks) || 0,

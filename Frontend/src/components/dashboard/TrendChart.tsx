@@ -14,19 +14,21 @@ import { Skeleton } from "@/components/ui/skeleton"; // <-- Import Skeleton
 import { AlertCircle } from "lucide-react"; // <-- Import icon for error
 import { useMemo } from "react";
 
-
-
 interface TrendChartProps {
   dateRange: string; // Used for the title
   data: DailyChartData[]; // <-- Real data
   isLoading: boolean; // <-- Loading state
   error: string | null; // <-- Error state
+  platform: "google" | "meta" | "shopify";
 }
 
-export const TrendChart = ({ dateRange,
+export const TrendChart = ({
+  dateRange,
   data,
   isLoading,
-  error, }: TrendChartProps) => {
+  error,
+  platform,
+}: TrendChartProps) => {
   // Generate data based on selected date range
 
   // Format currency for tooltip
@@ -112,7 +114,7 @@ export const TrendChart = ({ dateRange,
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
-            
+
             <Line
               type="monotone"
               dataKey="totalSpend"

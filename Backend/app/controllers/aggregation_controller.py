@@ -31,7 +31,7 @@ class MetaAggregationRequest(BaseModel):
 class GoogleAggregationRequest(BaseModel):
     start_date: date
     end_date: date
-    customer_id: str
+    ad_account_id: str  # Changed from customer_id
     group_by: Optional[str] = None
 
 
@@ -40,7 +40,8 @@ async def aggregate_meta_data(request: MetaAggregationRequest, user_id: str = De
     """
     Aggregates Meta Ads daily insights by campaign, adset, ad, or time period.
     """
-    logger.info(f"[Aggregation] Meta request: user={user_id}, account={request.ad_account_id}, group_by={request.group_by}")
+    logger.info(f"[META ENDPOINT] Request received - user: {user_id}, account: {request.ad_account_id}, group_by: {request.group_by}")
+    logger.info(f"[META ENDPOINT] Date range: {request.start_date} to {request.end_date}")
 
     try:
         raw_result = AggregationService.run_meta_aggregation(
@@ -50,18 +51,23 @@ async def aggregate_meta_data(request: MetaAggregationRequest, user_id: str = De
             end_date=request.end_date,
             group_by=request.group_by,
         )
+        
         results_list = raw_result.get("results", [])
+        logger.info(f"[META ENDPOINT] Got {len(results_list)} results from service")
+        
         group_by = request.group_by
 
         if group_by == "campaign":
-            id_field = "campaign_id"
+            id_field = "campaignId"
         elif group_by == "adset":
-            id_field = "adset_id"
+            id_field = "adsetId"
         elif group_by == "ad":
-            id_field = "ad_id"
+            id_field = "adId"
         elif group_by == "date":
+            logger.info(f"[META ENDPOINT] Returning date-grouped results: {results_list}")
             return results_list
         else:
+            logger.info(f"[META ENDPOINT] No grouping, returning raw list: {results_list}")
             return results_list
         
         results_dict = {}
@@ -69,14 +75,17 @@ async def aggregate_meta_data(request: MetaAggregationRequest, user_id: str = De
             if id_field in item:
                 item_id = item.pop(id_field)
                 results_dict[item_id] = item
+                logger.info(f"[META ENDPOINT] Mapped {id_field}={item_id} -> {item}")
+            else:
+                logger.warning(f"[META ENDPOINT] Item missing {id_field}: {item}")
 
-        logger.info(f"[Aggregation] Returned {len(results_dict)} {group_by} insights for account {request.ad_account_id}")
+        logger.info(f"[META ENDPOINT] Final response: {len(results_dict)} items")
         return results_dict
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[Aggregation] Meta aggregation failed: {e}", exc_info=True)
+        logger.error(f"[META ENDPOINT] Failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal aggregation error")
 
 
@@ -84,27 +93,50 @@ async def aggregate_meta_data(request: MetaAggregationRequest, user_id: str = De
 async def aggregate_google_data(request: GoogleAggregationRequest, user_id: str = Depends(get_current_user_id)):
     """
     Aggregates Google Ads campaign data.
-    
-    Note: Currently returns totals since daily breakdown isn't stored yet.
-    Returns single aggregated result for the date range.
     """
-    logger.info(f"[Aggregation] Google request: user={user_id}, customer={request.customer_id}, group_by={request.group_by}")
+    logger.info(f"[GOOGLE ENDPOINT] Request received - user: {user_id}, ad_account: {request.ad_account_id}, group_by: {request.group_by}")
+    logger.info(f"[GOOGLE ENDPOINT] Date range: {request.start_date} to {request.end_date}")
 
     try:
         raw_result = AggregationService.run_google_aggregation(
             user_id=user_id,
-            customer_id=request.customer_id,
+            customer_id=request.ad_account_id,
             start_date=request.start_date,
             end_date=request.end_date,
             group_by=request.group_by,
         )
-        results_list = raw_result.get("results", [])
         
-        # For now, just return the totals (single result)
+        results_list = raw_result.get("results", [])
+        logger.info(f"[GOOGLE ENDPOINT] Got {len(results_list)} results from service")
+        
+        group_by = request.group_by
+        
+        # For date grouping, return the full array for chart data
+        if group_by == "date":
+            logger.info(f"[GOOGLE ENDPOINT] Returning date-grouped array: {len(results_list)} days")
+            return results_list
+        
+        # For campaign/adgroup/ad grouping, return as dictionary keyed by ID
+        if group_by in ["campaign", "adgroup", "ad"]:
+            id_field = f"{group_by}Id"
+            results_dict = {}
+            for item in results_list:
+                if id_field in item:
+                    item_id = item.pop(id_field)
+                    results_dict[item_id] = item
+                    logger.info(f"[GOOGLE ENDPOINT] Mapped {id_field}={item_id} -> {item}")
+                else:
+                    logger.warning(f"[GOOGLE ENDPOINT] Item missing {id_field}: {item}")
+            
+            logger.info(f"[GOOGLE ENDPOINT] Returning {len(results_dict)} grouped items")
+            return results_dict
+        
+        # Default: return single aggregated totals
         if results_list:
-            logger.info(f"[Aggregation] Returned Google totals for customer {request.customer_id}")
-            return results_list[0]  # Return single aggregated result
+            logger.info(f"[GOOGLE ENDPOINT] First result: {results_list[0]}")
+            return results_list[0]
         else:
+            logger.warning(f"[GOOGLE ENDPOINT] No results, returning zeros")
             return {
                 "totalSpend": 0,
                 "totalClicks": 0,
@@ -118,7 +150,7 @@ async def aggregate_google_data(request: GoogleAggregationRequest, user_id: str 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[Aggregation] Google aggregation failed: {e}", exc_info=True)
+        logger.error(f"[GOOGLE ENDPOINT] Failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal aggregation error")
 
 
@@ -132,6 +164,8 @@ async def get_aggregated_meta_insights(
     """
     Aggregates Meta Ads daily insights for a specific level over a preset date range.
     """
+    logger.info(f"[META INSIGHTS] Request - level: {level}, account: {ad_account_id}, preset: {date_preset}")
+    
     if level not in ["campaign", "adset", "ad"]:
         raise HTTPException(status_code=400, detail="Invalid level. Must be 'campaign', 'adset', or 'ad'.")
 
@@ -147,8 +181,7 @@ async def get_aggregated_meta_insights(
         start_date = today - timedelta(days=days_back)
     
     end_date = today
-
-    logger.info(f"[Aggregation] Meta {level} insights: user={user_id}, account={ad_account_id}, range={start_date} to {end_date}")
+    logger.info(f"[META INSIGHTS] Date range: {start_date} to {end_date}")
 
     try:
         collection_map = {
@@ -160,6 +193,8 @@ async def get_aggregated_meta_insights(
         collection = db[collection_map[level]]
         id_field = f"{level}_id"
         group_id_field = f"${id_field}"
+
+        logger.info(f"[META INSIGHTS] Using collection: {collection_map[level]}, grouping by: {id_field}")
 
         pipeline = [
             {
@@ -224,15 +259,19 @@ async def get_aggregated_meta_insights(
         ]
 
         results = list(collection.aggregate(pipeline))
+        logger.info(f"[META INSIGHTS] Got {len(results)} results from aggregation")
+        
+        if results:
+            logger.info(f"[META INSIGHTS] Sample result: {results[0]}")
 
         results_dict = {}
         for item in results:
             item_id = item.pop("id")
             results_dict[item_id] = item
 
-        logger.info(f"[Aggregation] Returned {len(results_dict)} {level} insights for account {ad_account_id}")
+        logger.info(f"[META INSIGHTS] Returning {len(results_dict)} {level} insights")
         return results_dict
 
     except Exception as e:
-        logger.error(f"[Aggregation] Meta {level} insights failed: {e}", exc_info=True)
+        logger.error(f"[META INSIGHTS] Failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal aggregation error for {level} insights")

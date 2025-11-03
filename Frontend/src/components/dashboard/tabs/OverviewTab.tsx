@@ -23,6 +23,13 @@ interface OverviewTabProps {
     avgCPC: number;
     avgCPM: number;
   };
+  googleChartData?: Array<{
+    date: string;
+    totalSpend: number;
+    totalClicks: number;
+    totalImpressions: number;
+    totalConversions?: number;
+  }>;
   googleLoading?: boolean;
   googleError?: string | null;
 }
@@ -34,6 +41,7 @@ export const OverviewTab = ({
   isLoading,
   error,
   googleData,
+  googleChartData,
   googleLoading,
   googleError,
 }: OverviewTabProps) => {
@@ -133,6 +141,7 @@ export const OverviewTab = ({
                 data={chartData}
                 isLoading={isLoading}
                 error={error}
+                platform="meta"
               />
             </>
           )}
@@ -183,19 +192,32 @@ export const OverviewTab = ({
                 />
               </div>
 
-              {/* Google Chart Placeholder */}
-              <Card className="p-6">
-                <div className="text-center py-12">
-                  <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-lg font-semibold mb-2">
-                    Daily Breakdown Coming Soon
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Daily Google Ads insights chart will be available once daily
-                    data storage is implemented
-                  </p>
-                </div>
-              </Card>
+              {/* Google Chart - USING SAME TrendChart COMPONENT AS META */}
+              {googleChartData && googleChartData.length > 0 ? (
+                <TrendChart
+                  dateRange={dateRange}
+                  data={googleChartData}
+                  isLoading={googleLoading || false}
+                  error={googleError || null}
+                  platform="google"
+                />
+              ) : (
+                <Card className="p-6">
+                  <div className="text-center py-12">
+                    <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-lg font-semibold mb-2">
+                      No Daily Data Available
+                    </p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Daily Google Ads insights need to be fetched first
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Go to the Google tab and let campaigns load, then come
+                      back here
+                    </p>
+                  </div>
+                </Card>
+              )}
             </>
           ) : (
             <Card className="p-6">

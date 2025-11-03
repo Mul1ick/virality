@@ -13,7 +13,7 @@ Responsibilities:
 
 from __future__ import annotations
 from typing import List, Dict, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import requests
 import urllib.parse
 
@@ -26,6 +26,7 @@ from app.database.mongo_client import (
     get_platform_connection_details,
     save_items,
     save_google_daily_insights,
+    db,
 )
 from app.utils.security import create_state_token, decode_token
 from app.utils.google_api import (
@@ -37,6 +38,9 @@ from app.utils.google_api import (
     get_direct_client_accounts,
     refresh_google_access_token,
     get_campaign_insights,
+    get_campaign_daily_insights,
+    get_adgroup_daily_insights,
+    get_ad_daily_insights,
 )
 
 logger = get_logger()
@@ -220,10 +224,9 @@ class GoogleService:
 
         return access_token
 
-
     # ---------------------- DATA FETCH ----------------------
     @staticmethod
-    def fetch_campaigns(user_id: str, customer_id: str, manager_id: Optional[str] = None,date_range: str = "LAST_30_DAYS"):
+    def fetch_campaigns(user_id: str, customer_id: str, manager_id: Optional[str] = None, date_range: str = "LAST_30_DAYS"):
         """
         Fetch all campaigns and metrics for a Google Ads customer account.
         Automatically determines correct login-customer-id for both
@@ -238,7 +241,7 @@ class GoogleService:
 
         # ✅ Step 3: Determine the correct login-customer-id context
         # - If the user has a manager selected, use it.
-        # - Otherwise, fallback to the direct client’s own ID.
+        # - Otherwise, fallback to the direct client's own ID.
         ctx_manager_id = (
             manager_id
             or details.get("selected_manager_id")
@@ -253,7 +256,6 @@ class GoogleService:
 
         # ✅ Step 4: Make the API call with correct headers (login-customer-id)
         resp = list_campaigns_for_child(token, customer_id, ctx_manager_id, date_range)
-
 
         # ✅ Step 5: Handle API errors early
         if not resp:
@@ -292,7 +294,6 @@ class GoogleService:
         save_items("campaigns", customer_id, transformed_data, GoogleService.PLATFORM_NAME)
         logger.info(f"[GoogleService] ✅ Saved {len(transformed_data)} campaigns for {customer_id}")
         return transformed_data
-
 
     @staticmethod
     def fetch_adgroups(user_id: str, customer_id: str, manager_id: Optional[str], campaign_id: str, date_range: str = "LAST_30_DAYS"):
@@ -360,7 +361,6 @@ class GoogleService:
         save_items("ads", customer_id, transformed_data, GoogleService.PLATFORM_NAME)
         return transformed_data
 
-
     @staticmethod
     def fetch_campaign_insights(user_id, customer_id, manager_id, date_range, campaign_id=None):
         from app.utils.google_api import get_campaign_insights
@@ -413,7 +413,6 @@ class GoogleService:
         save_items("adsets", customer_id, data, GoogleService.PLATFORM_NAME)
         return data
 
-
     @staticmethod
     def fetch_all_ads(user_id: str, customer_id: str, manager_id: Optional[str], date_range: str = "LAST_30_DAYS"):
         """
@@ -434,7 +433,7 @@ class GoogleService:
         data = [
             {
                 "id": i.get("adGroupAd", {}).get("ad", {}).get("id"),
-                "name": i.get("adGroupAd", {}).get("ad", {}).get("name"),
+                "name": i.get("adGroupAd", {}).get("ad", {}).get("name") or f"Ad {i.get('adGroupAd', {}).get('ad', {}).get('id', '')}",  # ✅ FIXED
                 "ad_group_id": i.get("adGroup", {}).get("id"),
                 "campaign_id": i.get("campaign", {}).get("id"),
                 "status": i.get("adGroupAd", {}).get("status"),
@@ -447,3 +446,306 @@ class GoogleService:
         ]
         save_items("ads", customer_id, data, GoogleService.PLATFORM_NAME)
         return data
+    # ---------------------- DAILY INSIGHTS FOR TRENDS ----------------------
+    
+    @staticmethod
+    def fetch_and_store_daily_campaign_insights(
+        user_id: str,
+        customer_id: str,
+        manager_id: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days_back: int = 30
+    ):
+        """
+        Fetch daily campaign insights and store in google_daily_campaign_insights collection.
+        
+        This creates daily records like Meta does for proper trend analysis.
+        """
+        token = GoogleService._maybe_refresh_token(user_id)
+        details = get_platform_connection_details(user_id, GoogleService.PLATFORM_NAME) or {}
+        
+        # Determine login customer ID
+        ctx_manager_id = (
+            manager_id
+            or details.get("selected_manager_id")
+            or details.get("client_customer_id")
+            or customer_id
+        )
+        
+        # Calculate date range
+        if not end_date:
+            end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if not start_date:
+            start_date_obj = datetime.now(timezone.utc) - timedelta(days=days_back)
+            start_date = start_date_obj.strftime("%Y-%m-%d")
+        
+        # Validate date range
+        if start_date > end_date:
+            raise HTTPException(status_code=400, detail="start_date must be before end_date")
+        
+        logger.info(f"[GoogleService] Fetching daily insights from {start_date} to {end_date}")
+        
+        # Fetch daily data from Google Ads API
+        resp = get_campaign_daily_insights(token, customer_id, ctx_manager_id, start_date, end_date)
+        
+        if not resp or resp.status_code != 200:
+            logger.error(f"[GoogleService] Daily insights API failed: {resp.status_code if resp else 'NO RESP'}")
+            raise HTTPException(
+                status_code=resp.status_code if resp else 500,
+                detail="Failed to fetch daily campaign insights"
+            )
+        
+        response_data = resp.json()
+
+        # Handle searchStream nested results format
+        raw_data = []
+        if isinstance(response_data, list):
+            for chunk in response_data:
+                if isinstance(chunk, dict) and 'results' in chunk:
+                    raw_data.extend(chunk['results'])
+                else:
+                    raw_data.append(chunk)
+        elif isinstance(response_data, dict) and 'results' in response_data:
+            raw_data = response_data['results']
+        else:
+            raw_data = [response_data] if response_data else []
+                
+        logger.info(f"[GoogleService] Retrieved {len(raw_data)} daily campaign records")
+        
+        # DEBUG: Log first record to see structure
+        if raw_data:
+            logger.info(f"[GoogleService] DEBUG - Sample raw record: {raw_data[0]}")
+        
+        daily_records = []
+        for item in raw_data:
+            campaign = item.get("campaign", {})
+            metrics = item.get("metrics", {})
+            segments = item.get("segments", {})
+            
+            record = {
+                "user_id": user_id,
+                "platform": "google",
+                "ad_account_id": customer_id,
+                "campaign_id": campaign.get("id"),
+                "campaign_name": campaign.get("name"),
+                "date_start": segments.get("date"),  # Daily date
+                "date_stop": segments.get("date"),   # Same as start for daily
+                "status": campaign.get("status"),
+                "advertising_channel_type": campaign.get("advertisingChannelType"),
+                # Metrics
+                "clicks": metrics.get("clicks", "0"),
+                "impressions": metrics.get("impressions", "0"),
+                "cost_micros": metrics.get("costMicros", "0"),
+                "conversions": metrics.get("conversions", 0),
+                "ctr": metrics.get("ctr", 0),
+                "average_cpc": metrics.get("averageCpc", 0),
+                "average_cpm": metrics.get("averageCpm", 0),
+                "last_updated": datetime.now(timezone.utc)
+            }
+            daily_records.append(record)
+        
+        # Save to new collection
+        if daily_records:
+            collection = db["google_daily_campaign_insights"]
+            
+            # Delete existing records for this date range to avoid duplicates
+            collection.delete_many({
+                "user_id": user_id,
+                "ad_account_id": customer_id,
+                "date_start": {"$gte": start_date, "$lte": end_date}
+            })
+            
+            # Insert new records
+            collection.insert_many(daily_records)
+            logger.info(f"[GoogleService] ✅ Saved {len(daily_records)} daily campaign records")
+        
+        return daily_records
+
+    @staticmethod
+    def fetch_and_store_daily_adgroup_insights(
+        user_id: str,
+        customer_id: str,
+        manager_id: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days_back: int = 30
+    ):
+        """
+        Fetch daily ad group insights and store in google_daily_adgroup_insights collection.
+        """
+        token = GoogleService._maybe_refresh_token(user_id)
+        details = get_platform_connection_details(user_id, GoogleService.PLATFORM_NAME) or {}
+        
+        ctx_manager_id = (
+            manager_id
+            or details.get("selected_manager_id")
+            or details.get("client_customer_id")
+            or customer_id
+        )
+        
+        if not end_date:
+            end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if not start_date:
+            start_date_obj = datetime.now(timezone.utc) - timedelta(days=days_back)
+            start_date = start_date_obj.strftime("%Y-%m-%d")
+        
+        # Validate date range
+        if start_date > end_date:
+            raise HTTPException(status_code=400, detail="start_date must be before end_date")
+        
+        resp = get_adgroup_daily_insights(token, customer_id, ctx_manager_id, start_date, end_date)
+        
+        if not resp or resp.status_code != 200:
+            logger.error(f"[GoogleService] Daily ad group insights failed")
+            raise HTTPException(status_code=resp.status_code if resp else 500, detail="Failed to fetch daily ad group insights")
+        
+        response_data = resp.json()
+
+        raw_data = []
+        if isinstance(response_data, list):
+            for chunk in response_data:
+                if isinstance(chunk, dict) and 'results' in chunk:
+                    raw_data.extend(chunk['results'])
+                else:
+                    raw_data.append(chunk)
+        elif isinstance(response_data, dict) and 'results' in response_data:
+            raw_data = response_data['results']
+        else:
+            raw_data = [response_data] if response_data else []
+        
+        logger.info(f"[GoogleService] Retrieved {len(raw_data)} daily ad group records")
+        
+        daily_records = []
+        for item in raw_data:
+            ad_group = item.get("adGroup", {})
+            campaign = item.get("campaign", {})
+            metrics = item.get("metrics", {})
+            segments = item.get("segments", {})
+            
+            record = {
+                "user_id": user_id,
+                "platform": "google",
+                "ad_account_id": customer_id,
+                "adgroup_id": ad_group.get("id"),
+                "adgroup_name": ad_group.get("name"),
+                "campaign_id": campaign.get("id"),
+                "campaign_name": campaign.get("name"),
+                "date_start": segments.get("date"),
+                "date_stop": segments.get("date"),
+                "status": ad_group.get("status"),
+                "clicks": metrics.get("clicks", "0"),
+                "impressions": metrics.get("impressions", "0"),
+                "cost_micros": metrics.get("costMicros", "0"),
+                "conversions": metrics.get("conversions", 0),
+                "last_updated": datetime.now(timezone.utc)
+            }
+            daily_records.append(record)
+        
+        if daily_records:
+            collection = db["google_daily_adgroup_insights"]
+            collection.delete_many({
+                "user_id": user_id,
+                "ad_account_id": customer_id,
+                "date_start": {"$gte": start_date, "$lte": end_date}
+            })
+            collection.insert_many(daily_records)
+            logger.info(f"[GoogleService] ✅ Saved {len(daily_records)} daily ad group records")
+        
+        return daily_records
+
+    @staticmethod
+    def fetch_and_store_daily_ad_insights(
+        user_id: str,
+        customer_id: str,
+        manager_id: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days_back: int = 30
+    ):
+        """
+        Fetch daily ad insights and store in google_daily_ad_insights collection.
+        """
+        token = GoogleService._maybe_refresh_token(user_id)
+        details = get_platform_connection_details(user_id, GoogleService.PLATFORM_NAME) or {}
+        
+        ctx_manager_id = (
+            manager_id
+            or details.get("selected_manager_id")
+            or details.get("client_customer_id")
+            or customer_id
+        )
+        
+        if not end_date:
+            end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if not start_date:
+            start_date_obj = datetime.now(timezone.utc) - timedelta(days=days_back)
+            start_date = start_date_obj.strftime("%Y-%m-%d")
+        
+        # Validate date range
+        if start_date > end_date:
+            raise HTTPException(status_code=400, detail="start_date must be before end_date")
+        
+        resp = get_ad_daily_insights(token, customer_id, ctx_manager_id, start_date, end_date)
+        
+        if not resp or resp.status_code != 200:
+            logger.error(f"[GoogleService] Daily ad insights failed")
+            raise HTTPException(status_code=resp.status_code if resp else 500, detail="Failed to fetch daily ad insights")
+        
+        response_data = resp.json()
+        response_data = resp.json()
+
+        raw_data = []
+        if isinstance(response_data, list):
+            for chunk in response_data:
+                if isinstance(chunk, dict) and 'results' in chunk:
+                    raw_data.extend(chunk['results'])
+                else:
+                    raw_data.append(chunk)
+        elif isinstance(response_data, dict) and 'results' in response_data:
+            raw_data = response_data['results']
+        else:
+            raw_data = [response_data] if response_data else []
+        
+        logger.info(f"[GoogleService] Retrieved {len(raw_data)} daily ad records")
+        
+        daily_records = []
+        for item in raw_data:
+            ad = item.get("adGroupAd", {}).get("ad", {})
+            ad_group = item.get("adGroup", {})
+            campaign = item.get("campaign", {})
+            metrics = item.get("metrics", {})
+            segments = item.get("segments", {})
+            
+            record = {
+                "user_id": user_id,
+                "platform": "google",
+                "ad_account_id": customer_id,
+                "ad_id": ad.get("id"),
+                "ad_name": ad.get("name") or f"Ad {ad.get('id', '')}",
+                "adgroup_id": ad_group.get("id"),
+                "adgroup_name": ad_group.get("name"),
+                "campaign_id": campaign.get("id"),
+                "campaign_name": campaign.get("name"),
+                "date_start": segments.get("date"),
+                "date_stop": segments.get("date"),
+                "status": item.get("adGroupAd", {}).get("status"),
+                "clicks": metrics.get("clicks", "0"),
+                "impressions": metrics.get("impressions", "0"),
+                "cost_micros": metrics.get("costMicros", "0"),
+                "conversions": metrics.get("conversions", 0),
+                "last_updated": datetime.now(timezone.utc)
+            }
+            daily_records.append(record)
+        
+        if daily_records:
+            collection = db["google_daily_ad_insights"]
+            collection.delete_many({
+                "user_id": user_id,
+                "ad_account_id": customer_id,
+                "date_start": {"$gte": start_date, "$lte": end_date}
+            })
+            collection.insert_many(daily_records)
+            logger.info(f"[GoogleService] ✅ Saved {len(daily_records)} daily ad records")
+        
+        return daily_records

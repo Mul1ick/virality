@@ -26,8 +26,16 @@ class AggregationService:
             else:
                 return "meta_daily_insights"
         elif platform == "google":
-            # Google stores in generic "campaigns" collection with platform filter
-            return "campaigns"
+            # Google now has daily collections like Meta!
+            if group_by == "campaign":
+                return "google_daily_campaign_insights"
+            elif group_by == "adgroup":
+                return "google_daily_adgroup_insights"
+            elif group_by == "ad":
+                return "google_daily_ad_insights"
+            else:
+                # Default to daily campaign insights for date-based queries
+                return "google_daily_campaign_insights"
         raise HTTPException(status_code=400, detail=f"Unsupported platform: {platform}")
 
     @staticmethod
@@ -55,14 +63,17 @@ class AggregationService:
                 }
             }
         elif platform == "google":
-            # Google campaigns collection structure
-            # NOTE: Google stores as "ad_account_id" not "customer_id"
+            # Google now has daily data with date_start field!
             match_stage = {
                 "$match": {
+                    "user_id": user_id,
+                    "ad_account_id": ad_account_id,
                     "platform": platform,
-                    "ad_account_id": ad_account_id,  # Use ad_account_id for Google
+                    "date_start": {"$gte": start_date, "$lte": end_date},
                 }
             }
+        
+        logger.info(f"[Pipeline] Match stage: {match_stage}")
         pipeline.append(match_stage)
 
         # --- 2. Add Fields Stage ---
@@ -112,17 +123,20 @@ class AggregationService:
         # --- 3. Group Stage ---
         group_id = None
         if group_by == "campaign":
-            group_id = "$campaign_id" if platform == "meta" else "$id"
-        elif group_by == "adset":
-            group_id = "$adset_id"
+            group_id = "$campaign_id"
+        elif group_by == "adset" or group_by == "adgroup":
+            group_id = "$adgroup_id" if platform == "google" else "$adset_id"
         elif group_by == "ad":
             group_id = "$ad_id"
+        elif group_by == "month":
+            group_id = {
+                "year": {"$year": {"$toDate": "$date_start"}},
+                "month": {"$month": {"$toDate": "$date_start"}},
+            }
         elif group_by == "date":
-            if platform == "meta":
-                group_id = "$date_start"
-            else:
-                # Google doesn't have daily breakdown yet - group all
-                group_id = None
+            group_id = "$date_start"
+
+        logger.info(f"[Pipeline] Group by: {group_by}, Group ID: {group_id}")
 
         group_stage = {
             "$group": {
@@ -139,9 +153,26 @@ class AggregationService:
             group_stage["$group"]["totalConversions"] = {"$sum": "$numericConversions"}
 
         # Add metadata fields
-        if group_by in ["campaign", "adset", "ad"]:
-            name_field = f"{group_by}_name" if platform == "meta" else "name"
+        if group_by in ["campaign", "adset", "adgroup", "ad"]:
+            # Handle field name differences between platforms
+            if platform == "google":
+                if group_by == "campaign":
+                    name_field = "campaign_name"
+                elif group_by == "adgroup":
+                    name_field = "adgroup_name"
+                elif group_by == "ad":
+                    name_field = "ad_name"
+                else:
+                    name_field = "name"
+            else:  # meta
+                name_field = f"{group_by}_name"
+            
             group_stage["$group"][f"{group_by}Name"] = {"$first": f"${name_field}"}
+            logger.info(f"[Pipeline] Adding name field: {name_field}")
+
+        if group_by not in ["date", None]:
+            group_stage["$group"]["startDate"] = {"$min": "$date_start"}
+            group_stage["$group"]["endDate"] = {"$max": "$date_start"}
 
         pipeline.append(group_stage)
 
@@ -194,7 +225,7 @@ class AggregationService:
             sort_field = "date"
         pipeline.append({"$sort": {sort_field: 1 if group_by == "date" else -1}})
 
-        logger.info(f"[AggregationService] Built pipeline for {platform}: {pipeline}")
+        logger.info(f"[Pipeline] Final pipeline stages count: {len(pipeline)}")
         return pipeline
 
     @staticmethod
@@ -208,6 +239,8 @@ class AggregationService:
         """
         Executes the Meta Ads aggregation and returns formatted results.
         """
+        logger.info(f"[META AGG] Starting - user: {user_id}, account: {ad_account_id}, dates: {start_date} to {end_date}, group: {group_by}")
+        
         pipeline = AggregationService.build_pipeline(
             user_id=user_id,
             ad_account_id=ad_account_id,
@@ -219,13 +252,20 @@ class AggregationService:
 
         collection_name = AggregationService._get_collection_name("meta", group_by)
         collection = db[collection_name]
+        logger.info(f"[META AGG] Using collection: {collection_name}")
 
         try:
             results = list(collection.aggregate(pipeline))
-            logger.info(f"[Meta Aggregation] Fetched {len(results)} results from {collection_name}")
+            logger.info(f"[META AGG] Raw results count: {len(results)}")
+            
+            if results:
+                logger.info(f"[META AGG] Sample result (first): {results[0]}")
+            else:
+                logger.warning(f"[META AGG] No results returned!")
+            
             return {"collection": collection_name, "count": len(results), "results": results}
         except Exception as e:
-            logger.error(f"Meta aggregation error: {e}", exc_info=True)
+            logger.error(f"[META AGG] Error: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Aggregation failed: {str(e)}")
 
     @staticmethod
@@ -238,10 +278,9 @@ class AggregationService:
     ) -> Dict[str, Any]:
         """
         Executes the Google Ads aggregation and returns formatted results.
-        
-        Note: Currently aggregates total metrics since Google campaigns 
-        don't have daily breakdown stored yet.
         """
+        logger.info(f"[GOOGLE AGG] Starting - user: {user_id}, customer: {customer_id}, dates: {start_date} to {end_date}, group: {group_by}")
+        
         pipeline = AggregationService.build_pipeline(
             user_id=user_id,
             ad_account_id=customer_id,
@@ -253,11 +292,18 @@ class AggregationService:
 
         collection_name = AggregationService._get_collection_name("google", group_by)
         collection = db[collection_name]
+        logger.info(f"[GOOGLE AGG] Using collection: {collection_name}")
 
         try:
             results = list(collection.aggregate(pipeline))
-            logger.info(f"[Google Aggregation] Fetched {len(results)} results from {collection_name}")
+            logger.info(f"[GOOGLE AGG] Raw results count: {len(results)}")
+            
+            if results:
+                logger.info(f"[GOOGLE AGG] Sample result (first): {results[0]}")
+            else:
+                logger.warning(f"[GOOGLE AGG] No results returned!")
+            
             return {"collection": collection_name, "count": len(results), "results": results}
         except Exception as e:
-            logger.error(f"Google aggregation error: {e}", exc_info=True)
+            logger.error(f"[GOOGLE AGG] Error: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Aggregation failed: {str(e)}")

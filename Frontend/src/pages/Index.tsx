@@ -54,6 +54,7 @@ const Index = () => {
   // Fetch Google overview data
   const {
     aggregatedData: googleOverviewData,
+    chartData: googleChartData,
     loading: googleOverviewLoading,
     error: googleOverviewError,
   } = useGoogleOverviewData(
@@ -251,6 +252,7 @@ const Index = () => {
               isLoading={overviewLoading}
               error={overviewError}
               googleData={googleOverviewData}
+              googleChartData={googleChartData}
               googleLoading={googleOverviewLoading}
               googleError={googleOverviewError}
             />

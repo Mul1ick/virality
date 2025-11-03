@@ -20,8 +20,6 @@ import requests
 from datetime import datetime, timedelta
 
 from app.config.config import settings
-
-
 from app.utils.logger import get_logger
 from app.database.mongo_client import save_or_update_platform_connection, get_platform_connection_details
 
@@ -266,7 +264,6 @@ def list_campaigns_for_child(
     """
     url = f"{BASE_URL}/customers/{_clean_customer_id(child_customer_id)}/googleAds:search"
 
-    # ✅ f-string interpolation ensures LAST_365_DAYS / LAST_30_DAYS etc. work
     query = f"""
     SELECT
       campaign.id,
@@ -401,10 +398,6 @@ def list_ads_for_adgroup(
 def get_direct_client_accounts(access_token: str, manager_customer_id: str) -> List[Dict]:
     """
     List directly-linked, non-manager client accounts under a specific MCC.
-
-    GAQL notes:
-    - `customer_client.level=1` = direct children of the context MCC.
-    - Enums/booleans are unquoted (ENABLED, false).
     """
     logger.info(f"Fetching direct client accounts under manager: {manager_customer_id}")
     cleaned_manager_id = _clean_customer_id(manager_customer_id)
@@ -441,7 +434,7 @@ def get_direct_client_accounts(access_token: str, manager_customer_id: str) -> L
                     client_accounts.append({
                         "id": acc_id_str,
                         "name": client.get("descriptiveName", f"Client {acc_id_str}"),
-                        "isManager": False,  # We filtered manager=false
+                        "isManager": False,
                     })
             logger.info(f"Found {len(client_accounts)} direct client accounts under {manager_customer_id}.")
         else:
@@ -462,10 +455,6 @@ def get_direct_client_accounts(access_token: str, manager_customer_id: str) -> L
 def get_basic_account_info(access_token: str, resource_names: List[str]) -> List[Dict]:
     """
     Fetch basic details (ID, name, manager) for a list of customer resource names.
-
-    - Tries with the first resource name as the query context.
-    - If Google complains about INVALID_CUSTOMER_ID, the offending IDs are skipped.
-    - Returns minimal placeholders for skipped ones.
     """
     if not resource_names:
         return []
@@ -496,15 +485,14 @@ def get_basic_account_info(access_token: str, resource_names: List[str]) -> List
                         "name": c.get("descriptiveName", f"Account {cid}"),
                         "isManager": c.get("manager", False),
                     })
-                break  # success → exit loop
+                break
             elif resp.status_code == 400 and "INVALID_CUSTOMER_ID" in resp.text:
-                # Identify which ID(s) caused the issue and drop them
                 bad_ids = [r.split("/")[-1] for r in remaining if r.split("/")[-1] in resp.text]
                 for bid in bad_ids:
                     errors_seen.add(bid)
                 remaining = [r for r in remaining if r.split("/")[-1] not in bad_ids]
                 logger.warning(f"Skipping invalid customer IDs: {bad_ids}")
-                continue  # retry with the rest
+                continue
             else:
                 logger.error(f"Google Ads returned {resp.status_code}: {resp.text}")
                 break
@@ -512,7 +500,6 @@ def get_basic_account_info(access_token: str, resource_names: List[str]) -> List
             logger.exception(f"Error fetching basic info batch: {e}")
             break
 
-    # Add placeholders for skipped ones
     for bid in errors_seen:
         account_details.append({
             "id": bid,
@@ -521,6 +508,8 @@ def get_basic_account_info(access_token: str, resource_names: List[str]) -> List
         })
 
     return account_details
+
+
 def get_campaign_insights(
     access_token: str,
     customer_id: str,
@@ -530,13 +519,9 @@ def get_campaign_insights(
 ):
     """
     Fetch campaign-level performance metrics over a given date range.
-    Supports flexible date ranges and optional filtering by campaign_id.
     """
-    from datetime import datetime, timedelta
-
     url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
 
-    # 🔹 Compute start and end date
     end_date = datetime.utcnow().date()
     days_map = {"LAST_7_DAYS": 7, "LAST_30_DAYS": 30, "LAST_90_DAYS": 90, "LAST_365_DAYS": 365}
 
@@ -553,7 +538,6 @@ def get_campaign_insights(
 
     start_str, end_str = start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
 
-    # 🔹 Build query
     query = f"""
     SELECT
       campaign.id,
@@ -571,7 +555,6 @@ def get_campaign_insights(
         query += f" AND campaign.id = {_clean_customer_id(campaign_id)}"
     query += " ORDER BY segments.date DESC"
 
-    # 🔹 Execute
     payload = {"query": query}
     logger.info(f"[Google Campaign Insights] Querying {customer_id} from {start_str} to {end_str}")
 
@@ -598,6 +581,7 @@ def get_campaign_insights(
         logger.exception(f"[Google Campaign Insights] Exception: {e}")
         return []
 
+
 def get_adgroup_insights(
     access_token: str,
     customer_id: str,
@@ -607,13 +591,9 @@ def get_adgroup_insights(
 ):
     """
     Fetch ad group-level performance metrics for a given date range.
-    Supports optional campaign_id filter.
     """
-    from datetime import datetime, timedelta
-
     url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
 
-    # 🔹 Compute start and end date
     end_date = datetime.utcnow().date()
     days_map = {"LAST_7_DAYS": 7, "LAST_30_DAYS": 30, "LAST_90_DAYS": 90, "LAST_365_DAYS": 365}
     if date_range in days_map:
@@ -628,7 +608,6 @@ def get_adgroup_insights(
 
     start_str, end_str = start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
 
-    # 🔹 Build query
     query = f"""
     SELECT
       ad_group.id,
@@ -684,13 +663,9 @@ def get_ad_insights(
 ):
     """
     Fetch individual ad-level performance metrics for a given date range.
-    Supports optional ad_group_id filter.
     """
-    from datetime import datetime, timedelta
-
     url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
 
-    # 🔹 Compute start and end date
     end_date = datetime.utcnow().date()
     days_map = {"LAST_7_DAYS": 7, "LAST_30_DAYS": 30, "LAST_90_DAYS": 90, "LAST_365_DAYS": 365}
     if date_range in days_map:
@@ -705,7 +680,6 @@ def get_ad_insights(
 
     start_str, end_str = start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
 
-    # 🔹 Build query
     query = f"""
     SELECT
       ad_group_ad.ad.id,
@@ -761,16 +735,12 @@ def list_all_adgroups_for_customer(
     date_range: str = "LAST_30_DAYS",
 ) -> list[dict]:
     """
-    Fetch all ad groups (with metrics) for the given customer across the provided date range.
-    Matches the date-handling style of insight functions using BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'.
+    Fetch all ad groups with metrics for the given customer across the provided date range.
     """
-    from datetime import datetime, timedelta
-
     base_url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
     all_results = []
     page_token = None
 
-    # 🔹 Compute date range like in insights
     end_date = datetime.utcnow().date()
     days_map = {"LAST_7_DAYS": 7, "LAST_30_DAYS": 30, "LAST_90_DAYS": 90, "LAST_365_DAYS": 365}
     if date_range in days_map:
@@ -829,16 +799,12 @@ def list_all_ads_for_customer(
     date_range: str = "LAST_30_DAYS",
 ) -> list[dict]:
     """
-    Fetch all ads (with metrics) for the given customer across the provided date range.
-    Matches the date-handling style of insight functions using BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'.
+    Fetch all ads with metrics for the given customer across the provided date range.
     """
-    from datetime import datetime, timedelta
-
     base_url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
     all_results = []
     page_token = None
 
-    # 🔹 Compute date range like in insights
     end_date = datetime.utcnow().date()
     days_map = {"LAST_7_DAYS": 7, "LAST_30_DAYS": 30, "LAST_90_DAYS": 90, "LAST_365_DAYS": 365}
     if date_range in days_map:
@@ -888,3 +854,157 @@ def list_all_ads_for_customer(
             break
 
     return all_results
+
+
+# ---------------------------------------------------------------------------
+# 📊 NEW: DAILY INSIGHTS FUNCTIONS
+# ---------------------------------------------------------------------------
+
+def get_campaign_daily_insights(
+    access_token: str,
+    customer_id: str,
+    login_customer_id: str,
+    start_date: str,
+    end_date: str
+):
+    """
+    Fetch daily campaign metrics for a date range.
+    
+    Args:
+        access_token: Google Ads API access token
+        customer_id: Customer ID (e.g., "2185497931")
+        login_customer_id: Login customer ID for MCC
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+    
+    Returns:
+        Response object with daily campaign data
+    """
+    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:searchStream"
+    
+    query = f"""
+        SELECT 
+            campaign.id,
+            campaign.name,
+            campaign.status,
+            campaign.advertising_channel_type,
+            segments.date,
+            metrics.clicks,
+            metrics.impressions,
+            metrics.cost_micros,
+            metrics.conversions,
+            metrics.ctr,
+            metrics.average_cpc,
+            metrics.average_cpm
+        FROM campaign
+        WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY segments.date DESC
+    """
+    
+    payload = {"query": query}
+    
+    try:
+        logger.info(f"[Google API] Fetching daily campaign insights for {customer_id} from {start_date} to {end_date}")
+        response = requests.post(
+            url, 
+            headers=_headers(access_token, login_customer_id),
+            json=payload, 
+            timeout=30
+        )
+        logger.info(f"[Google API] Daily campaign insights response: {response.status_code}")
+        return response
+    except Exception as e:
+        logger.error(f"[Google API] Daily campaign insights error: {e}")
+        return None
+
+
+def get_adgroup_daily_insights(
+    access_token: str,
+    customer_id: str,
+    login_customer_id: str,
+    start_date: str,
+    end_date: str
+):
+    """
+    Fetch daily ad group metrics for a date range.
+    """
+    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:searchStream"
+    
+    query = f"""
+        SELECT 
+            ad_group.id,
+            ad_group.name,
+            ad_group.status,
+            campaign.id,
+            campaign.name,
+            segments.date,
+            metrics.clicks,
+            metrics.impressions,
+            metrics.cost_micros,
+            metrics.conversions
+        FROM ad_group
+        WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY segments.date DESC
+    """
+    
+    payload = {"query": query}
+    
+    try:
+        logger.info(f"[Google API] Fetching daily ad group insights for {customer_id}")
+        response = requests.post(
+            url,
+            headers=_headers(access_token, login_customer_id),
+            json=payload,
+            timeout=30
+        )
+        return response
+    except Exception as e:
+        logger.error(f"[Google API] Daily ad group insights error: {e}")
+        return None
+
+
+def get_ad_daily_insights(
+    access_token: str,
+    customer_id: str,
+    login_customer_id: str,
+    start_date: str,
+    end_date: str
+):
+    """
+    Fetch daily ad metrics for a date range.
+    """
+    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:searchStream"
+    
+    query = f"""
+        SELECT 
+            ad_group_ad.ad.id,
+            ad_group_ad.ad.name,
+            ad_group_ad.status,
+            ad_group.id,
+            ad_group.name,
+            campaign.id,
+            campaign.name,
+            segments.date,
+            metrics.clicks,
+            metrics.impressions,
+            metrics.cost_micros,
+            metrics.conversions
+        FROM ad_group_ad
+        WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY segments.date DESC
+    """
+    
+    payload = {"query": query}
+    
+    try:
+        logger.info(f"[Google API] Fetching daily ad insights for {customer_id}")
+        response = requests.post(
+            url,
+            headers=_headers(access_token, login_customer_id),
+            json=payload,
+            timeout=30
+        )
+        return response
+    except Exception as e:
+        logger.error(f"[Google API] Daily ad insights error: {e}")
+        return None
