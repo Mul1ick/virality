@@ -37,7 +37,8 @@ export const MetaCampaignsTable = ({
     return labels[dateRange] || "Last 30 days";
   };
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | undefined) => {
+    if (value === undefined || value === null || isNaN(value)) return "$0.00";
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -46,11 +47,13 @@ export const MetaCampaignsTable = ({
     }).format(value);
   };
 
-  const formatNumber = (value: number) => {
+  const formatNumber = (value: number | undefined) => {
+    if (value === undefined || value === null || isNaN(value)) return "0";
     return new Intl.NumberFormat("en-US").format(value);
   };
 
-  const formatPercentage = (value: number) => {
+  const formatPercentage = (value: number | undefined) => {
+    if (value === undefined || value === null || isNaN(value)) return "0.00%";
     return `${value.toFixed(2)}%`;
   };
 
@@ -100,6 +103,30 @@ export const MetaCampaignsTable = ({
       </Card>
     );
   }
+
+  // Calculate totals safely
+  const totalSpend = campaigns.reduce(
+    (sum, c) => sum + (c.insights?.spend || 0),
+    0
+  );
+  const totalImpressions = campaigns.reduce(
+    (sum, c) => sum + (c.insights?.impressions || 0),
+    0
+  );
+  const totalClicks = campaigns.reduce(
+    (sum, c) => sum + (c.insights?.clicks || 0),
+    0
+  );
+  const campaignsWithInsights = campaigns.filter(
+    (c) => c.insights && c.insights.ctr !== undefined
+  );
+  const avgCTR =
+    campaignsWithInsights.length > 0
+      ? campaignsWithInsights.reduce(
+          (sum, c) => sum + (c.insights?.ctr || 0),
+          0
+        ) / campaignsWithInsights.length
+      : 0;
 
   return (
     <Card className="p-6">
@@ -177,7 +204,7 @@ export const MetaCampaignsTable = ({
                       <TableCell className="text-right">
                         <span
                           className={
-                            campaign.insights.ctr >= 2
+                            (campaign.insights.ctr || 0) >= 2
                               ? "text-green-600 font-semibold"
                               : ""
                           }
@@ -210,38 +237,22 @@ export const MetaCampaignsTable = ({
           <div>
             <p className="text-xs text-muted-foreground">Total Spend</p>
             <p className="text-lg font-semibold">
-              {formatCurrency(
-                campaigns.reduce((sum, c) => sum + (c.insights?.spend || 0), 0)
-              )}
+              {formatCurrency(totalSpend)}
             </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Total Impressions</p>
             <p className="text-lg font-semibold">
-              {formatNumber(
-                campaigns.reduce(
-                  (sum, c) => sum + (c.insights?.impressions || 0),
-                  0
-                )
-              )}
+              {formatNumber(totalImpressions)}
             </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Total Clicks</p>
-            <p className="text-lg font-semibold">
-              {formatNumber(
-                campaigns.reduce((sum, c) => sum + (c.insights?.clicks || 0), 0)
-              )}
-            </p>
+            <p className="text-lg font-semibold">{formatNumber(totalClicks)}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Avg. CTR</p>
-            <p className="text-lg font-semibold">
-              {formatPercentage(
-                campaigns.reduce((sum, c) => sum + (c.insights?.ctr || 0), 0) /
-                  campaigns.filter((c) => c.insights).length || 0
-              )}
-            </p>
+            <p className="text-lg font-semibold">{formatPercentage(avgCTR)}</p>
           </div>
         </div>
       </div>
