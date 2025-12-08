@@ -17,7 +17,9 @@ from app.database.mongo_client import (
     save_daily_ad_insights,
     save_daily_campaign_insights,
     save_daily_insights,
+    save_demographics
 )
+
 from app.utils.meta_api import generate_monthly_ranges, fetch_paginated_insights
 from app.utils.logger import get_logger
 
@@ -105,7 +107,10 @@ def fetch_and_save(endpoint: str, user_id: str, ad_account_id: str, fields: str,
             save_items(collection, ad_account_id, data["data"], PLATFORM_NAME)
         return data
     except requests.exceptions.RequestException as e:
+        error_body = e.response.text if e.response is not None else "No response body"
         logger.error(f"[Meta] Failed to fetch {endpoint} for {ad_account_id}: {e}")
+        logger.error(f"[Meta] API Error Details: {error_body}")
+        
         detail = e.response.text if e.response else "Meta API request failed."
         raise HTTPException(status_code=502, detail=detail)
 
@@ -162,3 +167,91 @@ async def run_historical_fetch(user_id: str, ad_account_id: str, level: str):
             logger.info(f"Saved {count} {level} records for {ad_account_id} [{i+1}/{len(monthly_ranges)}]")
 
     logger.info(f"[Meta Historical] Done. {total_saved} total {level} records saved for {ad_account_id}.")
+
+
+async def get_demographics_data(user_id: str, ad_account_id: str, date_preset: str = "maximum"):
+    """
+    Fetches age and gender breakdown for the entire ad account.
+    """
+    # 1. Get Token
+    token_data = get_platform_connection_details(user_id, platform=PLATFORM_NAME)
+    if not token_data or "access_token" not in token_data:
+        raise HTTPException(status_code=404, detail="Meta access token missing.")
+
+    access_token = token_data["access_token"]
+    account = f"act_{ad_account_id}" if not ad_account_id.startswith("act_") else ad_account_id
+    
+    url = f"https://graph.facebook.com/{API_VERSION}/{account}/insights"
+
+    # 2. Prepare Parameters
+    # We use level='account' to get the aggregate for the whole account, 
+    # but broken down by age and gender.
+    params = {
+        "access_token": access_token,
+        "level": "account", 
+        "date_preset": date_preset,
+        "breakdowns": "age,gender", 
+        "fields": "impressions,spend,clicks,reach,actions",
+        "limit": 500
+    }
+
+    # 3. Fetch Data
+    try:
+        # We use the async fetcher you already have
+        data = await fetch_paginated_insights(url, params)
+        return data
+    except Exception as e:
+        logger.error(f"[Meta Demographics] Failed: {e}")
+        raise HTTPException(status_code=502, detail="Failed to fetch demographic data.")
+    
+async def run_historical_demographics_fetch(user_id: str, ad_account_id: str, level: str):
+    """
+    Fetches historical AGE & GENDER breakdown.
+    This runs parallel to the main sync to keep operations clean.
+    """
+    token_data = get_platform_connection_details(user_id, platform=PLATFORM_NAME)
+    if not token_data or "access_token" not in token_data:
+        return
+
+    access_token = token_data["access_token"]
+    account = f"act_{ad_account_id}" if not ad_account_id.startswith("act_") else ad_account_id
+    url = f"https://graph.facebook.com/{API_VERSION}/{account}/insights"
+
+    # Determine collection and ID field
+    if level == "campaign":
+        collection = "meta_demographics_campaign"
+        id_field = "campaign_id"
+    elif level == "adset":
+        collection = "meta_demographics_adset"
+        id_field = "adset_id"
+    else:
+        collection = "meta_demographics_ad"
+        id_field = "ad_id"
+
+    # Generate monthly ranges (same as main fetch)
+    end_date = date.today()
+    start_date = end_date - relativedelta(years=1) # Fetch 1 year of demographics (to save space)
+    monthly_ranges = generate_monthly_ranges(start_date, end_date)
+
+    params = {
+        "access_token": access_token,
+        "level": level,
+        "time_increment": "monthly", # Aggregate by month to reduce row count (daily demographics is too heavy)
+        "breakdowns": "age,gender",
+        "fields": "campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,impressions,spend,clicks,reach,actions",
+        "limit": 500,
+    }
+
+    total = 0
+    for i, (since, until) in enumerate(monthly_ranges):
+        time_range = {"since": since, "until": until}
+        current_params = {**params, "time_range": str(time_range).replace("'", '"')}
+        
+        logger.info(f"[Meta Demographics] Fetching {level} {since} -> {until}")
+        data = await fetch_paginated_insights(url, current_params)
+        
+        if data:
+            count = save_demographics(collection, data, PLATFORM_NAME, user_id, ad_account_id, id_field)
+            total += count
+
+    logger.info(f"[Meta Demographics] Finished. Saved {total} records.")

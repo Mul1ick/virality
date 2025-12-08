@@ -1,3 +1,5 @@
+import { Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,6 +12,8 @@ import {
 } from "@/components/ui/table";
 import { MetaCampaign } from "@/hooks/useMetaData";
 import { DateRange } from "react-day-picker";
+import { DemographicsModal } from "@/components/modals/DemographicsModal";
+import { useState } from "react";
 
 interface MetaCampaignsTableProps {
   campaigns: MetaCampaign[];
@@ -24,6 +28,7 @@ export const MetaCampaignsTable = ({
   dateRange = "30days",
   customRange,
 }: MetaCampaignsTableProps) => {
+  const [selectedCampaign, setSelectedCampaign] = useState<{id: string, name: string} | null>(null);
   const getDateRangeText = () => {
     if (dateRange === "custom" && customRange?.from && customRange?.to) {
       return `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`;
@@ -41,7 +46,7 @@ export const MetaCampaignsTable = ({
     if (value === undefined || value === null || isNaN(value)) return "$0.00";
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: "INR",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);
@@ -147,6 +152,7 @@ export const MetaCampaignsTable = ({
                 <TableHead className="font-semibold min-w-[200px]">
                   Campaign Name
                 </TableHead>
+                <TableHead className="w-[50px]"></TableHead>
                 <TableHead className="font-semibold">Status</TableHead>
                 <TableHead className="font-semibold">Objective</TableHead>
                 <TableHead className="font-semibold text-right">
@@ -173,6 +179,17 @@ export const MetaCampaignsTable = ({
                   className="hover:bg-muted/30 transition-colors"
                 >
                   <TableCell className="font-medium">{campaign.name}</TableCell>
+                  <TableCell>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 hover:text-primary hover:bg-primary/10"
+                    title="View Demographics"
+                    onClick={() => setSelectedCampaign({ id: campaign.id, name: campaign.name })}
+                  >
+                    <Users className="h-4 w-4" />
+                  </Button>
+                </TableCell>
                   <TableCell>
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(
@@ -256,6 +273,13 @@ export const MetaCampaignsTable = ({
           </div>
         </div>
       </div>
+      <DemographicsModal 
+        isOpen={!!selectedCampaign}
+        onClose={() => setSelectedCampaign(null)}
+        level="campaign"
+        itemId={selectedCampaign?.id || null}
+        itemName={selectedCampaign?.name || ""}
+      />
     </Card>
   );
 };

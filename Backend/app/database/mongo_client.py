@@ -266,3 +266,49 @@ def save_shopify_user_token(user_id: str, access_token: str, shop_url: str):
         logger.info(f"[DB][Shopify] Token saved for user {user_id}, shop {shop_url}")
     except Exception as e:
         logger.error(f"[DB][Shopify] save_shopify_user_token failed: {e}", exc_info=True)
+
+
+# ============================================================
+# 👥 DEMOGRAPHICS STORAGE
+# ============================================================
+def save_demographics(collection_name: str, items_data: list, platform: str, user_id: str, ad_account_id: str, id_field: str):
+    """
+    Bulk upsert demographic breakdowns.
+    Unique Key: id_field + date_start + age + gender
+    """
+    if not items_data:
+        return 0
+
+    collection = db[collection_name]
+    bulk_ops = []
+
+    for item in items_data:
+        # Create a unique filter for the specific demographic bucket
+        filter_query = {
+            id_field: item.get(id_field),
+            "date_start": item.get("date_start"),
+            "age": item.get("age"),
+            "gender": item.get("gender"),
+            "platform": platform
+        }
+        
+        update_doc = {
+            "$set": {
+                **item,
+                "user_id": user_id,
+                "ad_account_id": ad_account_id,
+                "platform": platform,
+                "last_updated": datetime.utcnow()
+            }
+        }
+        bulk_ops.append(UpdateOne(filter_query, update_doc, upsert=True))
+
+    if bulk_ops:
+        try:
+            result = collection.bulk_write(bulk_ops)
+            logger.info(f"[DB][Demographics] Saved {len(bulk_ops)} records to {collection_name}")
+            return result.upserted_count + result.modified_count
+        except Exception as e:
+            logger.error(f"[DB][Demographics] Error: {e}")
+            return 0
+    return 0

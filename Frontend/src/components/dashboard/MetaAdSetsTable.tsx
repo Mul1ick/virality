@@ -9,6 +9,10 @@ import {
 } from "@/components/ui/table";
 import { MetaAdSet } from "@/hooks/useMetaData";
 import { DateRange } from "react-day-picker";
+import { Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { DemographicsModal } from "@/components/modals/DemographicsModal";
 
 interface MetaAdSetsTableProps {
   adsets: MetaAdSet[];
@@ -23,6 +27,7 @@ export const MetaAdSetsTable = ({
   dateRange = "30days",
   customRange,
 }: MetaAdSetsTableProps) => {
+  const [selectedAdSet, setSelectedAdSet] = useState<{id: string, name: string} | null>(null);
   const getDateRangeText = () => {
     if (dateRange === "custom" && customRange?.from && customRange?.to) {
       return `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`;
@@ -113,6 +118,7 @@ export const MetaAdSetsTable = ({
                 <TableHead className="font-semibold min-w-[200px]">
                   Ad Set Name
                 </TableHead>
+                <TableHead className="w-[50px]"></TableHead>
                 <TableHead className="font-semibold">Status</TableHead>
                 <TableHead className="font-semibold text-right">
                   Daily Budget
@@ -141,6 +147,17 @@ export const MetaAdSetsTable = ({
                   className="hover:bg-muted/30 transition-colors"
                 >
                   <TableCell className="font-medium">{adset.name}</TableCell>
+                  <TableCell>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 hover:text-primary hover:bg-primary/10"
+                        title="View Demographics"
+                        onClick={() => setSelectedAdSet({ id: adset.id, name: adset.name })}
+                      >
+                        <Users className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   <TableCell>
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(
@@ -239,6 +256,13 @@ export const MetaAdSetsTable = ({
           </div>
         </div>
       </div>
+      <DemographicsModal 
+        isOpen={!!selectedAdSet}
+        onClose={() => setSelectedAdSet(null)}
+        level="adset" // <-- Important: set level to adset
+        itemId={selectedAdSet?.id || null}
+        itemName={selectedAdSet?.name || ""}
+      />
     </Card>
   );
 };

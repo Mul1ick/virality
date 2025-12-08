@@ -8,9 +8,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Image, Video, FileText } from "lucide-react";
+import { Image, Video, FileText, Users } from "lucide-react"; // 1. Import Users
 import { MetaAd } from "@/hooks/useMetaData";
 import { DateRange } from "react-day-picker";
+import { Button } from "@/components/ui/button"; // 1. Import Button
+import { useState } from "react"; // 1. Import useState
+import { DemographicsModal } from "@/components/modals/DemographicsModal"; // 1. Import Modal
 
 interface MetaAdsTableProps {
   ads: MetaAd[];
@@ -25,6 +28,7 @@ export const MetaAdsTable = ({
   dateRange = "30days",
   customRange,
 }: MetaAdsTableProps) => {
+  const [selectedAd, setSelectedAd] = useState<{id: string, name: string} | null>(null);
   const getDateRangeText = () => {
     if (dateRange === "custom" && customRange?.from && customRange?.to) {
       return `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`;
@@ -128,6 +132,7 @@ export const MetaAdsTable = ({
                 <TableHead className="font-semibold min-w-[200px]">
                   Ad Name
                 </TableHead>
+                <TableHead className="w-[50px]"></TableHead>
                 <TableHead className="font-semibold">Creative</TableHead>
                 <TableHead className="font-semibold min-w-[250px]">
                   Ad Body
@@ -158,6 +163,17 @@ export const MetaAdsTable = ({
                     className="hover:bg-muted/30 transition-colors"
                   >
                     <TableCell className="font-medium">{ad.name}</TableCell>
+                    <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 hover:text-primary hover:bg-primary/10"
+                          title="View Demographics"
+                          onClick={() => setSelectedAd({ id: ad.id, name: ad.name })}
+                        >
+                          <Users className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <CreativeIcon className="h-4 w-4 text-muted-foreground" />
@@ -269,6 +285,14 @@ export const MetaAdsTable = ({
           </div>
         </div>
       </div>
+      <DemographicsModal 
+        isOpen={!!selectedAd}
+        onClose={() => setSelectedAd(null)}
+        level="ad" // <-- Important: set level to ad
+        itemId={selectedAd?.id || null}
+        itemName={selectedAd?.name || ""}
+      />
     </Card>
+    
   );
 };
