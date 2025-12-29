@@ -228,3 +228,4 @@ node_modules
 
 Backend/dash/
 Frontend/node_modules/
+Frontend/.vite/
