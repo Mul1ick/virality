@@ -1,19 +1,20 @@
 // FILE: Frontend/src/components/auth/ProtectedRoute.tsx
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
-const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
-  // Check if the user has a token
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
+
+const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const token = localStorage.getItem("access_token");
-  const location = useLocation();
+  const userId = localStorage.getItem("user_id");
 
-  if (!token) {
-    // If not logged in, redirect to /signin
-    // "state={{ from: location }}" allows you to redirect them back after they login
-    return <Navigate to="/signin" state={{ from: location }} replace />;
+  // If no token or userId, redirect to signup (landing page)
+  if (!token || !userId) {
+    return <Navigate to="/" replace />;
   }
 
-  // If logged in, render the protected component (Dashboard)
-  return children;
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;

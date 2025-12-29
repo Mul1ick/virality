@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ChatBotWrapper } from "@/components/chatbot/ChatBotWrapper";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -16,7 +16,7 @@ import SelectGoogleAccount from "./pages/SelectGoogleAccount";
 import SelectShopifyAccount from "@/pages/SelectShopifyAccount";
 import Admin from "./pages/Admin";
 import AdminRoute from "./components/auth/AdminRoute";
-import ProtectedRoute from "./components/auth/ProtectedRoute"; // <--- 1. Import this
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -27,33 +27,59 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          {/* 2. Wrap the Index route with ProtectedRoute */}
-          <Route 
-            path="/" 
+          {/* Landing page - SignUp for new users */}
+          <Route path="/" element={<SignUp />} />
+
+          {/* Dashboard - Protected */}
+          <Route
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <Index />
               </ProtectedRoute>
-            } 
+            }
           />
-          
+
+          {/* Auth routes */}
           <Route path="/signup" element={<SignUp />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/verify-otp" element={<VerifyOTP />} />
-          
-          {/* You should probably protect these routes too */}
-          <Route 
-            path="/profile" 
+
+          {/* Protected routes */}
+          <Route
+            path="/profile"
             element={
               <ProtectedRoute>
                 <Profile />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route path="/select-meta-account" element={<ProtectedRoute><SelectMetaAccount /></ProtectedRoute>} />
-          <Route path="/select-google-account" element={<ProtectedRoute><SelectGoogleAccount /></ProtectedRoute>} />
-          <Route path="/select-shopify" element={<ProtectedRoute><SelectShopifyAccount /></ProtectedRoute>} />
+          <Route
+            path="/select-meta-account"
+            element={
+              <ProtectedRoute>
+                <SelectMetaAccount />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/select-google-account"
+            element={
+              <ProtectedRoute>
+                <SelectGoogleAccount />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/select-shopify"
+            element={
+              <ProtectedRoute>
+                <SelectShopifyAccount />
+              </ProtectedRoute>
+            }
+          />
 
+          {/* Admin route */}
           <Route
             path="/admin"
             element={
@@ -63,6 +89,7 @@ const App = () => (
             }
           />
 
+          {/* 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
 

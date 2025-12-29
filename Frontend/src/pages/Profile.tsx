@@ -508,15 +508,15 @@ const Profile = () => {
   const handleGoToDashboard = () => {
     const userId = localStorage.getItem("user_id");
     if (userId) {
-      navigate(`/?user_id=${userId}`);
+      navigate(`/dashboard?user_id=${userId}`);
     } else {
-      navigate("/");
+      navigate("/dashboard");
     }
   };
 
   const handleSignOut = () => {
     localStorage.clear();
-    navigate("/signin");
+    navigate("/");
   };
 
   const hasAnyConnection = Object.values(connectedAccounts).some((v) => v);

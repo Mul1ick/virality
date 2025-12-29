@@ -103,7 +103,7 @@ function VerifyOTP() {
       localStorage.setItem("user_id", response.data.user_id);
       localStorage.setItem("isAdmin", response.data.isAdmin ? "true" : "false");
 
-      navigate("/profile");
+      navigate("/dashboard");
     } catch (err) {
       console.error("OTP verification error:", err);
       setError(err.response?.data?.detail || "Invalid OTP. Please try again.");
