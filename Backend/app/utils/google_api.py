@@ -880,7 +880,7 @@ def get_campaign_daily_insights(
     Returns:
         Response object with daily campaign data
     """
-    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:searchStream"
+    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
     
     query = f"""
         SELECT 
@@ -928,7 +928,7 @@ def get_adgroup_daily_insights(
     """
     Fetch daily ad group metrics for a date range.
     """
-    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:searchStream"
+    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
     
     query = f"""
         SELECT 
@@ -973,7 +973,7 @@ def get_ad_daily_insights(
     """
     Fetch daily ad metrics for a date range.
     """
-    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:searchStream"
+    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
     
     query = f"""
         SELECT 

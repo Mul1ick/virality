@@ -1,30 +1,25 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  TrendingUp,
-  Facebook,
-  Search,
-  ShoppingCart,
-  Loader2,
-  X,
-} from "lucide-react";
+// FILE: Frontend/src/pages/Index.tsx
 import { useState, useEffect } from "react";
 import { DateRange } from "react-day-picker";
+import { Loader2, X, AlertCircle } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { NotificationBanner } from "@/components/dashboard/NotificationBanner";
+import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { OverviewTab } from "@/components/dashboard/tabs/OverviewTab";
 import { MetaTab } from "@/components/dashboard/tabs/MetaTab";
 import { GoogleTab } from "@/components/dashboard/tabs/GoogleTab";
 import { ShopifyTab } from "@/components/dashboard/tabs/ShopifyTab";
 import { usePlatformStatus } from "@/hooks/usePlatformStatus";
-import { useShopifyData } from "@/hooks/useShopifyData";
+// import { useShopifyOverviewData } from "@/hooks/useShopifyOverviewData"; // COMMENTED OUT - Coming Soon
 import { useOverviewData } from "@/hooks/useOverviewData";
 import { useGoogleOverviewData } from "@/hooks/useGoogleOverviewData";
+import { Card } from "@/components/ui/card";
 
 const Index = () => {
   const [dateRange, setDateRange] = useState("30days");
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showHistoricalBanner, setShowHistoricalBanner] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [activeSubTab, setActiveSubTab] = useState("meta");
 
   // Get userId from URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -68,101 +63,46 @@ const Index = () => {
     customRange
   );
 
-  // Fetch Shopify data
+  /* SHOPIFY DATA FETCHING - COMMENTED OUT FOR NOW
+  // Fetch Shopify overview data
   const {
-    orders: shopifyOrders,
-    products: shopifyProducts,
-    customers: shopifyCustomers,
-    loading: shopifyLoading,
-    error: shopifyError,
-    refreshAll: refreshShopify,
-  } = useShopifyData(
+    chartData: shopifyChartData,
+    loading: shopifyOverviewLoading,
+    error: shopifyOverviewError,
+  } = useShopifyOverviewData(
     userId,
     platformStatus.shopify.connected,
-    !platformsLoading
+    !platformsLoading,
+    dateRange,
+    customRange
   );
 
-  // Notification state
-  const [notifications, setNotifications] = useState({
-    loading: {
-      platforms: false,
-      shopify: false,
-    },
-    error: {
-      platforms: null as string | null,
-      shopify: null as string | null,
-    },
-    success: {
-      shopify: false,
-    },
-  });
+  // Calculate Shopify aggregated data from chartData
+  const shopifyOverviewData = shopifyChartData.reduce(
+    (acc, day) => ({
+      totalRevenue: acc.totalRevenue + day.totalRevenue,
+      orderCount: acc.orderCount + day.orderCount,
+      avgOrderValue: 0,
+    }),
+    { totalRevenue: 0, orderCount: 0, avgOrderValue: 0 }
+  );
 
-  // Update notifications based on hook states
-  useEffect(() => {
-    const anyShopifyLoading =
-      shopifyLoading.orders ||
-      shopifyLoading.products ||
-      shopifyLoading.customers;
-    const anyShopifyError =
-      shopifyError.orders || shopifyError.products || shopifyError.customers;
+  // Recalculate average order value
+  shopifyOverviewData.avgOrderValue =
+    shopifyOverviewData.orderCount > 0
+      ? shopifyOverviewData.totalRevenue / shopifyOverviewData.orderCount
+      : 0;
+  */
 
-    setNotifications({
-      loading: {
-        platforms: platformsLoading,
-        shopify: anyShopifyLoading,
-      },
-      error: {
-        platforms: platformsError,
-        shopify: anyShopifyError,
-      },
-      success: {
-        shopify:
-          !anyShopifyLoading &&
-          !anyShopifyError &&
-          shopifyOrders.length > 0 &&
-          platformStatus.shopify.connected,
-      },
-    });
-  }, [
-    platformsLoading,
-    platformsError,
-    shopifyLoading.orders,
-    shopifyLoading.products,
-    shopifyLoading.customers,
-    shopifyError.orders,
-    shopifyError.products,
-    shopifyError.customers,
-    shopifyOrders.length,
-    platformStatus.shopify.connected,
-  ]);
-
-  // Auto-hide notifications after 3 seconds
-  useEffect(() => {
-    const hasAnyNotification =
-      Object.values(notifications.loading).some((v) => v) ||
-      Object.values(notifications.error).some((v) => v) ||
-      Object.values(notifications.success).some((v) => v);
-
-    if (hasAnyNotification) {
-      const timer = setTimeout(() => {
-        setNotifications((prev) => ({
-          loading: {
-            platforms: false,
-            shopify: false,
-          },
-          error: {
-            platforms: null,
-            shopify: null,
-          },
-          success: {
-            shopify: false,
-          },
-        }));
-      }, 3000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [notifications]);
+  // TEMPORARY: Mock empty Shopify data
+  const shopifyChartData: any[] = [];
+  const shopifyOverviewLoading = false;
+  const shopifyOverviewError = null;
+  const shopifyOverviewData = {
+    totalRevenue: 0,
+    orderCount: 0,
+    avgOrderValue: 0,
+  };
 
   // Handle date range change
   const handleDateRangeChange = (value: string) => {
@@ -177,8 +117,75 @@ const Index = () => {
     setCustomRange(range);
   };
 
+  // Render active tab content
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "overview":
+        return (
+          <OverviewTab
+            dateRange={dateRange}
+            customRange={customRange}
+            chartData={overviewChartData}
+            isLoading={overviewLoading}
+            error={overviewError}
+            activeSubTab={activeSubTab}
+            onSubTabChange={setActiveSubTab}
+            googleData={googleOverviewData}
+            googleChartData={googleChartData}
+            googleLoading={googleOverviewLoading}
+            googleError={googleOverviewError}
+            shopifyData={shopifyOverviewData}
+            shopifyChartData={shopifyChartData}
+            shopifyLoading={shopifyOverviewLoading}
+            shopifyError={shopifyOverviewError}
+          />
+        );
+
+      case "meta":
+        return (
+          <MetaTab
+            userId={userId}
+            adAccountId={platformStatus.meta.ad_account_id}
+            isConnected={platformStatus.meta.connected}
+            platformsLoaded={!platformsLoading}
+          />
+        );
+
+      case "google":
+        return (
+          <GoogleTab
+            userId={userId}
+            managerId={
+              platformStatus.google.selected_manager_id ||
+              platformStatus.google.manager_id
+            }
+            customerId={platformStatus.google.client_customer_id}
+            isConnected={platformStatus.google.connected}
+            platformsLoaded={!platformsLoading}
+          />
+        );
+
+      case "shopify":
+        return (
+          <ShopifyTab
+            userId={userId}
+            isConnected={platformStatus.shopify.connected}
+            platformsLoaded={!platformsLoading}
+          />
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Dark gradient background overlay */}
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 -z-10"></div>
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent -z-10"></div>
+
+      {/* Header */}
       <DashboardHeader
         dateRange={dateRange}
         onDateRangeChange={handleDateRangeChange}
@@ -186,117 +193,74 @@ const Index = () => {
         onCustomRangeChange={handleCustomRangeChange}
       />
 
-      <main className="container mx-auto px-6 py-4">
-        <NotificationBanner
-          loading={notifications.loading}
-          error={notifications.error}
-          success={notifications.success}
-          counts={{
-            metaCampaigns: 0,
-            metaAdSets: 0,
-            metaAds: 0,
-            googleCampaigns: 0,
-            shopifyOrders: shopifyOrders.length,
-          }}
-        />
+      {/* Main Layout with Sidebar */}
+      <div className="flex h-[calc(100vh-73px)]">
+        {/* Sidebar - Fixed position with high z-index */}
+        <div className="fixed left-0 top-[73px] h-[calc(100vh-73px)] z-40">
+          <DashboardSidebar
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            activeSubTab={activeSubTab}
+            onSubTabChange={setActiveSubTab}
+          />
+        </div>
 
-        {showHistoricalBanner &&
-          platformStatus.meta.connected &&
-          platformStatus.meta.ad_account_id && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 relative">
-              <button
-                onClick={() => setShowHistoricalBanner(false)}
-                className="absolute top-3 right-3 text-blue-600 hover:text-blue-900 transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <div className="flex items-center gap-3 pr-8">
-                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                <div>
-                  <p className="font-semibold text-blue-900">
-                    Loading Historical Data
-                  </p>
-                  <p className="text-sm text-blue-700">
-                    Fetching 2.5 years of data in the background. This may take
-                    5-15 minutes. You can use the dashboard normally while this
-                    completes.
-                  </p>
+        {/* Main Content - With left margin to account for sidebar */}
+        <main className="flex-1 ml-64 overflow-x-hidden">
+          <div className="container mx-auto px-6 py-6 max-w-[calc(100vw-16rem)]">
+            {/* Platform Error Banner */}
+            {platformsError && (
+              <Card className="bg-destructive/10 border-destructive/50 backdrop-blur-sm p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+                  <div>
+                    <p className="text-destructive font-semibold">
+                      Error loading platforms
+                    </p>
+                    <p className="text-destructive/80 text-sm mt-1">
+                      {platformsError}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
+              </Card>
+            )}
 
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="overview" className="gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="meta" className="gap-2">
-              <Facebook className="h-4 w-4" />
-              Meta
-            </TabsTrigger>
-            <TabsTrigger value="google" className="gap-2">
-              <Search className="h-4 w-4" />
-              Google
-            </TabsTrigger>
-            <TabsTrigger value="shopify" className="gap-2">
-              <ShoppingCart className="h-4 w-4" />
-              Shopify
-            </TabsTrigger>
-          </TabsList>
+            {/* Historical Data Loading Banner */}
+            {showHistoricalBanner &&
+              platformStatus.meta.connected &&
+              platformStatus.meta.ad_account_id && (
+                <Card className="bg-primary/10 border-primary/30 backdrop-blur-sm p-4 mb-6 relative overflow-hidden">
+                  {/* Animated gradient background */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 animate-pulse"></div>
 
-          <TabsContent value="overview">
-            <OverviewTab
-              dateRange={dateRange}
-              customRange={customRange}
-              chartData={overviewChartData}
-              isLoading={overviewLoading}
-              error={overviewError}
-              googleData={googleOverviewData}
-              googleChartData={googleChartData}
-              googleLoading={googleOverviewLoading}
-              googleError={googleOverviewError}
-            />
-          </TabsContent>
+                  <button
+                    onClick={() => setShowHistoricalBanner(false)}
+                    className="absolute top-3 right-3 text-primary hover:text-primary/70 transition-colors z-10"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
 
-          <TabsContent value="meta">
-            <MetaTab
-              userId={userId}
-              adAccountId={platformStatus.meta.ad_account_id}
-              isConnected={platformStatus.meta.connected}
-              platformsLoaded={!platformsLoading}
-            />
-          </TabsContent>
+                  <div className="flex items-center gap-3 pr-8 relative z-10">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        Loading Historical Data
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Fetching 2.5 years of data in the background. This may
+                        take 5-15 minutes. You can use the dashboard normally
+                        while this completes.
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              )}
 
-          <TabsContent value="google">
-            <GoogleTab
-              userId={userId}
-              managerId={
-                platformStatus.google.selected_manager_id ||
-                platformStatus.google.manager_id
-              }
-              customerId={platformStatus.google.client_customer_id}
-              isConnected={platformStatus.google.connected}
-              platformsLoaded={!platformsLoading}
-            />
-          </TabsContent>
-
-          <TabsContent value="shopify">
-            <ShopifyTab
-              orders={shopifyOrders}
-              products={shopifyProducts}
-              customers={shopifyCustomers}
-              isConnected={platformStatus.shopify.connected}
-              loading={shopifyLoading}
-              isRefreshing={isRefreshing}
-              onRefresh={refreshShopify}
-              dateRange={dateRange}
-              customRange={customRange}
-            />
-          </TabsContent>
-        </Tabs>
-      </main>
+            {/* Tab Content */}
+            {renderTabContent()}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

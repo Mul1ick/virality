@@ -32,7 +32,7 @@ export const GoogleTab = ({
   isConnected,
   platformsLoaded,
 }: GoogleTabProps) => {
-  const [dateRange, setDateRange] = useState("30days");
+  const [dateRange, setDateRange] = useState("90days"); // ✅ Changed from "30days" to "90days"
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -68,7 +68,7 @@ export const GoogleTab = ({
       "30days": "Last 30 Days",
       "90days": "Last 90 Days",
     };
-    return labels[dateRange] || "Last 30 Days";
+    return labels[dateRange] || "Last 90 Days"; // ✅ Changed default from "Last 30 Days"
   };
 
   const handleDateRangeChange = (value: string) => {

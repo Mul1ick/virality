@@ -1,3 +1,4 @@
+// FILE: Frontend/src/components/dashboard/tabs/MetaTab.tsx
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +12,7 @@ import { MetaCampaignsTable } from "@/components/dashboard/MetaCampaignsTable";
 import { MetaAdSetsTable } from "@/components/dashboard/MetaAdSetsTable";
 import { MetaAdsTable } from "@/components/dashboard/MetaAdsTable";
 import { Facebook, RefreshCw, Calendar } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { DateRange } from "react-day-picker";
 import { DatePickerWithRange } from "@/components/ui/date-picker-with-range";
 import { useMetaData } from "@/hooks/useMetaData";
@@ -99,12 +100,17 @@ export const MetaTab = ({
   };
 
   return (
-    <div className="bg-card rounded-lg border p-6">
+    <div className="bg-card/50 backdrop-blur-sm rounded-lg border border-slate-700/50 p-6">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Facebook className="h-6 w-6 text-blue-600" />
+          <div className="p-2 bg-blue-500/10 rounded-lg">
+            <Facebook className="h-6 w-6 text-blue-400" />
+          </div>
           <div>
-            <h2 className="text-2xl font-bold">Meta Campaigns & Ads</h2>
+            <h2 className="text-2xl font-bold text-foreground">
+              Meta Campaigns & Ads
+            </h2>
             <p className="text-sm text-muted-foreground">
               {getDateRangeText()}
             </p>
@@ -112,12 +118,13 @@ export const MetaTab = ({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Date Range Selector */}
           <Select value={dateRange} onValueChange={handleDateRangeChange}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-[160px] border-slate-700/50 bg-slate-800/50">
               <Calendar className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Select range" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="border-slate-700/50 bg-slate-800">
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="7days">Last 7 Days</SelectItem>
               <SelectItem value="30days">Last 30 Days</SelectItem>
@@ -126,11 +133,13 @@ export const MetaTab = ({
             </SelectContent>
           </Select>
 
+          {/* Refresh Button */}
           <Button
             onClick={handleRefresh}
             disabled={isRefreshing || !isConnected}
             variant="outline"
             size="sm"
+            className="border-slate-700/50 bg-slate-800/50 hover:bg-slate-800"
           >
             <RefreshCw
               className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
@@ -140,11 +149,12 @@ export const MetaTab = ({
         </div>
       </div>
 
+      {/* Custom Date Picker */}
       {showCustomPicker && (
-        <div className="mb-6 p-4 bg-muted rounded-lg border">
+        <div className="mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1">
-              <p className="text-sm font-medium mb-2">
+              <p className="text-sm font-medium mb-2 text-foreground">
                 Select Custom Date Range
               </p>
               <DatePickerWithRange
@@ -156,6 +166,7 @@ export const MetaTab = ({
               <Button
                 variant="outline"
                 size="sm"
+                className="border-slate-700/50"
                 onClick={() => {
                   setShowCustomPicker(false);
                   setDateRange("30days");
@@ -176,6 +187,7 @@ export const MetaTab = ({
         </div>
       )}
 
+      {/* Loading State */}
       {(loading.campaigns || loading.adSets || loading.ads) && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
@@ -183,25 +195,38 @@ export const MetaTab = ({
         </div>
       )}
 
+      {/* Error State */}
       {(error.campaigns || error.adSets || error.ads) && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800 font-semibold">Error loading Meta data</p>
-          <p className="text-red-600 text-sm">
+        <div className="bg-destructive/10 border border-destructive/50 backdrop-blur-sm rounded-lg p-4 mb-6">
+          <p className="text-destructive font-semibold">
+            Error loading Meta data
+          </p>
+          <p className="text-destructive/80 text-sm mt-1">
             {error.campaigns || error.adSets || error.ads}
           </p>
         </div>
       )}
 
+      {/* Data Tabs */}
       {hasData ? (
         <Tabs defaultValue="campaigns" className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="campaigns">
+          <TabsList className="mb-6 bg-slate-800/50 border border-slate-700/50">
+            <TabsTrigger
+              value="campaigns"
+              className="data-[state=active]:bg-slate-700/50 data-[state=active]:text-foreground"
+            >
               Campaigns {campaigns.length > 0 && `(${campaigns.length})`}
             </TabsTrigger>
-            <TabsTrigger value="adsets">
+            <TabsTrigger
+              value="adsets"
+              className="data-[state=active]:bg-slate-700/50 data-[state=active]:text-foreground"
+            >
               Ad Sets {adSets.length > 0 && `(${adSets.length})`}
             </TabsTrigger>
-            <TabsTrigger value="ads">
+            <TabsTrigger
+              value="ads"
+              className="data-[state=active]:bg-slate-700/50 data-[state=active]:text-foreground"
+            >
               Ads {ads.length > 0 && `(${ads.length})`}
             </TabsTrigger>
           </TabsList>
@@ -239,11 +264,13 @@ export const MetaTab = ({
         !error.campaigns &&
         !error.adSets &&
         !error.ads ? (
-        <p className="text-muted-foreground text-center py-8">
-          {isConnected
-            ? "No Meta data available. Try refreshing or check your ad account."
-            : "Meta not connected. Connect your Meta account in the Profile page."}
-        </p>
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">
+            {isConnected
+              ? "No Meta data available. Try refreshing or check your ad account."
+              : "Meta not connected. Connect your Meta account in the Profile page."}
+          </p>
+        </div>
       ) : null}
     </div>
   );

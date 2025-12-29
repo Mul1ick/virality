@@ -225,9 +225,9 @@ export const useGoogleOverviewData = (
       return;
     }
 
-    // Check if we have any data in MongoDB
+    // ✅ FIX: Check for data using 90 days (same range as sync)
     try {
-      const testParams = getDatesFromPreset("30days");
+      const testParams = getDatesFromPreset("90days"); // ✅ Changed from 30days to 90days
       const testFetch = await apiClient.post(`/aggregate/google`, {
         ad_account_id: customerId,
         start_date: testParams.start_date,

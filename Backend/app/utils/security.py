@@ -1,5 +1,6 @@
 # FILE: app/utils/security.py
 
+from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pymongo import MongoClient
@@ -37,7 +38,7 @@ HOURLY_LIMIT = 50
 # --------------------------------------------------------------------
 # 🔑 JWT Helpers
 # --------------------------------------------------------------------
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Creates an access token with default 24-hour expiry."""
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))

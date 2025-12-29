@@ -1,8 +1,7 @@
-
 """
 Shopify Controller
 ------------------
-Complete OAuth flow matching Meta/Google patterns
+Complete OAuth flow with paginated data endpoints
 """
 
 from fastapi import APIRouter, Query, HTTPException, Request, Depends
@@ -29,9 +28,7 @@ def shopify_login(
     shop: str = Query(..., description="The merchant's shop domain"),
     current_user_id: str = Depends(get_current_user_id)
 ):
-    """
-    Begin Shopify OAuth installation flow WITH user authentication.
-    """
+    """Begin Shopify OAuth installation flow WITH user authentication."""
     if not shop:
         raise HTTPException(status_code=400, detail="Missing 'shop' parameter")
 
@@ -65,9 +62,7 @@ def shopify_callback(
     timestamp: str,
     state: str
 ):
-    """
-    Handle Shopify OAuth callback and redirect to shop selection.
-    """
+    """Handle Shopify OAuth callback and redirect to shop selection."""
     logger.info(f"[Shopify Callback] Received callback for {shop}")
 
     # Verify state and extract user_id
@@ -89,7 +84,7 @@ def shopify_callback(
     # Exchange code for access token
     access_token = shopify_service.exchange_code_for_token(shop, code)
 
-    # 🔥 SAVE WITH SCOPES - This ensures permissions are tracked
+    # Save connection with scopes
     save_or_update_platform_connection(
         user_id=user_id,
         platform="shopify",
@@ -97,7 +92,7 @@ def shopify_callback(
             "access_token": access_token,
             "shop_url": shop,
             "connected": True,
-            "scopes": SCOPES,  # 🔥 ADD THIS LINE
+            "scopes": SCOPES,
         }
     )
 
@@ -107,8 +102,9 @@ def shopify_callback(
         url=f"http://localhost:8080/select-shopify?user_id={user_id}"
     )
 
+
 # ---------------------------------------------------------------------------
-# 🏪 Shop Confirmation
+# 🪙 Shop Confirmation
 # ---------------------------------------------------------------------------
 class ShopConfirmation(BaseModel):
     shop_url: str
@@ -119,10 +115,7 @@ def confirm_shop(
     confirmation: ShopConfirmation,
     user_id: str = Depends(get_current_user_id)
 ):
-    """
-    User confirms the Shopify shop selection.
-    """
-    # Update connection as confirmed
+    """User confirms the Shopify shop selection."""
     save_or_update_platform_connection(
         user_id=user_id,
         platform="shopify",
@@ -139,102 +132,152 @@ def confirm_shop(
     }
 
 
-# --------------------------- Data Endpoints --------------------------- #
+# ---------------------------------------------------------------------------
+# 📊 Data Endpoints (Paginated)
+# ---------------------------------------------------------------------------
 
 @router.get("/orders/{user_id}")
 def fetch_orders(
     user_id: str,
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(50, ge=1, le=250, description="Items per page"),
     start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     current_user_id: str = Depends(get_current_user_id)
 ):
-    """Fetch Shopify orders (supports historical pull)"""
+    """
+    Fetch Shopify orders with pagination.
+    Returns cached data from MongoDB.
+    """
     if user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    details = shopify_service.get_connection_or_403(user_id, current_user_id)
-    result = shopify_service.fetch_and_save(
-        "orders",
-        user_id,
-        shopify_service.get_all_orders,
-        details["shop_url"],
-        details["access_token"],
+    return shopify_service.fetch_and_save_paginated(
+        resource_type="orders",
+        user_id=user_id,
+        page=page,
+        limit=limit,
         start_date=start_date,
         end_date=end_date,
     )
-
-    return {
-        "data": result.get("data", []),
-        "count": result.get("count", 0),
-        "user_id": user_id,
-        "start_date": start_date,
-        "end_date": end_date,
-    }
-
 
 
 @router.get("/products/{user_id}")
 def fetch_products(
     user_id: str,
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(50, ge=1, le=250, description="Items per page"),
     start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     current_user_id: str = Depends(get_current_user_id)
 ):
-    """Fetch Shopify products (supports historical pull)."""
+    """
+    Fetch Shopify products with pagination.
+    Returns cached data from MongoDB.
+    """
     if user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    details = shopify_service.get_connection_or_403(user_id, current_user_id)
-    result = shopify_service.fetch_and_save(
-        "products",
-        user_id,
-        shopify_service.get_all_products,
-        details["shop_url"],
-        details["access_token"],
+    return shopify_service.fetch_and_save_paginated(
+        resource_type="products",
+        user_id=user_id,
+        page=page,
+        limit=limit,
         start_date=start_date,
         end_date=end_date,
     )
-
-    return {
-        "data": result.get("data", []),
-        "count": result.get("count", 0),
-        "user_id": user_id,
-        "start_date": start_date,
-        "end_date": end_date,
-    }
 
 
 @router.get("/customers/{user_id}")
 def fetch_customers(
     user_id: str,
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(50, ge=1, le=250, description="Items per page"),
     start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     current_user_id: str = Depends(get_current_user_id)
 ):
-    """Fetch Shopify customers (supports historical pull)."""
+    """
+    Fetch Shopify customers with pagination.
+    Returns cached data from MongoDB.
+    """
     if user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    details = shopify_service.get_connection_or_403(user_id, current_user_id)
-    result = shopify_service.fetch_and_save(
-        "customers",
-        user_id,
-        shopify_service.get_all_customers,
-        details["shop_url"],
-        details["access_token"],
+    return shopify_service.fetch_and_save_paginated(
+        resource_type="customers",
+        user_id=user_id,
+        page=page,
+        limit=limit,
         start_date=start_date,
         end_date=end_date,
     )
 
-    return {
-        "data": result.get("data", []),
-        "count": result.get("count", 0),
-        "user_id": user_id,
-        "start_date": start_date,
-        "end_date": end_date,
-    }
+
+# ---------------------------------------------------------------------------
+# 🔄 Sync Endpoint (Initial/Full Refresh)
+# ---------------------------------------------------------------------------
+
+@router.post("/sync/{user_id}")
+def sync_shopify_data(
+    user_id: str,
+    start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    current_user_id: str = Depends(get_current_user_id)
+):
+    """
+    Sync ALL Shopify data from API and save to MongoDB.
+    Use this for initial sync or full refresh.
+    This may take 60-120s for large stores!
+    """
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    details = shopify_service.get_connection_or_403(user_id, current_user_id)
     
-    
+    try:
+        # Fetch all data from Shopify API
+        orders_result = shopify_service.fetch_and_save(
+            "orders",
+            user_id,
+            shopify_service.get_all_orders,
+            details["shop_url"],
+            details["access_token"],
+            start_date=start_date,
+            end_date=end_date,
+        )
+        
+        products_result = shopify_service.fetch_and_save(
+            "products",
+            user_id,
+            shopify_service.get_all_products,
+            details["shop_url"],
+            details["access_token"],
+            start_date=start_date,
+            end_date=end_date,
+        )
+        
+        customers_result = shopify_service.fetch_and_save(
+            "customers",
+            user_id,
+            shopify_service.get_all_customers,
+            details["shop_url"],
+            details["access_token"],
+            start_date=start_date,
+            end_date=end_date,
+        )
+        
+        return {
+            "message": "Shopify data synced successfully",
+            "orders_synced": orders_result["count"],
+            "products_synced": products_result["count"],
+            "customers_synced": customers_result["count"],
+        }
+    except Exception as e:
+        logger.error(f"[Shopify Sync] Failed: {e}")
+        raise HTTPException(status_code=500, detail="Sync failed")
+
+
 @router.get("/collections/{user_id}")
 def fetch_collections(
     user_id: str,
@@ -242,7 +285,7 @@ def fetch_collections(
     end_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     current_user_id: str = Depends(get_current_user_id)
 ):
-    """Fetch Shopify collections (supports historical pull)."""
+    """Fetch Shopify collections."""
     if user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -261,8 +304,6 @@ def fetch_collections(
         "data": result.get("data", []),
         "count": result.get("count", 0),
         "user_id": user_id,
-        "start_date": start_date,
-        "end_date": end_date,
     }
 
 
@@ -273,7 +314,7 @@ def fetch_inventory_levels(
     end_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     current_user_id: str = Depends(get_current_user_id)
 ):
-    """Fetch Shopify inventory levels (supports historical pull)."""
+    """Fetch Shopify inventory levels."""
     if user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -292,10 +333,7 @@ def fetch_inventory_levels(
         "data": result.get("data", []),
         "count": result.get("count", 0),
         "user_id": user_id,
-        "start_date": start_date,
-        "end_date": end_date,
     }
-
 # """
 # Shopify Controller
 # ------------------

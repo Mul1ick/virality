@@ -1,3 +1,4 @@
+// FILE: Frontend/src/components/dashboard/MetaCampaignsTable.tsx
 import { Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -28,7 +29,11 @@ export const MetaCampaignsTable = ({
   dateRange = "30days",
   customRange,
 }: MetaCampaignsTableProps) => {
-  const [selectedCampaign, setSelectedCampaign] = useState<{id: string, name: string} | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
   const getDateRangeText = () => {
     if (dateRange === "custom" && customRange?.from && customRange?.to) {
       return `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`;
@@ -43,8 +48,8 @@ export const MetaCampaignsTable = ({
   };
 
   const formatCurrency = (value: number | undefined) => {
-    if (value === undefined || value === null || isNaN(value)) return "$0.00";
-    return new Intl.NumberFormat("en-US", {
+    if (value === undefined || value === null || isNaN(value)) return "₹0.00";
+    return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       minimumFractionDigits: 2,
@@ -65,13 +70,13 @@ export const MetaCampaignsTable = ({
   const getStatusStyle = (status: string) => {
     const statusUpper = status.toUpperCase();
     if (statusUpper === "ACTIVE") {
-      return "bg-green-500/10 text-green-700 border-green-500/20";
+      return "bg-green-500/10 text-green-400 border-green-500/30";
     } else if (statusUpper === "PAUSED") {
-      return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20";
+      return "bg-yellow-500/10 text-yellow-400 border-yellow-500/30";
     } else if (statusUpper === "ARCHIVED" || statusUpper === "DELETED") {
-      return "bg-red-500/10 text-red-700 border-red-500/20";
+      return "bg-red-500/10 text-red-400 border-red-500/30";
     }
-    return "bg-gray-500/10 text-gray-700 border-gray-500/20";
+    return "bg-slate-500/10 text-slate-400 border-slate-500/30";
   };
 
   const formatObjective = (objective: string) => {
@@ -88,7 +93,7 @@ export const MetaCampaignsTable = ({
 
   if (isLoading) {
     return (
-      <Card className="p-6">
+      <Card className="bg-card/50 backdrop-blur-sm border-slate-700/50 p-6">
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading campaigns...</p>
@@ -99,7 +104,7 @@ export const MetaCampaignsTable = ({
 
   if (campaigns.length === 0) {
     return (
-      <Card className="p-6">
+      <Card className="bg-card/50 backdrop-blur-sm border-slate-700/50 p-6">
         <div className="text-center py-12">
           <p className="text-muted-foreground">
             No campaigns found. Connect your Meta account to view campaigns.
@@ -134,146 +139,177 @@ export const MetaCampaignsTable = ({
       : 0;
 
   return (
-    <Card className="p-6">
+    <Card className="bg-card/50 backdrop-blur-sm border-slate-700/50 p-6">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold">Meta Campaigns</h3>
+            <h3 className="text-lg font-semibold text-foreground">
+              Meta Campaigns
+            </h3>
             <p className="text-sm text-muted-foreground">
               {campaigns.length} campaigns • {getDateRangeText()}
             </p>
           </div>
         </div>
 
-        <div className="border rounded-lg overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="font-semibold min-w-[200px]">
-                  Campaign Name
-                </TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="font-semibold">Objective</TableHead>
-                <TableHead className="font-semibold text-right">
-                  Spend
-                </TableHead>
-                <TableHead className="font-semibold text-right">
-                  Impressions
-                </TableHead>
-                <TableHead className="font-semibold text-right">
-                  Reach
-                </TableHead>
-                <TableHead className="font-semibold text-right">
-                  Clicks
-                </TableHead>
-                <TableHead className="font-semibold text-right">CTR</TableHead>
-                <TableHead className="font-semibold text-right">CPM</TableHead>
-                <TableHead className="font-semibold text-right">CPC</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {campaigns.map((campaign) => (
-                <TableRow
-                  key={campaign.id}
-                  className="hover:bg-muted/30 transition-colors"
-                >
-                  <TableCell className="font-medium">{campaign.name}</TableCell>
-                  <TableCell>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 hover:text-primary hover:bg-primary/10"
-                    title="View Demographics"
-                    onClick={() => setSelectedCampaign({ id: campaign.id, name: campaign.name })}
-                  >
-                    <Users className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(
-                        campaign.status
-                      )}`}
-                    >
-                      {formatStatus(campaign.status)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      {formatObjective(campaign.objective)}
-                    </Badge>
-                  </TableCell>
-                  {campaign.insights ? (
-                    <>
-                      <TableCell className="text-right font-semibold">
-                        {formatCurrency(campaign.insights.spend)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatNumber(campaign.insights.impressions)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatNumber(campaign.insights.reach)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatNumber(campaign.insights.clicks)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span
-                          className={
-                            (campaign.insights.ctr || 0) >= 2
-                              ? "text-green-600 font-semibold"
-                              : ""
-                          }
-                        >
-                          {formatPercentage(campaign.insights.ctr)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(campaign.insights.cpm)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(campaign.insights.cpc)}
-                      </TableCell>
-                    </>
-                  ) : (
-                    <TableCell
-                      colSpan={7}
-                      className="text-center text-muted-foreground text-sm"
-                    >
-                      No insights available
-                    </TableCell>
-                  )}
+        {/* ✅ FIXED: Dark borders, no white borders */}
+        <div className="border border-slate-700/50 rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-800/50 border-b border-slate-700/50 hover:bg-slate-800/50">
+                  <TableHead className="font-semibold min-w-[200px] text-slate-300">
+                    Campaign Name
+                  </TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="font-semibold text-slate-300">
+                    Status
+                  </TableHead>
+                  <TableHead className="font-semibold text-slate-300">
+                    Objective
+                  </TableHead>
+                  <TableHead className="font-semibold text-right text-slate-300">
+                    Spend
+                  </TableHead>
+                  <TableHead className="font-semibold text-right text-slate-300">
+                    Impressions
+                  </TableHead>
+                  <TableHead className="font-semibold text-right text-slate-300">
+                    Reach
+                  </TableHead>
+                  <TableHead className="font-semibold text-right text-slate-300">
+                    Clicks
+                  </TableHead>
+                  <TableHead className="font-semibold text-right text-slate-300">
+                    CTR
+                  </TableHead>
+                  <TableHead className="font-semibold text-right text-slate-300">
+                    CPM
+                  </TableHead>
+                  <TableHead className="font-semibold text-right text-slate-300">
+                    CPC
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {campaigns.map((campaign) => (
+                  <TableRow
+                    key={campaign.id}
+                    className="border-b border-slate-700/30 hover:bg-slate-800/30 transition-colors"
+                  >
+                    <TableCell className="font-medium text-foreground">
+                      {campaign.name}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:text-primary hover:bg-primary/10"
+                        title="View Demographics"
+                        onClick={() =>
+                          setSelectedCampaign({
+                            id: campaign.id,
+                            name: campaign.name,
+                          })
+                        }
+                      >
+                        <Users className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(
+                          campaign.status
+                        )}`}
+                      >
+                        {formatStatus(campaign.status)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-slate-600 text-slate-300"
+                      >
+                        {formatObjective(campaign.objective)}
+                      </Badge>
+                    </TableCell>
+                    {campaign.insights ? (
+                      <>
+                        <TableCell className="text-right font-semibold text-foreground">
+                          {formatCurrency(campaign.insights.spend)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatNumber(campaign.insights.impressions)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatNumber(campaign.insights.reach)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatNumber(campaign.insights.clicks)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span
+                            className={
+                              (campaign.insights.ctr || 0) >= 2
+                                ? "text-green-400 font-semibold"
+                                : "text-muted-foreground"
+                            }
+                          >
+                            {formatPercentage(campaign.insights.ctr)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatCurrency(campaign.insights.cpm)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatCurrency(campaign.insights.cpc)}
+                        </TableCell>
+                      </>
+                    ) : (
+                      <TableCell
+                        colSpan={7}
+                        className="text-center text-muted-foreground text-sm"
+                      >
+                        No insights available
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-700/50">
           <div>
             <p className="text-xs text-muted-foreground">Total Spend</p>
-            <p className="text-lg font-semibold">
+            <p className="text-lg font-semibold text-foreground">
               {formatCurrency(totalSpend)}
             </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Total Impressions</p>
-            <p className="text-lg font-semibold">
+            <p className="text-lg font-semibold text-foreground">
               {formatNumber(totalImpressions)}
             </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Total Clicks</p>
-            <p className="text-lg font-semibold">{formatNumber(totalClicks)}</p>
+            <p className="text-lg font-semibold text-foreground">
+              {formatNumber(totalClicks)}
+            </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Avg. CTR</p>
-            <p className="text-lg font-semibold">{formatPercentage(avgCTR)}</p>
+            <p className="text-lg font-semibold text-foreground">
+              {formatPercentage(avgCTR)}
+            </p>
           </div>
         </div>
       </div>
-      <DemographicsModal 
+
+      <DemographicsModal
         isOpen={!!selectedCampaign}
         onClose={() => setSelectedCampaign(null)}
         level="campaign"

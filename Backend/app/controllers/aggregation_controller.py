@@ -1,8 +1,8 @@
-# FILE: app/controllers/aggregation_controller.py
+# FILE: Backend/app/controllers/aggregation_controller.py
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
-from datetime import date, timedelta
+from pydantic import BaseModel, field_validator
+from datetime import datetime, date, timedelta
 from typing import Optional
 from app.database.mongo_client import db
 
@@ -22,17 +22,51 @@ logger = get_logger()
 
 
 class MetaAggregationRequest(BaseModel):
-    start_date: date
-    end_date: date
+    start_date: str  # ✅ Changed from date to str
+    end_date: str    # ✅ Changed from date to str
     ad_account_id: str
     group_by: Optional[str] = None
 
+    @field_validator('start_date', 'end_date')
+    @classmethod
+    def validate_date_format(cls, v):
+        """Validate that date strings are in YYYY-MM-DD format"""
+        try:
+            datetime.strptime(v, '%Y-%m-%d')
+            return v
+        except ValueError:
+            raise ValueError('Date must be in YYYY-MM-DD format')
+
 
 class GoogleAggregationRequest(BaseModel):
-    start_date: date
-    end_date: date
-    ad_account_id: str  # Changed from customer_id
+    start_date: str  # ✅ Changed from date to str
+    end_date: str    # ✅ Changed from date to str
+    ad_account_id: str
     group_by: Optional[str] = None
+
+    @field_validator('start_date', 'end_date')
+    @classmethod
+    def validate_date_format(cls, v):
+        try:
+            datetime.strptime(v, '%Y-%m-%d')
+            return v
+        except ValueError:
+            raise ValueError('Date must be in YYYY-MM-DD format')
+
+
+class ShopifyAggregationRequest(BaseModel):
+    start_date: str  # ✅ Changed from date to str
+    end_date: str    # ✅ Changed from date to str
+    group_by: Optional[str] = "date"
+
+    @field_validator('start_date', 'end_date')
+    @classmethod
+    def validate_date_format(cls, v):
+        try:
+            datetime.strptime(v, '%Y-%m-% d')
+            return v
+        except ValueError:
+            raise ValueError('Date must be in YYYY-MM-DD format')
 
 
 @router.post("/meta", summary="Aggregate Meta Ads Data")
@@ -44,11 +78,16 @@ async def aggregate_meta_data(request: MetaAggregationRequest, user_id: str = De
     logger.info(f"[META ENDPOINT] Date range: {request.start_date} to {request.end_date}")
 
     try:
+        # ✅ Convert string dates to date objects for the service
+        from datetime import datetime
+        start_date_obj = datetime.strptime(request.start_date, '%Y-%m-%d').date()
+        end_date_obj = datetime.strptime(request.end_date, '%Y-%m-%d').date()
+        
         raw_result = AggregationService.run_meta_aggregation(
             user_id=user_id,
             ad_account_id=request.ad_account_id,
-            start_date=request.start_date,
-            end_date=request.end_date,
+            start_date=start_date_obj,
+            end_date=end_date_obj,
             group_by=request.group_by,
         )
         
@@ -98,11 +137,16 @@ async def aggregate_google_data(request: GoogleAggregationRequest, user_id: str 
     logger.info(f"[GOOGLE ENDPOINT] Date range: {request.start_date} to {request.end_date}")
 
     try:
+        # ✅ Convert string dates to date objects
+        from datetime import datetime
+        start_date_obj = datetime.strptime(request.start_date, '%Y-%m-%d').date()
+        end_date_obj = datetime.strptime(request.end_date, '%Y-%m-%d').date()
+        
         raw_result = AggregationService.run_google_aggregation(
             user_id=user_id,
             customer_id=request.ad_account_id,
-            start_date=request.start_date,
-            end_date=request.end_date,
+            start_date=start_date_obj,
+            end_date=end_date_obj,
             group_by=request.group_by,
         )
         
@@ -111,12 +155,10 @@ async def aggregate_google_data(request: GoogleAggregationRequest, user_id: str 
         
         group_by = request.group_by
         
-        # For date grouping, return the full array for chart data
         if group_by == "date":
             logger.info(f"[GOOGLE ENDPOINT] Returning date-grouped array: {len(results_list)} days")
             return results_list
         
-        # For campaign/adgroup/ad grouping, return as dictionary keyed by ID
         if group_by in ["campaign", "adgroup", "ad"]:
             id_field = f"{group_by}Id"
             results_dict = {}
@@ -131,7 +173,6 @@ async def aggregate_google_data(request: GoogleAggregationRequest, user_id: str 
             logger.info(f"[GOOGLE ENDPOINT] Returning {len(results_dict)} grouped items")
             return results_dict
         
-        # Default: return single aggregated totals
         if results_list:
             logger.info(f"[GOOGLE ENDPOINT] First result: {results_list[0]}")
             return results_list[0]
@@ -151,6 +192,52 @@ async def aggregate_google_data(request: GoogleAggregationRequest, user_id: str 
         raise
     except Exception as e:
         logger.error(f"[GOOGLE ENDPOINT] Failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal aggregation error")
+
+
+@router.post("/shopify", summary="Aggregate Shopify Data")
+async def aggregate_shopify_data(request: ShopifyAggregationRequest, user_id: str = Depends(get_current_user_id)):
+    """
+    Aggregates Shopify orders data for revenue, order count, and AOV.
+    """
+    logger.info(f"[SHOPIFY ENDPOINT] Request received - user: {user_id}, group_by: {request.group_by}")
+    logger.info(f"[SHOPIFY ENDPOINT] Date range: {request.start_date} to {request.end_date}")
+
+    try:
+        # ✅ Convert string dates to date objects
+        from datetime import datetime
+        start_date_obj = datetime.strptime(request.start_date, '%Y-%m-%d').date()
+        end_date_obj = datetime.strptime(request.end_date, '%Y-%m-%d').date()
+        
+        raw_result = AggregationService.run_shopify_aggregation(
+            user_id=user_id,
+            start_date=start_date_obj,
+            end_date=end_date_obj,
+            group_by=request.group_by,
+        )
+        
+        results_list = raw_result.get("results", [])
+        logger.info(f"[SHOPIFY ENDPOINT] Got {len(results_list)} results from service")
+        
+        if request.group_by == "date":
+            logger.info(f"[SHOPIFY ENDPOINT] Returning date-grouped array: {len(results_list)} days")
+            return results_list
+        
+        if results_list:
+            logger.info(f"[SHOPIFY ENDPOINT] First result: {results_list[0]}")
+            return results_list[0]
+        else:
+            logger.warning(f"[SHOPIFY ENDPOINT] No results, returning zeros")
+            return {
+                "totalRevenue": 0,
+                "orderCount": 0,
+                "avgOrderValue": 0
+            }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[SHOPIFY ENDPOINT] Failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal aggregation error")
 
 

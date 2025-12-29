@@ -2,65 +2,161 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
-All colors MUST be HSL.
-*/
+/* Araknet-style dark theme with vibrant accent colors */
 @layer base {
   :root {
-    /* Light, fresh backgrounds with cyan influence */
-    --background: 184 35% 89%;
-    --foreground: 220 15% 15%;
+    /* Dark gradient backgrounds */
+    --background: 222 47% 11%; /* Deep slate/navy background */
+    --foreground: 210 40% 98%; /* Near white text */
 
-    /* Card colors - white with subtle warmth */
-    --card: 0 0% 100%;
-    --card-foreground: 220 15% 15%;
+    /* Dark cards with subtle elevation */
+    --card: 217 33% 17%; /* Slate-800 equivalent */
+    --card-foreground: 210 40% 98%; /* White text */
 
     /* Popover colors */
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 15%;
+    --popover: 217 33% 17%;
+    --popover-foreground: 210 40% 98%;
 
-    /* Primary brand color - VIBRANT CYAN/TURQUOISE (Virality Media brand) */
-    --primary: 184 45% 65%;
-    --primary-foreground: 0 0% 100%;
+    /* Primary - Vibrant Cyan/Turquoise (main brand) */
+    --primary: 186 100% 55%; /* Electric cyan */
+    --primary-foreground: 222 47% 11%; /* Dark text on cyan */
 
-    /* Secondary - light gray for subtle elements */
-    --secondary: 210 15% 92%;
-    --secondary-foreground: 220 15% 15%;
+    /* Secondary - Teal accent */
+    --secondary: 174 72% 56%; /* Bright teal */
+    --secondary-foreground: 222 47% 11%;
 
-    /* Muted colors - soft gray */
-    --muted: 210 15% 90%;
-    --muted-foreground: 220 10% 45%;
+    /* Muted colors - subtle gray */
+    --muted: 217 33% 22%; /* Slightly lighter than card */
+    --muted-foreground: 215 20% 65%; /* Gray-400 text */
 
-    /* Accent - vibrant cyan for CTAs and highlights */
-    --accent: 184 45% 65%;
-    --accent-foreground: 0 0% 100%;
+    /* Accent - Purple/Magenta for variety */
+    --accent: 280 65% 60%; /* Vibrant purple */
+    --accent-foreground: 210 40% 98%;
 
-    /* Destructive - keeping red */
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
+    /* Destructive - Bright red */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
 
-    /* Success - vibrant green */
-    --success: 142.1 70% 45%;
-    --success-foreground: 0 0% 100%;
+    /* Success - Vibrant green */
+    --success: 142 76% 36%; /* Emerald green */
+    --success-foreground: 210 40% 98%;
 
-    /* Warning - keeping orange */
+    /* Warning - Bright orange */
     --warning: 38 92% 50%;
-    --warning-foreground: 220 15% 15%;
+    --warning-foreground: 222 47% 11%;
 
-    /* Border and input colors - soft, subtle */
-    --border: 220 13% 85%;
-    --input: 220 13% 85%;
+    /* Border and input - subtle dark borders */
+    --border: 217 33% 25%; /* Slightly lighter than card */
+    --input: 217 33% 25%;
 
-    /* Ring color - cyan for focus states */
-    --ring: 184 45% 65%;
+    /* Ring color - cyan glow for focus */
+    --ring: 186 100% 55%;
 
     --radius: 0.75rem;
 
-    /* Chart colors - vibrant and varied */
-    --chart-1: 184 45% 65%;
-    --chart-2: 198.6 88.7% 48.4%;
-    --chart-3: 142.1 70% 45%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 346.8 77.2% 49.8%;
+    /* Chart colors - vibrant and varied for dark theme */
+    --chart-1: 186 100% 55%; /* Cyan */
+    --chart-2: 280 65% 60%; /* Purple */
+    --chart-3: 142 76% 36%; /* Green */
+    --chart-4: 38 92% 50%; /* Orange */
+    --chart-5: 346 77% 50%; /* Pink/Red */
+  }
+
+  /* Smooth scrolling */
+  * {
+    scroll-behavior: smooth;
+  }
+
+  /* Body background gradient */
+  body {
+    background: linear-gradient(
+      135deg,
+      hsl(222 47% 11%) 0%,
+      hsl(217 33% 17%) 100%
+    );
+    color: hsl(var(--foreground));
+  }
+
+  /* Better text rendering */
+  body,
+  input,
+  textarea,
+  button {
+    font-feature-settings: "kern" 1, "liga" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom utility classes for the Araknet style */
+@layer utilities {
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-teal-400;
+  }
+
+  /* Glowing border effect */
+  .glow-border {
+    @apply relative;
+  }
+
+  .glow-border::before {
+    content: "";
+    @apply absolute inset-0 rounded-lg opacity-0 transition-opacity duration-300;
+    background: linear-gradient(
+      90deg,
+      hsl(186 100% 55% / 0.3),
+      hsl(174 72% 56% / 0.3)
+    );
+    filter: blur(8px);
+  }
+
+  .glow-border:hover::before {
+    @apply opacity-100;
+  }
+
+  /* Metric card icon backgrounds */
+  .metric-icon-cyan {
+    @apply bg-cyan-500/10 text-cyan-400;
+  }
+
+  .metric-icon-teal {
+    @apply bg-teal-500/10 text-teal-400;
+  }
+
+  .metric-icon-purple {
+    @apply bg-purple-500/10 text-purple-400;
+  }
+
+  .metric-icon-green {
+    @apply bg-green-500/10 text-green-400;
+  }
+
+  .metric-icon-orange {
+    @apply bg-orange-500/10 text-orange-400;
+  }
+
+  /* Animated gradient background */
+  .animated-gradient {
+    background: linear-gradient(
+      135deg,
+      hsl(186 100% 55% / 0.1) 0%,
+      hsl(174 72% 56% / 0.05) 50%,
+      hsl(280 65% 60% / 0.1) 100%
+    );
+    background-size: 200% 200%;
+    animation: gradient-shift 15s ease infinite;
+  }
+
+  @keyframes gradient-shift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
   }
 }

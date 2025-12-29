@@ -1,4 +1,4 @@
-# FILE: app/services/aggregation_service.py
+# FILE: Backend/app/services/aggeregation_service.py
 
 from datetime import date
 from typing import Optional, List, Dict, Any
@@ -24,9 +24,9 @@ class AggregationService:
             elif group_by == "ad":
                 return "meta_daily_ad_insights"
             else:
-                return "meta_daily_insights"
+                # ✅ FIXED: Use campaign insights for date grouping (Overview chart)
+                return "meta_daily_campaign_insights"
         elif platform == "google":
-            # Google now has daily collections like Meta!
             if group_by == "campaign":
                 return "google_daily_campaign_insights"
             elif group_by == "adgroup":
@@ -34,8 +34,9 @@ class AggregationService:
             elif group_by == "ad":
                 return "google_daily_ad_insights"
             else:
-                # Default to daily campaign insights for date-based queries
                 return "google_daily_campaign_insights"
+        elif platform == "shopify":
+            return "shopify_daily_insights"
         raise HTTPException(status_code=400, detail=f"Unsupported platform: {platform}")
 
     @staticmethod
@@ -63,7 +64,6 @@ class AggregationService:
                 }
             }
         elif platform == "google":
-            # Google now has daily data with date_start field!
             match_stage = {
                 "$match": {
                     "user_id": user_id,
@@ -86,11 +86,8 @@ class AggregationService:
                 }
             })
         elif platform == "google":
-            # Google stores cost in cost_micros (can be string OR number)
-            # clicks and impressions are strings
             pipeline.append({
                 "$addFields": {
-                    # Handle cost_micros as either string or number, then convert to dollars
                     "numericSpend": {
                         "$divide": [
                             {
@@ -103,7 +100,6 @@ class AggregationService:
                             1000000
                         ]
                     },
-                    # Clicks and impressions are strings - convert to int
                     "numericClicks": {
                         "$toInt": {"$ifNull": ["$clicks", "0"]}
                     },
@@ -148,13 +144,10 @@ class AggregationService:
             }
         }
 
-        # Add conversions for Google
         if platform == "google":
             group_stage["$group"]["totalConversions"] = {"$sum": "$numericConversions"}
 
-        # Add metadata fields
         if group_by in ["campaign", "adset", "adgroup", "ad"]:
-            # Handle field name differences between platforms
             if platform == "google":
                 if group_by == "campaign":
                     name_field = "campaign_name"
@@ -164,7 +157,7 @@ class AggregationService:
                     name_field = "ad_name"
                 else:
                     name_field = "name"
-            else:  # meta
+            else:
                 name_field = f"{group_by}_name"
             
             group_stage["$group"][f"{group_by}Name"] = {"$first": f"${name_field}"}
@@ -306,4 +299,87 @@ class AggregationService:
             return {"collection": collection_name, "count": len(results), "results": results}
         except Exception as e:
             logger.error(f"[GOOGLE AGG] Error: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Aggregation failed: {str(e)}")
+
+    @staticmethod
+    def run_shopify_aggregation(
+        user_id: str,
+        start_date: date,
+        end_date: date,
+        group_by: Optional[str] = "date",
+    ) -> Dict[str, Any]:
+        """
+        Executes Shopify aggregation and returns formatted results.
+        """
+        logger.info(f"[SHOPIFY AGG] Starting - user: {user_id}, dates: {start_date} to {end_date}, group: {group_by}")
+        
+        collection = db["shopify_daily_insights"]
+        logger.info(f"[SHOPIFY AGG] Using collection: shopify_daily_insights")
+
+        pipeline = [
+            {
+                "$match": {
+                    "user_id": user_id,
+                    "platform": "shopify",
+                    "date_start": {
+                        "$gte": start_date.strftime("%Y-%m-%d"),
+                        "$lte": end_date.strftime("%Y-%m-%d")
+                    }
+                }
+            }
+        ]
+
+        if group_by == "date":
+            pipeline.append({
+                "$project": {
+                    "_id": 0,
+                    "date": "$date_start",
+                    "totalRevenue": "$total_revenue",
+                    "orderCount": "$order_count",
+                    "avgOrderValue": "$avg_order_value",
+                    "totalItems": "$total_items"
+                }
+            })
+            pipeline.append({"$sort": {"date": 1}})
+        else:
+            pipeline.extend([
+                {
+                    "$group": {
+                        "_id": None,
+                        "totalRevenue": {"$sum": "$total_revenue"},
+                        "orderCount": {"$sum": "$order_count"},
+                        "totalItems": {"$sum": "$total_items"}
+                    }
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "totalRevenue": 1,
+                        "orderCount": 1,
+                        "totalItems": 1,
+                        "avgOrderValue": {
+                            "$cond": [
+                                {"$eq": ["$orderCount", 0]},
+                                0,
+                                {"$divide": ["$totalRevenue", "$orderCount"]}
+                            ]
+                        }
+                    }
+                }
+            ])
+
+        logger.info(f"[SHOPIFY AGG] Pipeline built with {len(pipeline)} stages")
+
+        try:
+            results = list(collection.aggregate(pipeline))
+            logger.info(f"[SHOPIFY AGG] Raw results count: {len(results)}")
+            
+            if results:
+                logger.info(f"[SHOPIFY AGG] Sample result (first): {results[0]}")
+            else:
+                logger.warning(f"[SHOPIFY AGG] No results returned!")
+            
+            return {"collection": "shopify_daily_insights", "count": len(results), "results": results}
+        except Exception as e:
+            logger.error(f"[SHOPIFY AGG] Error: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Aggregation failed: {str(e)}")
