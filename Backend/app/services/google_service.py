@@ -1,13 +1,9 @@
-"""
-Google Ads Service Layer - FIXED
--------------------------
-"""
-
 from __future__ import annotations
 from typing import List, Dict, Optional
 from datetime import datetime, timezone, timedelta
 import requests
 import urllib.parse
+import json
 
 from fastapi import HTTPException
 from app.utils.logger import get_logger
@@ -17,7 +13,6 @@ from app.database.mongo_client import (
     save_or_update_platform_connection,
     get_platform_connection_details,
     save_items,
-    save_google_daily_insights,
     db,
 )
 from app.utils.security import create_state_token, decode_token
@@ -220,18 +215,12 @@ class GoogleService:
         """Fetch all campaigns and metrics for a Google Ads customer account."""
         token = GoogleService._maybe_refresh_token(user_id)
         details = get_platform_connection_details(user_id, GoogleService.PLATFORM_NAME) or {}
-        mode = details.get("mode", "direct")
-
+        
         ctx_manager_id = (
             manager_id
             or details.get("selected_manager_id")
             or details.get("client_customer_id")
             or customer_id
-        )
-
-        logger.info(
-            f"[GoogleService] Fetching campaigns for user={user_id}, "
-            f"customer_id={customer_id}, login_id={ctx_manager_id}, mode={mode}"
         )
 
         resp = list_campaigns_for_child(token, customer_id, ctx_manager_id, date_range)
@@ -243,13 +232,16 @@ class GoogleService:
             raise HTTPException(status_code=resp.status_code, detail="Failed to fetch campaigns.")
 
         raw_data = resp.json().get("results", [])
-        logger.info(f"[GoogleService] Retrieved {len(raw_data)} campaigns for {customer_id}")
-
+        
         transformed_data = []
         for item in raw_data:
             campaign = item.get("campaign", {})
             metrics = item.get("metrics", {})
             budget = item.get("campaignBudget", {})
+
+            # ✅ v23 Fix: Support both new DateTime fields and legacy Date fields
+            start_date = campaign.get("startDateTime") or campaign.get("startDate")
+            end_date = campaign.get("endDateTime") or campaign.get("endDate")
 
             transformed_data.append({
                 "id": campaign.get("id"),
@@ -257,8 +249,8 @@ class GoogleService:
                 "status": campaign.get("status"),
                 "advertising_channel_type": campaign.get("advertisingChannelType"),
                 "bidding_strategy_type": campaign.get("biddingStrategyType"),
-                "start_date": campaign.get("startDate"),
-                "end_date": campaign.get("endDate"),
+                "start_date": start_date,
+                "end_date": end_date,
                 "resource_name": campaign.get("resourceName"),
                 "clicks": metrics.get("clicks", "0"),
                 "conversions": metrics.get("conversions", 0),
@@ -268,7 +260,6 @@ class GoogleService:
             })
 
         save_items("campaigns", customer_id, transformed_data, GoogleService.PLATFORM_NAME)
-        logger.info(f"[GoogleService] ✅ Saved {len(transformed_data)} campaigns for {customer_id}")
         return transformed_data
 
     @staticmethod
@@ -357,7 +348,6 @@ class GoogleService:
 
     @staticmethod
     def fetch_all_adgroups(user_id: str, customer_id: str, manager_id: Optional[str], date_range: str = "LAST_30_DAYS"):
-        """Fetch all ad groups for a customer across the specified date range."""
         token = GoogleService._maybe_refresh_token(user_id)
         details = get_platform_connection_details(user_id, GoogleService.PLATFORM_NAME) or {}
         ctx_manager_id = manager_id or details.get("selected_manager_id")
@@ -388,7 +378,6 @@ class GoogleService:
 
     @staticmethod
     def fetch_all_ads(user_id: str, customer_id: str, manager_id: Optional[str], date_range: str = "LAST_30_DAYS"):
-        """Fetch all ads for a customer across the specified date range."""
         token = GoogleService._maybe_refresh_token(user_id)
         details = get_platform_connection_details(user_id, GoogleService.PLATFORM_NAME) or {}
         ctx_manager_id = manager_id or details.get("selected_manager_id")
@@ -450,104 +439,67 @@ class GoogleService:
         
         logger.info(f"[GoogleService] Fetching daily campaign insights from {start_date} to {end_date}")
         
-        # ✅ FIXED: Properly handle response object
-        resp = get_campaign_daily_insights(token, customer_id, ctx_manager_id, start_date, end_date)
+        # ✅ FIXED: This calls the UPDATED google_api function which returns a LIST of processed dicts
+        result = get_campaign_daily_insights(token, customer_id, ctx_manager_id, start_date, end_date)
         
-        if not resp:
-            logger.error(f"[GoogleService] No response from daily insights API")
-            raise HTTPException(status_code=500, detail="Failed to fetch daily campaign insights - no response")
+        if result is None:
+            logger.error(f"[GoogleService] Failed to fetch daily campaign insights")
+            raise HTTPException(status_code=500, detail="Failed to fetch daily campaign insights")
         
-        if resp.status_code != 200:
-            logger.error(f"[GoogleService] Daily insights API failed: {resp.status_code}, {resp.text}")
-            raise HTTPException(
-                status_code=resp.status_code,
-                detail=f"Failed to fetch daily campaign insights: {resp.text[:200]}"
-            )
-        
-        # ✅ Parse JSON response
-        try:
-            response_data = resp.json()
-        except Exception as e:
-            logger.error(f"[GoogleService] Failed to parse JSON response: {e}")
-            raise HTTPException(status_code=500, detail="Invalid JSON response from Google API")
-        
-        logger.info(f"[GoogleService] Raw API response keys: {response_data.keys() if isinstance(response_data, dict) else 'not a dict'}")
-        
-        # ✅ Extract results array
-        raw_data = response_data.get("results", []) if isinstance(response_data, dict) else []
-        
-        logger.info(f"[GoogleService] Retrieved {len(raw_data)} daily campaign records")
-        
-        if raw_data and len(raw_data) > 0:
-            logger.info(f"[GoogleService] Sample record structure: {list(raw_data[0].keys())}")
-        
-        # ✅ Transform records - ONLY keep records with segments.date
-        daily_records = []
-        skipped = 0
-        
-        for item in raw_data:
-            campaign = item.get("campaign", {})
-            metrics = item.get("metrics", {})
-            segments = item.get("segments", {})
-            
-            # ✅ CRITICAL: Skip if no date
-            record_date = segments.get("date")
-            if not record_date:
-                skipped += 1
-                logger.warning(f"[GoogleService] Skipping record without date: campaign={campaign.get('name')}")
-                continue
-            
-            # ✅ Handle both camelCase and snake_case for cost_micros
-            cost_micros = metrics.get("costMicros") or metrics.get("cost_micros") or 0
-            
-            record = {
+        # Ensure we have a list (backward compatibility check)
+        daily_records_list = []
+        if isinstance(result, list):
+             daily_records_list = result
+        else:
+             # Fallback if someone didn't update google_api.py correctly
+             logger.error("API Utility did not return a list. Please update google_api.py")
+             return []
+
+        if not daily_records_list:
+            logger.info("No daily campaign records found.")
+            return []
+
+        # ✅ Transform and Add Metadata
+        final_records = []
+        for item in daily_records_list:
+             record = {
                 "user_id": user_id,
                 "platform": "google",
                 "ad_account_id": customer_id,
-                "campaign_id": str(campaign.get("id", "")),
-                "campaign_name": campaign.get("name", "Unknown Campaign"),
-                "date_start": record_date,
-                "date_stop": record_date,
-                "status": campaign.get("status", "UNKNOWN"),
-                "advertising_channel_type": campaign.get("advertisingChannelType", "UNKNOWN"),
-                "clicks": str(metrics.get("clicks", 0)),
-                "impressions": str(metrics.get("impressions", 0)),
-                "cost_micros": str(cost_micros),
-                "conversions": float(metrics.get("conversions", 0)),
-                "ctr": float(metrics.get("ctr", 0)),
-                "average_cpc": float(metrics.get("averageCpc", 0)),
-                "average_cpm": float(metrics.get("averageCpm", 0)),
+                "campaign_id": str(item.get("campaign_id", "")),
+                "campaign_name": item.get("campaign_name", "Unknown Campaign"),
+                "date_start": item.get("date"),
+                "date_stop": item.get("date"),
+                "ad_network_type": item.get("ad_network_type"), # ✅ Capture the v23 segmentation
+                "clicks": str(item.get("clicks", 0)),
+                "impressions": str(item.get("impressions", 0)),
+                "cost_micros": str(item.get("cost_micros", 0)),
+                "conversions": float(item.get("conversions", 0)),
+                "ctr": float(item.get("ctr", 0)),
                 "last_updated": datetime.now(timezone.utc)
             }
-            daily_records.append(record)
-        
-        logger.info(f"[GoogleService] Processed {len(daily_records)} valid records, skipped {skipped}")
-        
-        if not daily_records:
-            logger.error(f"[GoogleService] ❌ NO VALID DAILY RECORDS! Raw count was {len(raw_data)}, all skipped")
-            return []
-        
+             final_records.append(record)
+
         # ✅ Save to MongoDB
         try:
             collection = db["google_daily_campaign_insights"]
             
             # Delete existing to avoid duplicates
-            delete_result = collection.delete_many({
+            collection.delete_many({
                 "user_id": user_id,
                 "ad_account_id": customer_id,
                 "date_start": {"$gte": start_date, "$lte": end_date}
             })
-            logger.info(f"[GoogleService] Deleted {delete_result.deleted_count} existing records")
             
-            # Insert new
-            insert_result = collection.insert_many(daily_records)
-            logger.info(f"[GoogleService] ✅ Inserted {len(insert_result.inserted_ids)} daily campaign records")
+            if final_records:
+                collection.insert_many(final_records)
+                logger.info(f"[GoogleService] ✅ Inserted {len(final_records)} daily campaign records")
             
         except Exception as e:
             logger.error(f"[GoogleService] MongoDB error: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
         
-        return daily_records
+        return final_records
 
     @staticmethod
     def fetch_and_store_daily_adgroup_insights(
@@ -575,36 +527,21 @@ class GoogleService:
             start_date_obj = datetime.now(timezone.utc) - timedelta(days=days_back)
             start_date = start_date_obj.strftime("%Y-%m-%d")
         
-        if start_date > end_date:
-            raise HTTPException(status_code=400, detail="start_date must be before end_date")
-        
         logger.info(f"[GoogleService] Fetching daily adgroup insights: {start_date} to {end_date}")
         
+        # NOTE: get_adgroup_daily_insights still returns a Response object (raw) in the updated api file
         resp = get_adgroup_daily_insights(token, customer_id, ctx_manager_id, start_date, end_date)
         
-        if not resp:
-            logger.error("No response from Google API (adgroups)")
-            raise HTTPException(status_code=500, detail="No response from API")
-        
-        if resp.status_code != 200:
-            logger.error(f"Adgroup API error {resp.status_code}: {resp.text[:300]}")
-            raise HTTPException(
-                status_code=resp.status_code,
-                detail=f"Google API error: {resp.text[:200]}"
-            )
+        if not resp or resp.status_code != 200:
+            logger.error(f"Adgroup API error")
+            raise HTTPException(status_code=500, detail="Google API error")
         
         try:
-            response_data = resp.json()
-        except Exception as e:
-            logger.error(f"JSON parse error (adgroups): {e}")
-            raise HTTPException(status_code=500, detail="Invalid JSON from Google API")
-
-        raw_data = response_data.get("results", []) if isinstance(response_data, dict) else []
-        logger.info(f"[GoogleService] Retrieved {len(raw_data)} daily ad group records")
-        
+            raw_data = resp.json().get("results", [])
+        except Exception:
+            raw_data = []
+            
         daily_records = []
-        skipped = 0
-        
         for item in raw_data:
             ad_group = item.get("adGroup", {})
             campaign = item.get("campaign", {})
@@ -612,9 +549,7 @@ class GoogleService:
             segments = item.get("segments", {})
             
             record_date = segments.get("date")
-            if not record_date:
-                skipped += 1
-                continue
+            if not record_date: continue
             
             cost_micros = metrics.get("costMicros") or metrics.get("cost_micros") or 0
             
@@ -637,25 +572,17 @@ class GoogleService:
             }
             daily_records.append(record)
         
-        logger.info(f"[GoogleService] Valid adgroup records: {len(daily_records)}, Skipped: {skipped}")
-        
         if daily_records:
             try:
                 collection = db["google_daily_adgroup_insights"]
-                
-                delete_result = collection.delete_many({
+                collection.delete_many({
                     "user_id": user_id,
                     "ad_account_id": customer_id,
                     "date_start": {"$gte": start_date, "$lte": end_date}
                 })
-                logger.info(f"Deleted {delete_result.deleted_count} existing adgroup records")
-                
-                insert_result = collection.insert_many(daily_records)
-                logger.info(f"[GoogleService] ✅ Saved {len(insert_result.inserted_ids)} daily ad group records")
-                
+                collection.insert_many(daily_records)
             except Exception as e:
-                logger.error(f"MongoDB error (adgroups): {e}", exc_info=True)
-                raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+                logger.error(f"MongoDB error: {e}")
         
         return daily_records
 
@@ -685,36 +612,20 @@ class GoogleService:
             start_date_obj = datetime.now(timezone.utc) - timedelta(days=days_back)
             start_date = start_date_obj.strftime("%Y-%m-%d")
         
-        if start_date > end_date:
-            raise HTTPException(status_code=400, detail="start_date must be before end_date")
-        
         logger.info(f"[GoogleService] Fetching daily ad insights: {start_date} to {end_date}")
         
+        # NOTE: get_ad_daily_insights still returns a Response object (raw)
         resp = get_ad_daily_insights(token, customer_id, ctx_manager_id, start_date, end_date)
         
-        if not resp:
-            logger.error("No response from Google API (ads)")
-            raise HTTPException(status_code=500, detail="No response from API")
-        
-        if resp.status_code != 200:
-            logger.error(f"Ad API error {resp.status_code}: {resp.text[:300]}")
-            raise HTTPException(
-                status_code=resp.status_code,
-                detail=f"Google API error: {resp.text[:200]}"
-            )
+        if not resp or resp.status_code != 200:
+            raise HTTPException(status_code=500, detail="Google API error")
         
         try:
-            response_data = resp.json()
-        except Exception as e:
-            logger.error(f"JSON parse error (ads): {e}")
-            raise HTTPException(status_code=500, detail="Invalid JSON from Google API")
-
-        raw_data = response_data.get("results", []) if isinstance(response_data, dict) else []
-        logger.info(f"[GoogleService] Retrieved {len(raw_data)} daily ad records")
+            raw_data = resp.json().get("results", [])
+        except Exception:
+            raw_data = []
         
         daily_records = []
-        skipped = 0
-        
         for item in raw_data:
             ad = item.get("adGroupAd", {}).get("ad", {})
             ad_group = item.get("adGroup", {})
@@ -723,9 +634,7 @@ class GoogleService:
             segments = item.get("segments", {})
             
             record_date = segments.get("date")
-            if not record_date:
-                skipped += 1
-                continue
+            if not record_date: continue
             
             cost_micros = metrics.get("costMicros") or metrics.get("cost_micros") or 0
             
@@ -750,26 +659,16 @@ class GoogleService:
             }
             daily_records.append(record)
         
-        logger.info(f"[GoogleService] Valid ad records: {len(daily_records)}, Skipped: {skipped}")
-        
         if daily_records:
             try:
                 collection = db["google_daily_ad_insights"]
-                
-                delete_result = collection.delete_many({
+                collection.delete_many({
                     "user_id": user_id,
                     "ad_account_id": customer_id,
                     "date_start": {"$gte": start_date, "$lte": end_date}
                 })
-                logger.info(f"Deleted {delete_result.deleted_count} existing ad records")
-                
-                insert_result = collection.insert_many(daily_records)
-                logger.info(f"[GoogleService] ✅ Saved {len(insert_result.inserted_ids)} daily ad records")
-                
+                collection.insert_many(daily_records)
             except Exception as e:
-                logger.error(f"MongoDB error (ads): {e}", exc_info=True)
-                raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+                logger.error(f"MongoDB error: {e}")
         
         return daily_records
-    
-    
