@@ -1,6 +1,6 @@
 // hooks/usePlatformStatus.ts
 import { useState, useEffect } from "react";
-import axios from "axios";
+import apiClient from "@/lib/api";
 
 interface PlatformStatus {
   meta: {
@@ -21,9 +21,6 @@ interface PlatformStatus {
   };
 }
 
-// 🔥 MOVE THIS OUTSIDE THE HOOK - it's a constant!
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
-
 export const usePlatformStatus = (userId: string | null) => {
   const [platformStatus, setPlatformStatus] = useState<PlatformStatus>({
     meta: { connected: false },
@@ -43,21 +40,11 @@ export const usePlatformStatus = (userId: string | null) => {
       try {
         console.log("🔍 Fetching platform status for user:", userId);
 
-        // CRITICAL: Always include JWT token in request
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-          throw new Error("No authentication token found");
-        }
-
-        const res = await axios.get(`${backendUrl}/user/${userId}/platforms`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        // Use apiClient which automatically adds the Bearer token
+        const res = await apiClient.get(`/user/${userId}/platforms`);
 
         console.log("✅ Platform status:", res.data);
 
-        // Backend now returns cleaner structure - use it directly
         const data = res.data;
 
         setPlatformStatus({
@@ -80,9 +67,12 @@ export const usePlatformStatus = (userId: string | null) => {
         });
 
         setError(null);
-      } catch (e) {
+      } catch (e: any) {
         console.error("❌ Failed to fetch platform status:", e);
-        setError("Failed to load platform connections");
+        // Don't set error for 401 — the apiClient interceptor handles that
+        if (e.response?.status !== 401) {
+          setError("Failed to load platform connections");
+        }
       } finally {
         setLoading(false);
       }

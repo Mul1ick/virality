@@ -1,6 +1,6 @@
 // src/lib/api.ts
 import axios from 'axios';
-import { toast } from '@/hooks/use-toast'; // Or your preferred notification method
+import { toast } from '@/hooks/use-toast';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -17,39 +17,46 @@ apiClient.interceptors.request.use(
     const token = localStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log("Interceptor: Added Auth header"); // For debugging
     } else {
-      console.warn("Interceptor: No auth token found in localStorage"); // For debugging
-      // Optional: You could redirect to login here if no token exists for a protected route
+      console.warn("Interceptor: No auth token found in localStorage");
     }
     return config;
   },
   (error) => {
-    console.error("Interceptor Request Error:", error); // For debugging
+    console.error("Interceptor Request Error:", error);
     return Promise.reject(error);
   }
 );
 
-// Optional: Response Interceptor (Example: Handle 401 globally)
+// Prevent multiple 401 redirects from racing each other
+let isRedirectingTo401 = false;
+
+// Response Interceptor: Handle 401 globally (debounced)
 apiClient.interceptors.response.use(
-  (response) => response, // Simply return successful responses
+  (response) => response,
   (error) => {
-    console.error("Interceptor Response Error:", error.response || error); // For debugging
     if (error.response && error.response.status === 401) {
-      console.error("Authentication Error (401): Token might be invalid or expired.");
-      // Clear credentials and redirect to login
-      localStorage.clear();
-      // Use toast or another notification method
-      toast({
-        title: "Session Expired",
-        description: "Please log in again.",
-        variant: "destructive",
-      });
-      // Redirect using window.location or navigate if within a component/hook context
-      // Be careful using navigate directly in a lib file if it relies on context.
-      window.location.href = '/signin';
+      // Only process the FIRST 401 — ignore subsequent ones
+      if (!isRedirectingTo401) {
+        isRedirectingTo401 = true;
+        console.error("Authentication Error (401): Token might be invalid or expired.");
+
+        // Clear auth data specifically (not everything)
+        localStorage.removeItem('access_token');
+
+        toast({
+          title: "Session Expired",
+          description: "Please log in again.",
+          variant: "destructive",
+        });
+
+        // Small delay so the toast can show before redirect
+        setTimeout(() => {
+          window.location.href = '/signin';
+        }, 300);
+      }
     }
-    return Promise.reject(error); // Reject the promise for other errors
+    return Promise.reject(error);
   }
 );
 

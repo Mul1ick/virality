@@ -19,7 +19,7 @@ const SelectGoogleAccount = () => {
 
   const handleComplete = (managerId: string, customerId: string) => {
     console.log("✅ Google accounts selected:", { managerId, customerId });
-    navigate(`/?user_id=${userId}`);
+    navigate(`/dashboard`);
   };
 
   const handleCancel = () => {

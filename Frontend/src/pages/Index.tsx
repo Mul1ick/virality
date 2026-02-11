@@ -21,9 +21,9 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [activeSubTab, setActiveSubTab] = useState("meta");
 
-  // Get userId from URL
+  // Get userId from URL params first, then fall back to localStorage
   const urlParams = new URLSearchParams(window.location.search);
-  const userId = urlParams.get("user_id");
+  const userId = urlParams.get("user_id") || localStorage.getItem("user_id");
 
   // Fetch platform status
   const {

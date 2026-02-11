@@ -438,47 +438,51 @@ class GoogleService:
             raise HTTPException(status_code=400, detail="start_date must be before end_date")
         
         logger.info(f"[GoogleService] Fetching daily campaign insights from {start_date} to {end_date}")
-        
-        # ✅ FIXED: This calls the UPDATED google_api function which returns a LIST of processed dicts
-        result = get_campaign_daily_insights(token, customer_id, ctx_manager_id, start_date, end_date)
-        
-        if result is None:
+
+        resp = get_campaign_daily_insights(token, customer_id, ctx_manager_id, start_date, end_date)
+
+        if not resp or resp.status_code != 200:
             logger.error(f"[GoogleService] Failed to fetch daily campaign insights")
             raise HTTPException(status_code=500, detail="Failed to fetch daily campaign insights")
-        
-        # Ensure we have a list (backward compatibility check)
-        daily_records_list = []
-        if isinstance(result, list):
-             daily_records_list = result
-        else:
-             # Fallback if someone didn't update google_api.py correctly
-             logger.error("API Utility did not return a list. Please update google_api.py")
-             return []
 
-        if not daily_records_list:
+        try:
+            raw_data = resp.json().get("results", [])
+        except Exception:
+            raw_data = []
+
+        if not raw_data:
             logger.info("No daily campaign records found.")
             return []
 
-        # ✅ Transform and Add Metadata
         final_records = []
-        for item in daily_records_list:
-             record = {
+        for item in raw_data:
+            campaign = item.get("campaign", {})
+            metrics = item.get("metrics", {})
+            segments = item.get("segments", {})
+
+            record_date = segments.get("date")
+            if not record_date:
+                continue
+
+            cost_micros = metrics.get("costMicros") or metrics.get("cost_micros") or 0
+
+            record = {
                 "user_id": user_id,
                 "platform": "google",
                 "ad_account_id": customer_id,
-                "campaign_id": str(item.get("campaign_id", "")),
-                "campaign_name": item.get("campaign_name", "Unknown Campaign"),
-                "date_start": item.get("date"),
-                "date_stop": item.get("date"),
-                "ad_network_type": item.get("ad_network_type"), # ✅ Capture the v23 segmentation
-                "clicks": str(item.get("clicks", 0)),
-                "impressions": str(item.get("impressions", 0)),
-                "cost_micros": str(item.get("cost_micros", 0)),
-                "conversions": float(item.get("conversions", 0)),
-                "ctr": float(item.get("ctr", 0)),
+                "campaign_id": str(campaign.get("id", "")),
+                "campaign_name": campaign.get("name", "Unknown Campaign"),
+                "date_start": record_date,
+                "date_stop": record_date,
+                "ad_network_type": segments.get("adNetworkType"),
+                "clicks": str(metrics.get("clicks", 0)),
+                "impressions": str(metrics.get("impressions", 0)),
+                "cost_micros": str(cost_micros),
+                "conversions": float(metrics.get("conversions", 0)),
+                "ctr": float(metrics.get("ctr", 0)),
                 "last_updated": datetime.now(timezone.utc)
             }
-             final_records.append(record)
+            final_records.append(record)
 
         # ✅ Save to MongoDB
         try:

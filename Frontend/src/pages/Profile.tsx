@@ -30,15 +30,13 @@ import {
   Clock,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import apiClient from "@/lib/api";
 
 interface UserProfileData {
   id: string;
   name: string;
   email: string;
 }
-
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 const getStatusBadge = (status, comingSoon = false) => {
   if (comingSoon) {
@@ -177,27 +175,23 @@ const Profile = () => {
       setProfileLoading(true);
       setProfileError(null);
       const userId = localStorage.getItem("user_id");
-      const token = localStorage.getItem("access_token");
 
-      if (!userId || !token) {
+      if (!userId) {
         setProfileError("Authentication required. Please log in.");
         setProfileLoading(false);
         return;
       }
 
       try {
-        const response = await axios.get(
-          `${backendUrl}/user/${userId}/profile`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const response = await apiClient.get(`/user/${userId}/profile`);
         setUserData(response.data);
       } catch (err: any) {
         console.error("Failed to fetch user profile:", err);
-        setProfileError(
-          err.response?.data?.detail || "Could not load profile."
-        );
-        if (err.response?.status === 401 || err.response?.status === 403) {
-          localStorage.clear();
+        // 401 is handled globally by apiClient interceptor
+        if (err.response?.status !== 401) {
+          setProfileError(
+            err.response?.data?.detail || "Could not load profile."
+          );
         }
       } finally {
         setProfileLoading(false);
@@ -218,19 +212,15 @@ const Profile = () => {
       setConnectedAccounts({ meta: false, google: false, shopify: false });
 
       const userId = localStorage.getItem("user_id");
-      const token = localStorage.getItem("access_token");
 
-      if (!userId || !token) {
+      if (!userId) {
         setPlatformStatusError("Authentication required.");
         setPlatformStatusLoading(false);
         return;
       }
 
       try {
-        const response = await axios.get(
-          `${backendUrl}/user/${userId}/platforms`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const response = await apiClient.get(`/user/${userId}/platforms`);
 
         const statusFromBackend = response.data;
         setConnectedAccounts({
@@ -241,11 +231,11 @@ const Profile = () => {
         });
       } catch (err: any) {
         console.error("Failed to fetch platform status:", err);
-        setPlatformStatusError(
-          err.response?.data?.detail || "Could not load connection status."
-        );
-        if (err.response?.status === 401 || err.response?.status === 403) {
-          localStorage.clear();
+        // 401 is handled globally by apiClient interceptor
+        if (err.response?.status !== 401) {
+          setPlatformStatusError(
+            err.response?.data?.detail || "Could not load connection status."
+          );
         }
       } finally {
         setPlatformStatusLoading(false);
@@ -345,20 +335,10 @@ const Profile = () => {
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
-    const token = localStorage.getItem("access_token");
-
-    if (!token) {
-      console.error("Auth token missing. Cannot initiate Google login.");
-      setProfileError("Authentication required. Please log in again.");
-      setIsLoading(false);
-      return;
-    }
 
     try {
       console.log("Requesting Google redirect URL from backend...");
-      const response = await axios.get(`${backendUrl}/google/login`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await apiClient.get(`/google/login`);
 
       const redirectUrl = response.data.redirect_url;
       if (redirectUrl) {
@@ -373,12 +353,10 @@ const Profile = () => {
       }
     } catch (error: any) {
       console.error("Error initiating Google login:", error);
-      setProfileError(
-        error.response?.data?.detail || "Failed to start Google connection."
-      );
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        localStorage.clear();
-        navigate("/signin");
+      if (error.response?.status !== 401) {
+        setProfileError(
+          error.response?.data?.detail || "Failed to start Google connection."
+        );
       }
       setIsLoading(false);
     }
@@ -386,20 +364,10 @@ const Profile = () => {
 
   const handleMetaLogin = async () => {
     setIsLoading(true);
-    const token = localStorage.getItem("access_token");
-
-    if (!token) {
-      console.error("Auth token missing. Cannot initiate Meta login.");
-      setProfileError("Authentication required. Please log in again.");
-      setIsLoading(false);
-      return;
-    }
 
     try {
       console.log("Requesting Meta redirect URL from backend...");
-      const response = await axios.get(`${backendUrl}/meta/login`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await apiClient.get(`/meta/login`);
 
       const redirectUrl = response.data.redirect_url;
       if (redirectUrl) {
@@ -414,12 +382,10 @@ const Profile = () => {
       }
     } catch (error: any) {
       console.error("Error initiating Meta login:", error);
-      setProfileError(
-        error.response?.data?.detail || "Failed to start Meta connection."
-      );
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        localStorage.clear();
-        navigate("/signin");
+      if (error.response?.status !== 401) {
+        setProfileError(
+          error.response?.data?.detail || "Failed to start Meta connection."
+        );
       }
       setIsLoading(false);
     }
@@ -506,12 +472,7 @@ const Profile = () => {
   };
 
   const handleGoToDashboard = () => {
-    const userId = localStorage.getItem("user_id");
-    if (userId) {
-      navigate(`/dashboard?user_id=${userId}`);
-    } else {
-      navigate("/dashboard");
-    }
+    navigate("/dashboard");
   };
 
   const handleSignOut = () => {

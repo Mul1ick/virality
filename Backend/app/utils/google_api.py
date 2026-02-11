@@ -560,5 +560,351 @@ def get_ad_daily_insights(
         logger.error(f"[Google API] Daily ad insights error: {e}")
         return None
 
-# (Note: list_all_adgroups_for_customer and list_all_ads_for_customer 
-# were not requested to change and are correct as provided previously)
+# ---------------------------------------------------------------------------
+# Account info helper (used during OAuth callback)
+# ---------------------------------------------------------------------------
+
+def get_basic_account_info(access_token: str, resource_names: List[str]) -> List[Dict]:
+    """
+    Given a list of resource names (e.g. 'customers/1234567890'),
+    fetch basic account details (id, name, isManager) for each.
+    """
+    customer_ids = []
+    for rn in resource_names:
+        cid = rn.replace("customers/", "")
+        customer_ids.append(cid)
+
+    if not customer_ids:
+        return []
+
+    return get_account_details_batch(access_token, customer_ids)
+
+
+# ---------------------------------------------------------------------------
+# Insights helpers (aggregated metrics, no daily segmentation)
+# ---------------------------------------------------------------------------
+
+def get_campaign_insights(
+    access_token: str,
+    customer_id: str,
+    login_customer_id: Optional[str],
+    date_range: str = "LAST_30_DAYS",
+    campaign_id: Optional[str] = None,
+) -> List[Dict]:
+    """
+    Fetch aggregated campaign-level insights for a customer.
+    Optionally filter by a single campaign_id.
+    """
+    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
+
+    campaign_filter = ""
+    if campaign_id:
+        campaign_filter = f"AND campaign.id = {_clean_customer_id(str(campaign_id))}"
+
+    query = f"""
+    SELECT
+      campaign.id,
+      campaign.name,
+      campaign.status,
+      campaign.advertising_channel_type,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.ctr,
+      metrics.average_cpc,
+      metrics.cost_micros,
+      metrics.conversions,
+      metrics.cost_per_conversion,
+      metrics.conversions_from_interactions_rate,
+      metrics.value_per_conversion
+    FROM campaign
+    WHERE segments.date DURING {date_range}
+      {campaign_filter}
+    ORDER BY metrics.impressions DESC
+    """
+
+    payload = {"query": query}
+    try:
+        resp = requests.post(
+            url,
+            headers=_headers(access_token, login_customer_id),
+            json=payload,
+            timeout=60,
+        )
+        if resp.status_code != 200:
+            logger.error(f"[Google Ads] Campaign insights failed {resp.status_code}: {resp.text}")
+            return []
+        results = resp.json().get("results", [])
+        insights = []
+        for item in results:
+            campaign = item.get("campaign", {})
+            metrics = item.get("metrics", {})
+            insights.append({
+                "campaign_id": campaign.get("id"),
+                "campaign_name": campaign.get("name"),
+                "status": campaign.get("status"),
+                "channel_type": campaign.get("advertisingChannelType"),
+                "impressions": metrics.get("impressions", "0"),
+                "clicks": metrics.get("clicks", "0"),
+                "ctr": metrics.get("ctr", 0),
+                "average_cpc": metrics.get("averageCpc", 0),
+                "cost_micros": metrics.get("costMicros", "0"),
+                "conversions": metrics.get("conversions", 0),
+                "cost_per_conversion": metrics.get("costPerConversion", 0),
+                "conversion_rate": metrics.get("conversionsFromInteractionsRate", 0),
+                "value_per_conversion": metrics.get("valuePerConversion", 0),
+            })
+        return insights
+    except Exception as e:
+        logger.exception(f"[Google Ads] Unexpected error fetching campaign insights: {e}")
+        return []
+
+
+def get_adgroup_insights(
+    access_token: str,
+    customer_id: str,
+    login_customer_id: Optional[str],
+    date_range: str = "LAST_30_DAYS",
+    campaign_id: Optional[str] = None,
+) -> List[Dict]:
+    """
+    Fetch aggregated ad-group-level insights for a customer.
+    Optionally filter by campaign_id.
+    """
+    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
+
+    campaign_filter = ""
+    if campaign_id:
+        campaign_filter = f"AND campaign.id = {_clean_customer_id(str(campaign_id))}"
+
+    query = f"""
+    SELECT
+      ad_group.id,
+      ad_group.name,
+      ad_group.status,
+      ad_group.type,
+      campaign.id,
+      campaign.name,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.ctr,
+      metrics.average_cpc,
+      metrics.cost_micros,
+      metrics.conversions
+    FROM ad_group
+    WHERE segments.date DURING {date_range}
+      {campaign_filter}
+    ORDER BY metrics.impressions DESC
+    """
+
+    payload = {"query": query}
+    try:
+        resp = requests.post(
+            url,
+            headers=_headers(access_token, login_customer_id),
+            json=payload,
+            timeout=60,
+        )
+        if resp.status_code != 200:
+            logger.error(f"[Google Ads] AdGroup insights failed {resp.status_code}: {resp.text}")
+            return []
+        results = resp.json().get("results", [])
+        insights = []
+        for item in results:
+            ad_group = item.get("adGroup", {})
+            campaign = item.get("campaign", {})
+            metrics = item.get("metrics", {})
+            insights.append({
+                "adgroup_id": ad_group.get("id"),
+                "adgroup_name": ad_group.get("name"),
+                "status": ad_group.get("status"),
+                "type": ad_group.get("type"),
+                "campaign_id": campaign.get("id"),
+                "campaign_name": campaign.get("name"),
+                "impressions": metrics.get("impressions", "0"),
+                "clicks": metrics.get("clicks", "0"),
+                "ctr": metrics.get("ctr", 0),
+                "average_cpc": metrics.get("averageCpc", 0),
+                "cost_micros": metrics.get("costMicros", "0"),
+                "conversions": metrics.get("conversions", 0),
+            })
+        return insights
+    except Exception as e:
+        logger.exception(f"[Google Ads] Unexpected error fetching adgroup insights: {e}")
+        return []
+
+
+def get_ad_insights(
+    access_token: str,
+    customer_id: str,
+    login_customer_id: Optional[str],
+    date_range: str = "LAST_30_DAYS",
+    ad_group_id: Optional[str] = None,
+) -> List[Dict]:
+    """
+    Fetch aggregated ad-level insights for a customer.
+    Optionally filter by ad_group_id.
+    """
+    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
+
+    adgroup_filter = ""
+    if ad_group_id:
+        adgroup_filter = f"AND ad_group.id = {_clean_customer_id(str(ad_group_id))}"
+
+    query = f"""
+    SELECT
+      ad_group_ad.ad.id,
+      ad_group_ad.ad.name,
+      ad_group_ad.ad.type,
+      ad_group_ad.status,
+      ad_group.id,
+      ad_group.name,
+      campaign.id,
+      campaign.name,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.ctr,
+      metrics.cost_micros,
+      metrics.conversions
+    FROM ad_group_ad
+    WHERE segments.date DURING {date_range}
+      {adgroup_filter}
+    ORDER BY metrics.impressions DESC
+    """
+
+    payload = {"query": query}
+    try:
+        resp = requests.post(
+            url,
+            headers=_headers(access_token, login_customer_id),
+            json=payload,
+            timeout=60,
+        )
+        if resp.status_code != 200:
+            logger.error(f"[Google Ads] Ad insights failed {resp.status_code}: {resp.text}")
+            return []
+        results = resp.json().get("results", [])
+        insights = []
+        for item in results:
+            ad = item.get("adGroupAd", {}).get("ad", {})
+            ad_group = item.get("adGroup", {})
+            campaign = item.get("campaign", {})
+            metrics = item.get("metrics", {})
+            insights.append({
+                "ad_id": ad.get("id"),
+                "ad_name": ad.get("name") or f"Ad {ad.get('id', '')}",
+                "ad_type": ad.get("type"),
+                "status": item.get("adGroupAd", {}).get("status"),
+                "adgroup_id": ad_group.get("id"),
+                "adgroup_name": ad_group.get("name"),
+                "campaign_id": campaign.get("id"),
+                "campaign_name": campaign.get("name"),
+                "impressions": metrics.get("impressions", "0"),
+                "clicks": metrics.get("clicks", "0"),
+                "ctr": metrics.get("ctr", 0),
+                "cost_micros": metrics.get("costMicros", "0"),
+                "conversions": metrics.get("conversions", 0),
+            })
+        return insights
+    except Exception as e:
+        logger.exception(f"[Google Ads] Unexpected error fetching ad insights: {e}")
+        return []
+
+
+# ---------------------------------------------------------------------------
+# Fetch ALL ad groups / ads for a customer (no campaign/adgroup filter)
+# ---------------------------------------------------------------------------
+
+def list_all_adgroups_for_customer(
+    access_token: str,
+    customer_id: str,
+    login_customer_id: Optional[str] = None,
+    date_range: str = "LAST_30_DAYS",
+) -> List[Dict]:
+    """
+    Retrieve all ad groups across all campaigns for a customer account.
+    Returns raw result dicts from the API.
+    """
+    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
+
+    query = f"""
+    SELECT
+      ad_group.id,
+      ad_group.name,
+      ad_group.status,
+      ad_group.type,
+      campaign.id,
+      campaign.name,
+      metrics.clicks,
+      metrics.impressions,
+      metrics.cost_micros,
+      metrics.conversions
+    FROM ad_group
+    WHERE segments.date DURING {date_range}
+    ORDER BY metrics.impressions DESC
+    """
+
+    payload = {"query": query}
+    try:
+        resp = requests.post(
+            url,
+            headers=_headers(access_token, login_customer_id),
+            json=payload,
+            timeout=60,
+        )
+        if resp.status_code != 200:
+            logger.error(f"[Google Ads] All adgroups fetch failed {resp.status_code}: {resp.text}")
+            return []
+        return resp.json().get("results", [])
+    except Exception as e:
+        logger.exception(f"[Google Ads] Unexpected error fetching all adgroups: {e}")
+        return []
+
+
+def list_all_ads_for_customer(
+    access_token: str,
+    customer_id: str,
+    login_customer_id: Optional[str] = None,
+    date_range: str = "LAST_30_DAYS",
+) -> List[Dict]:
+    """
+    Retrieve all ads across all ad groups for a customer account.
+    Returns raw result dicts from the API.
+    """
+    url = f"{BASE_URL}/customers/{_clean_customer_id(customer_id)}/googleAds:search"
+
+    query = f"""
+    SELECT
+      ad_group_ad.ad.id,
+      ad_group_ad.ad.name,
+      ad_group_ad.ad.type,
+      ad_group_ad.ad.final_urls,
+      ad_group_ad.status,
+      ad_group.id,
+      ad_group.name,
+      campaign.id,
+      campaign.name,
+      metrics.clicks,
+      metrics.impressions,
+      metrics.cost_micros,
+      metrics.ctr,
+      metrics.conversions
+    FROM ad_group_ad
+    WHERE segments.date DURING {date_range}
+    ORDER BY metrics.impressions DESC
+    """
+
+    payload = {"query": query}
+    try:
+        resp = requests.post(
+            url,
+            headers=_headers(access_token, login_customer_id),
+            json=payload,
+            timeout=60,
+        )
+        if resp.status_code != 200:
+            logger.error(f"[Google Ads] All ads fetch failed {resp.status_code}: {resp.text}")
+            return []
+        return resp.json().get("results", [])
+    except Exception as e:
+        logger.exception(f"[Google Ads] Unexpected error fetching all ads: {e}")
+        return []

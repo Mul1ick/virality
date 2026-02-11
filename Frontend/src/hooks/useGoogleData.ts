@@ -1,8 +1,6 @@
 // hooks/useGoogleData.ts - WITH DATE RANGE SUPPORT
 import { useState, useEffect, useCallback, useMemo } from "react";
-import axios from "axios";
-
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
+import apiClient from "@/lib/api";
 
 // Simplified interfaces - metrics are part of the main object
 export interface GoogleCampaign {
@@ -118,16 +116,9 @@ export const useGoogleData = (
     }
 
     const fetchAllData = async () => {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        console.error("❌ [Google] No auth token");
-        return;
-      }
-
       setLoading({ campaigns: true, adGroups: true, ads: true });
       setError({ campaigns: null, adGroups: null, ads: null });
 
-      const headers = { Authorization: `Bearer ${token}` };
       const params: any = {
         customer_id: customerId,
         date_range: getGoogleDateRange(dateRange),
@@ -142,28 +133,25 @@ export const useGoogleData = (
           getGoogleDateRange(dateRange)
         );
 
-        // Fetch all in parallel (3 API calls)
+        // Fetch all in parallel (3 API calls) using apiClient for auth
         const [campaignsRes, adGroupsRes, adsRes] = await Promise.all([
-          axios
-            .get(`${backendUrl}/google/campaigns/${userId}`, {
+          apiClient
+            .get(`/google/campaigns/${userId}`, {
               params,
-              headers,
               timeout: 30000,
             })
             .catch((err) => ({ error: err })),
 
-          axios
-            .get(`${backendUrl}/google/adgroups/all/${userId}`, {
+          apiClient
+            .get(`/google/adgroups/all/${userId}`, {
               params,
-              headers,
               timeout: 30000,
             })
             .catch((err) => ({ error: err })),
 
-          axios
-            .get(`${backendUrl}/google/ads/all/${userId}`, {
+          apiClient
+            .get(`/google/ads/all/${userId}`, {
               params,
-              headers,
               timeout: 30000,
             })
             .catch((err) => ({ error: err })),

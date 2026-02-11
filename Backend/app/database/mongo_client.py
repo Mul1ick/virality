@@ -122,7 +122,7 @@ def save_or_update_platform_connection(user_id: str, platform: str, platform_dat
 
     # Google-specific
     if platform == "google":
-        for key in ["customer_ids", "manager_id", "client_customer_id", "selected_manager_id"]:
+        for key in ["customer_ids", "manager_id", "client_customer_id", "selected_manager_id", "mode", "client_accounts"]:
             if key in platform_data:
                 update_fields[f"connected_platforms.{platform}.{key}"] = platform_data[key]
 
