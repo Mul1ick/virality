@@ -1,8 +1,6 @@
 // hooks/useShopifyData.ts - OPTIMIZED VERSION
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
-
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
+import apiClient from "@/lib/api";
 
 export interface ShopifyOrder {
   id: string;
@@ -107,10 +105,8 @@ export const useShopifyData = (
         setLoading((prev) => ({ ...prev, orders: true }));
         console.log(`📊 Fetching Shopify orders - page ${page}...`);
 
-        const token = localStorage.getItem("access_token");
-        const res = await axios.get(`${backendUrl}/shopify/orders/${userId}`, {
+        const res = await apiClient.get(`/shopify/orders/${userId}`, {
           params: { page, limit: 50 },
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
 
         const newOrders = res.data.data || res.data.orders || [];
@@ -147,14 +143,9 @@ export const useShopifyData = (
         setLoading((prev) => ({ ...prev, products: true }));
         console.log(`📊 Fetching Shopify products - page ${page}...`);
 
-        const token = localStorage.getItem("access_token");
-        const res = await axios.get(
-          `${backendUrl}/shopify/products/${userId}`,
-          {
-            params: { page, limit: 50 },
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }
-        );
+        const res = await apiClient.get(`/shopify/products/${userId}`, {
+          params: { page, limit: 50 },
+        });
 
         const newProducts = res.data.data || res.data.products || [];
         const total = res.data.total || newProducts.length;
@@ -192,14 +183,9 @@ export const useShopifyData = (
         setLoading((prev) => ({ ...prev, customers: true }));
         console.log(`📊 Fetching Shopify customers - page ${page}...`);
 
-        const token = localStorage.getItem("access_token");
-        const res = await axios.get(
-          `${backendUrl}/shopify/customers/${userId}`,
-          {
-            params: { page, limit: 50 },
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }
-        );
+        const res = await apiClient.get(`/shopify/customers/${userId}`, {
+          params: { page, limit: 50 },
+        });
 
         const newCustomers = res.data.data || res.data.customers || [];
         const total = res.data.total || newCustomers.length;
@@ -260,14 +246,9 @@ export const useShopifyData = (
 
     // Check if we have any data in MongoDB
     try {
-      const token = localStorage.getItem("access_token");
-      const testFetch = await axios.get(
-        `${backendUrl}/shopify/orders/${userId}`,
-        {
-          params: { page: 1, limit: 1 },
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
-      );
+      const testFetch = await apiClient.get(`/shopify/orders/${userId}`, {
+        params: { page: 1, limit: 1 },
+      });
 
       // If we have data, skip sync
       if (testFetch.data?.total > 0) {
@@ -282,13 +263,10 @@ export const useShopifyData = (
       setSyncing(true);
       setSyncError(null);
 
-      const syncResponse = await axios.post(
-        `${backendUrl}/shopify/sync/${userId}`,
+      const syncResponse = await apiClient.post(
+        `/shopify/sync/${userId}`,
         {},
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          timeout: 300000, // 5 minute timeout
-        }
+        { timeout: 300000 }
       );
 
       console.log("✅ [Shopify] Sync complete:", syncResponse.data);

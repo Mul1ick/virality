@@ -12,7 +12,7 @@ import { MetaCampaignsTable } from "@/components/dashboard/MetaCampaignsTable";
 import { MetaAdSetsTable } from "@/components/dashboard/MetaAdSetsTable";
 import { MetaAdsTable } from "@/components/dashboard/MetaAdsTable";
 import { Facebook, RefreshCw, Calendar } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DateRange } from "react-day-picker";
 import { DatePickerWithRange } from "@/components/ui/date-picker-with-range";
 import { useMetaData } from "@/hooks/useMetaData";
@@ -22,6 +22,8 @@ interface MetaTabProps {
   adAccountId: string | null | undefined;
   isConnected: boolean;
   platformsLoaded: boolean;
+  headerDateRange?: string;
+  headerCustomRange?: DateRange;
 }
 
 export const MetaTab = ({
@@ -29,11 +31,30 @@ export const MetaTab = ({
   adAccountId,
   isConnected,
   platformsLoaded,
+  headerDateRange,
+  headerCustomRange,
 }: MetaTabProps) => {
-  const [dateRange, setDateRange] = useState("30days");
-  const [customRange, setCustomRange] = useState<DateRange | undefined>();
+  const [dateRange, setDateRange] = useState(headerDateRange || "30days");
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(headerCustomRange);
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Sync with header date range when it changes
+  useEffect(() => {
+    if (headerDateRange) {
+      setDateRange(headerDateRange);
+      if (headerDateRange !== "custom") {
+        setShowCustomPicker(false);
+        setCustomRange(undefined);
+      }
+    }
+  }, [headerDateRange]);
+
+  useEffect(() => {
+    if (headerCustomRange) {
+      setCustomRange(headerCustomRange);
+    }
+  }, [headerCustomRange]);
 
   const { campaigns, adSets, ads, loading, error, refreshAll } = useMetaData(
     userId,

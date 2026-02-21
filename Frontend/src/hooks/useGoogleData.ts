@@ -178,7 +178,7 @@ export const useGoogleData = (
                 cost_micros: Number(c.cost_micros) || 0,
               })
             )
-            .filter((c: GoogleCampaign) => c.spend > 0 || c.clicks > 0); // Only show campaigns with data
+            .filter((c: GoogleCampaign) => c.spend > 0 || c.clicks > 0 || c.impressions > 0);
 
           console.log(`✅ [Google] Campaigns: ${processed.length} with data`);
           setCampaigns(processed);
@@ -205,7 +205,7 @@ export const useGoogleData = (
                 cost_micros: Number(ag.cost_micros) || 0,
               })
             )
-            .filter((ag: GoogleAdGroup) => ag.spend > 0 || ag.clicks > 0);
+            .filter((ag: GoogleAdGroup) => ag.spend > 0 || ag.clicks > 0 || ag.impressions > 0);
 
           console.log(`✅ [Google] Ad Groups: ${processed.length} with data`);
           setAdGroups(processed);
@@ -229,7 +229,7 @@ export const useGoogleData = (
                 cost_micros: Number(ad.cost_micros) || 0,
               })
             )
-            .filter((ad: GoogleAd) => ad.spend > 0 || ad.clicks > 0);
+            .filter((ad: GoogleAd) => ad.spend > 0 || ad.clicks > 0 || ad.impressions > 0);
 
           console.log(`✅ [Google] Ads: ${processed.length} with data`);
           setAds(processed);
@@ -266,10 +266,103 @@ export const useGoogleData = (
     }));
   }, [ads, adGroups]);
 
-  // Refresh function
+  // Refresh function — re-fetches all live data from Google API
   const refreshAll = useCallback(async () => {
-    console.log("🔄 [Google] Refreshing...");
-  }, []);
+    if (!canFetch) return;
+    console.log("🔄 [Google] Refreshing all data...");
+
+    setLoading({ campaigns: true, adGroups: true, ads: true });
+    setError({ campaigns: null, adGroups: null, ads: null });
+
+    const params: any = {
+      customer_id: customerId,
+      date_range: getGoogleDateRange(dateRange),
+    };
+    if (managerId) params.manager_id = managerId;
+
+    try {
+      const [campaignsRes, adGroupsRes, adsRes] = await Promise.all([
+        apiClient
+          .get(`/google/campaigns/${userId}`, { params, timeout: 30000 })
+          .catch((err) => ({ error: err })),
+        apiClient
+          .get(`/google/adgroups/all/${userId}`, { params, timeout: 30000 })
+          .catch((err) => ({ error: err })),
+        apiClient
+          .get(`/google/ads/all/${userId}`, { params, timeout: 30000 })
+          .catch((err) => ({ error: err })),
+      ]);
+
+      if (!("error" in campaignsRes)) {
+        const processed = (campaignsRes.data?.campaigns || [])
+          .map((c: any) =>
+            computeMetrics({
+              id: c.id || "",
+              name: c.name || "Unnamed",
+              status: c.status || "",
+              advertising_channel_type: c.advertising_channel_type || "",
+              clicks: Number(c.clicks) || 0,
+              impressions: Number(c.impressions) || 0,
+              conversions: Number(c.conversions) || 0,
+              cost_micros: Number(c.cost_micros) || 0,
+            })
+          )
+          .filter(
+            (c: GoogleCampaign) =>
+              c.spend > 0 || c.clicks > 0 || c.impressions > 0
+          );
+        setCampaigns(processed);
+      }
+
+      if (!("error" in adGroupsRes)) {
+        const processed = (adGroupsRes.data?.adgroups || [])
+          .map((ag: any) =>
+            computeMetrics({
+              id: ag.id || "",
+              name: ag.name || ag.ad_name || ag.adName || `Ad ${ag.id}`,
+              status: ag.status || "",
+              campaign_id: ag.campaign_id || "",
+              clicks: Number(ag.clicks) || 0,
+              impressions: Number(ag.impressions) || 0,
+              conversions: Number(ag.conversions) || 0,
+              cost_micros: Number(ag.cost_micros) || 0,
+            })
+          )
+          .filter(
+            (ag: GoogleAdGroup) =>
+              ag.spend > 0 || ag.clicks > 0 || ag.impressions > 0
+          );
+        setAdGroups(processed);
+      }
+
+      if (!("error" in adsRes)) {
+        const processed = (adsRes.data?.ads || [])
+          .map((ad: any) =>
+            computeMetrics({
+              id: ad.id || "",
+              name: ad.name || "Unnamed",
+              status: ad.status || "",
+              ad_group_id: ad.ad_group_id || "",
+              clicks: Number(ad.clicks) || 0,
+              impressions: Number(ad.impressions) || 0,
+              conversions: Number(ad.conversions) || 0,
+              cost_micros: Number(ad.cost_micros) || 0,
+            })
+          )
+          .filter(
+            (ad: GoogleAd) =>
+              ad.spend > 0 || ad.clicks > 0 || ad.impressions > 0
+          );
+        setAds(processed);
+      }
+
+      console.log("✅ [Google] Refresh complete!");
+    } catch (e: any) {
+      console.error("❌ [Google] Refresh error:", e);
+    } finally {
+      setLoading({ campaigns: false, adGroups: false, ads: false });
+    }
+  }, [canFetch, userId, managerId, customerId, dateRange]);
 
   return {
     campaigns,

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DateRange } from "react-day-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ interface GoogleTabProps {
   customerId: string | null | undefined;
   isConnected: boolean;
   platformsLoaded: boolean;
+  headerDateRange?: string;
+  headerCustomRange?: DateRange;
 }
 
 export const GoogleTab = ({
@@ -31,10 +33,25 @@ export const GoogleTab = ({
   customerId,
   isConnected,
   platformsLoaded,
+  headerDateRange,
+  headerCustomRange,
 }: GoogleTabProps) => {
-  const [dateRange, setDateRange] = useState("90days"); // ✅ Changed from "30days" to "90days"
-  const [customRange, setCustomRange] = useState<DateRange | undefined>();
+  const [dateRange, setDateRange] = useState(headerDateRange || "30days");
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(headerCustomRange);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Sync with header date range when it changes
+  useEffect(() => {
+    if (headerDateRange) {
+      setDateRange(headerDateRange);
+    }
+  }, [headerDateRange]);
+
+  useEffect(() => {
+    if (headerCustomRange) {
+      setCustomRange(headerCustomRange);
+    }
+  }, [headerCustomRange]);
 
   // Fetch campaigns, ad groups, ads data
   const { campaigns, adGroups, ads, loading, error, refreshAll } =
@@ -186,10 +203,9 @@ export const GoogleTab = ({
         </div>
       )}
 
-      {/* Main Content - Only show after sync is complete */}
-      {syncComplete && !syncing && (
+      {/* Main Content - Show live data regardless of sync status */}
+      {!syncing && (
         <>
-          {/* Tabs for Campaigns, Ad Groups, Ads */}
           {hasData ? (
             <Tabs defaultValue="campaigns" className="w-full">
               <TabsList className="mb-6">

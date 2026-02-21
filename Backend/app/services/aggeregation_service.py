@@ -86,32 +86,23 @@ class AggregationService:
                 }
             })
         elif platform == "google":
+            # All numeric fields stored as strings — use $toDouble (handles "150", "0", "150.5", etc.)
             pipeline.append({
                 "$addFields": {
                     "numericSpend": {
                         "$divide": [
-                            {
-                                "$cond": [
-                                    {"$eq": [{"$type": "$cost_micros"}, "string"]},
-                                    {"$toDouble": {"$ifNull": ["$cost_micros", "0"]}},
-                                    {"$ifNull": ["$cost_micros", 0]}
-                                ]
-                            },
+                            {"$toDouble": {"$ifNull": ["$cost_micros", "0"]}},
                             1000000
                         ]
                     },
                     "numericClicks": {
-                        "$toInt": {"$ifNull": ["$clicks", "0"]}
+                        "$toDouble": {"$ifNull": ["$clicks", "0"]}
                     },
                     "numericImpressions": {
-                        "$toInt": {"$ifNull": ["$impressions", "0"]}
+                        "$toDouble": {"$ifNull": ["$impressions", "0"]}
                     },
                     "numericConversions": {
-                        "$cond": [
-                            {"$eq": [{"$type": "$conversions"}, "string"]},
-                            {"$toDouble": {"$ifNull": ["$conversions", "0"]}},
-                            {"$ifNull": ["$conversions", 0]}
-                        ]
+                        "$toDouble": {"$ifNull": ["$conversions", "0"]}
                     },
                 }
             })

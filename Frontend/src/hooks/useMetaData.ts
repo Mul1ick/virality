@@ -340,25 +340,25 @@ export const useMetaData = (
   // --- Refresh Function ---
   const refreshAll = useCallback(async () => {
     console.log("🔄 Syncing recent Meta data...");
-    
+
     // 1. Trigger the Backend Sync
     try {
       await apiClient.post(`/meta/sync/recent/${userId}/${adAccountId}`);
-      
-      // 2. Wait a moment for sync to likely process (optional UX hack)
-      // Since it's a background task, we can't await it perfectly without sockets,
-      // but a small delay + re-fetch usually works for small accounts.
+
+      // 2. Wait a moment for sync to process
       await new Promise(r => setTimeout(r, 2000));
-      
-      // 3. Re-fetch from DB
-      await fetchBasicData();
-      // await fetchAggregatedInsights(); // Optional: only if you want to refresh charts too
-      
+
+      // 3. Re-fetch both basic data AND insights
+      await Promise.all([
+        fetchBasicData(),
+        fetchAggregatedInsights(),
+      ]);
+
       console.log("✅ Meta data refreshed.");
     } catch (e) {
       console.error("Sync failed", e);
     }
-  }, [userId, adAccountId, fetchBasicData]);
+  }, [userId, adAccountId, fetchBasicData, fetchAggregatedInsights]);
 
   // --- Return ---
   return {

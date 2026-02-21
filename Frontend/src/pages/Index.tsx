@@ -148,6 +148,8 @@ const Index = () => {
             adAccountId={platformStatus.meta.ad_account_id}
             isConnected={platformStatus.meta.connected}
             platformsLoaded={!platformsLoading}
+            headerDateRange={dateRange}
+            headerCustomRange={customRange}
           />
         );
 
@@ -162,6 +164,8 @@ const Index = () => {
             customerId={platformStatus.google.client_customer_id}
             isConnected={platformStatus.google.connected}
             platformsLoaded={!platformsLoading}
+            headerDateRange={dateRange}
+            headerCustomRange={customRange}
           />
         );
 
