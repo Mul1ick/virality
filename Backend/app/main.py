@@ -38,6 +38,7 @@ app.add_middleware(
         "http://localhost:8080",
         "http://127.0.0.1:8080",
         "http://localhost:3000",  # Frontend ports (React/Vue)
+        "https://virality-pi.vercel.app/",
     ],
     allow_credentials=True,
     allow_methods=["*"],  # Allow GET, POST, PUT, DELETE, etc.
