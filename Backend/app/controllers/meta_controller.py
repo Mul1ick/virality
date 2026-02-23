@@ -77,7 +77,7 @@ def meta_callback(code: str = Query(...), state: str = Query(...)):
     platform_user_id = user_info.get("id")
 
     save_meta_connection(user_id, access_token, expires_in, platform_user_id)
-    return RedirectResponse(url=f"http://localhost:8080/select-meta-account?user_id={user_id}")
+    return RedirectResponse(url=f"{config.settings.FRONTEND_URL}/select-meta-account?user_id={user_id}")
 
 
 # ---------------------------------------------------------------------------
