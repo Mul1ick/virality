@@ -29,6 +29,8 @@ else:
 # ------------------------------------------------------------------
 class Settings:
     """Holds configuration values loaded from environment."""
+    # --- Frontend ---
+    FRONTEND_URL : str=os.getenv("FRONTEND_URL")
 
     # --- Core Keys ---
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY")

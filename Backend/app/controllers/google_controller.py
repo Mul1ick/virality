@@ -5,6 +5,7 @@ from typing import Optional
 from app.services.google_service import GoogleService
 from app.utils.security import get_current_user_id
 from app.utils.logger import get_logger
+from app.config import config
 
 router = APIRouter(tags=["Google Ads"])
 logger = get_logger()
@@ -37,7 +38,7 @@ def google_login(current_user_id: str = Depends(get_current_user_id)):
 def google_callback(code: str, state: str):
     user_id = GoogleService.handle_callback(code, state)
     return RedirectResponse(
-        url=f"http://localhost:8080/select-google-account?user_id={user_id}"
+        url=f"{config.settings.FRONTEND_URL}/select-google-account?user_id={user_id}"
     )
 
 

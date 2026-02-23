@@ -13,6 +13,7 @@ from app.utils.security import create_state_token, decode_token, get_current_use
 from app.utils.logger import get_logger
 from app.services import shopify_service
 from app.database.mongo_client import save_or_update_platform_connection
+from app.config import config
 
 router = APIRouter(tags=["Shopify"])
 logger = get_logger()
@@ -99,7 +100,7 @@ def shopify_callback(
     logger.info(f"[Shopify Callback] ✅ Saved connection for user={user_id}, shop={shop}")
     
     return RedirectResponse(
-        url=f"http://localhost:8080/select-shopify?user_id={user_id}"
+        url=f"{config.settings.FRONTEND_URL}/select-shopify?user_id={user_id}"
     )
 
 
