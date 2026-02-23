@@ -1,5 +1,5 @@
-import smtplib
-from email.mime.text import MIMEText
+import os
+import resend
 from app.config.config import settings
 from app.utils.logger import get_logger
 
@@ -7,7 +7,7 @@ logger = get_logger()
 
 def send_otp_email(recipient_email: str, otp: str) -> bool:
     """
-    Sends a One-Time Password (OTP) email to the user's address.
+    Sends a One-Time Password (OTP) email to the user's address using the Resend API.
 
     Args:
         recipient_email (str): The target email address.
@@ -16,30 +16,39 @@ def send_otp_email(recipient_email: str, otp: str) -> bool:
     Returns:
         bool: True if sent successfully, False otherwise.
     """
-    sender_email = settings.SMTP_USERNAME or "noreply@virality.media"
-    smtp_server = settings.SMTP_SERVER
-    smtp_port = int(settings.SMTP_PORT or 587)
+    # Safely get the API key without breaking Pydantic settings if it's missing from config.py
+    api_key = getattr(settings, "RESEND_API_KEY", None) or os.getenv("RESEND_API_KEY")
+    
+    if not api_key:
+        logger.error("[MAIL] RESEND_API_KEY is missing! Cannot send email.")
+        return False
 
-    msg = MIMEText(
-        f"""
-        Your Virality Media verification code is: {otp}
+    resend.api_key = api_key
 
-        This code will expire in 10 minutes.
-        If you didn’t request this, please ignore this email.
-        """
-    )
-    msg["Subject"] = "🔐 Your Virality Verification Code"
-    msg["From"] = sender_email
-    msg["To"] = recipient_email
+    # While testing on the free tier, Resend requires you to send FROM this exact address.
+    # Once you verify your domain later, you can change this back to "noreply@virality.media"
+    sender_email = "Virality Dashboard <onboarding@resend.dev>"
+
+    text_content = f"""
+    Your Virality Media verification code is: {otp}
+
+    This code will expire in 10 minutes.
+    If you didn’t request this, please ignore this email.
+    """
 
     try:
-        # Secure SMTP connection
-        with smtplib.SMTP(smtp_server, smtp_port, timeout=15) as server:
-            server.starttls()
-            server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-            server.sendmail(sender_email, [recipient_email], msg.as_string())
+        # Build the email payload
+        params = {
+            "from": sender_email,
+            "to": recipient_email,
+            "subject": "🔐 Your Virality Verification Code",
+            "text": text_content,
+        }
 
-        logger.info(f"[MAIL] OTP email sent → {recipient_email}")
+        # Send via Resend HTTP API (Port 443 - Bypasses Render's firewall)
+        resend.Emails.send(params)
+
+        logger.info(f"[MAIL] OTP email sent → {recipient_email} via Resend")
         return True
 
     except Exception as e:
