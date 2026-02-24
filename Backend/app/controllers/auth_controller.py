@@ -3,6 +3,7 @@ from pydantic import BaseModel, EmailStr
 import random
 import string
 from datetime import datetime, timedelta
+from bson import ObjectId
 from jose import jwt
 
 from app.utils.logger import get_logger
@@ -138,3 +139,27 @@ def verify_otp(data: OtpVerify):
             "user_id": str(user["_id"]),
             "isAdmin": is_admin
         }
+
+# Backend/app/controllers/auth_controller.py
+@router.post("/verify-oauth-session")
+async def verify_oauth_session(payload: dict):
+    token = payload.get("token")
+    try:
+        # Decode the short-lived transfer token
+        decoded = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if decoded.get("type") != "oauth_handshake":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+            
+        user_id = decoded.get("sub")
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        
+        # Return a fresh, full-access session token
+        access_token = create_access_token(data={
+            "sub": user["email"], 
+            "user_id": str(user["_id"]),
+            "isAdmin": user.get("isAdmin", False)
+        })
+        
+        return {"access_token": access_token}
+    except Exception:
+        raise HTTPException(status_code=401, detail="Session verification failed")

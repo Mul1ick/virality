@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Query, BackgroundTasks, HTTPException
 from fastapi.responses import RedirectResponse
+from app.controllers.auth_controller import create_access_token # Ensure this is accessible
 from pydantic import BaseModel
 from typing import List, Dict
 from app.utils.logger import get_logger
@@ -70,14 +71,18 @@ def meta_callback(code: str = Query(...), state: str = Query(...)):
         raise HTTPException(status_code=400, detail=f"Invalid state: {e}")
 
     token_data = exchange_code_for_token(code)
-    access_token = token_data.get("access_token")
-    expires_in = token_data.get("expires_in")
+    user_info = get_user_info(token_data.get("access_token"))
+    save_meta_connection(user_id, token_data.get("access_token"), token_data.get("expires_in"), user_info.get("id"))
 
-    user_info = get_user_info(access_token)
-    platform_user_id = user_info.get("id")
+    transfer_token = create_access_token(data={
+        "sub": user_id, 
+        "type": "oauth_handshake"
+    })
 
-    save_meta_connection(user_id, access_token, expires_in, platform_user_id)
-    return RedirectResponse(url=f"{config.settings.FRONTEND_URL}/select-meta-account?user_id={user_id}")
+    # save_meta_connection(user_id, access_token, expires_in, platform_user_id)
+    return RedirectResponse(
+        url=f"{config.settings.FRONTEND_URL}/select-meta-account?user_id={user_id}&token={transfer_token}"
+    )
 
 
 # ---------------------------------------------------------------------------

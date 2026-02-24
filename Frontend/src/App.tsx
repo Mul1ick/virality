@@ -54,14 +54,10 @@ const App = () => (
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/select-meta-account"
-            element={
-              <ProtectedRoute>
-                <SelectMetaAccount />
-              </ProtectedRoute>
-            }
-          />
+          <Route 
+  path="/select-meta-account" 
+  element={<SelectMetaAccount />} 
+/>
           <Route
             path="/select-google-account"
             element={

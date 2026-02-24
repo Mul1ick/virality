@@ -3,28 +3,49 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AccountSelectionModal } from "@/components/modals/AccountSelectionModal";
 import { Loader2 } from "lucide-react";
+import apiClient from "@/lib/api";
 
 const SelectMetaAccount = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const userId = searchParams.get("user_id");
+  const transferToken = searchParams.get("token"); // <-- 1. Grab the token from URL
 
-  useEffect(() => {
-    if (!userId) {
-      // No user_id - redirect to signin
-      navigate("/signin");
-      return;
-    }
+useEffect(() => {
+    const initializeAuth = async () => {
+      // If no token or user_id in URL, check fallback
+      if (!userId || !transferToken) {
+        const token = localStorage.getItem("access_token");
+        if (!token) navigate("/signin");
+        return;
+      }
 
-    // Open modal automatically when page loads
-    setIsModalOpen(true);
-  }, [userId, navigate]);
+      try {
+        // 2. SEND THE TOKEN: The backend is looking for `payload.get("token")`
+        const response = await apiClient.post("/auth/verify-oauth-session", { 
+          token: transferToken // <-- Changed from user_id to token
+        });
+
+        // 3. PERSIST SESSION
+        localStorage.setItem("access_token", response.data.access_token);
+        localStorage.setItem("user_id", userId);
+
+        setIsModalOpen(true);
+      } catch (error) {
+        console.error("OAuth session verification failed:", error);
+        localStorage.removeItem("access_token");
+        navigate("/signin");
+      }
+    };
+
+    initializeAuth();
+  }, [userId, transferToken, navigate]); // <-- Add transferToken to dependency array
 
   const handleComplete = (accountId: string) => {
     console.log("✅ Meta account selected:", accountId);
     // Redirect to dashboard with user_id
-    navigate(`/?user_id=${userId}`);
+    navigate("/dashboard");
   };
 
   const handleCancel = () => {
