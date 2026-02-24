@@ -101,6 +101,7 @@ function VerifyOTP() {
       localStorage.clear();
       localStorage.setItem("access_token", response.data.access_token);
       localStorage.setItem("user_id", response.data.user_id);
+      localStorage.setItem("user_email", email);
       localStorage.setItem("isAdmin", response.data.isAdmin ? "true" : "false");
 
       navigate("/dashboard");

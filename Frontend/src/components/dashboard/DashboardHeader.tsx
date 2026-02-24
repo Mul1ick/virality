@@ -33,10 +33,10 @@ export const DashboardHeader = ({
   const [userEmail, setUserEmail] = useState("");
 
   useEffect(() => {
-    const userId = localStorage.getItem("user_id");
-    if (userId) {
-      setUserEmail(userId);
-      const initial = userId.charAt(0).toUpperCase();
+    const email = localStorage.getItem("user_email");
+    if (email) {
+      setUserEmail(email);
+      const initial = email.charAt(0).toUpperCase();
       setUserName(initial);
     }
   }, []);

@@ -63,7 +63,7 @@ const getStatusBadge = (status, comingSoon = false) => {
   );
 };
 
-const IntegrationCard = ({ integration, onConnect, isLoading }) => (
+const IntegrationCard = ({ integration, onConnect, loadingPlatform }) => (
   <Card
     className={`bg-card/50 border-border/50 backdrop-blur-sm hover:border-primary/30 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 group ${
       integration.comingSoon ? "opacity-75" : ""
@@ -125,7 +125,7 @@ const IntegrationCard = ({ integration, onConnect, isLoading }) => (
           !integration.comingSoon && onConnect(integration.connectHandler)
         }
         disabled={
-          isLoading ||
+          !!loadingPlatform ||
           integration.status === "Connected" ||
           integration.comingSoon
         }
@@ -143,7 +143,7 @@ const IntegrationCard = ({ integration, onConnect, isLoading }) => (
         ) : (
           <>
             <Link className="h-4 w-4 mr-2" />
-            {isLoading ? "Connecting..." : "Connect Now"}
+            {loadingPlatform === integration.connectHandler ? "Connecting..." : "Connect Now"}
           </>
         )}
       </Button>
@@ -152,7 +152,7 @@ const IntegrationCard = ({ integration, onConnect, isLoading }) => (
 );
 
 const Profile = () => {
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingPlatform, setLoadingPlatform] = useState<string | null>(null);
   const [connectedAccounts, setConnectedAccounts] = useState({
     meta: false,
     google: false,
@@ -334,7 +334,7 @@ const Profile = () => {
   ];
 
   const handleGoogleLogin = async () => {
-    setIsLoading(true);
+    setLoadingPlatform("google");
 
     try {
       console.log("Requesting Google redirect URL from backend...");
@@ -349,7 +349,7 @@ const Profile = () => {
         setProfileError(
           "Could not initiate Google connection. Please try again."
         );
-        setIsLoading(false);
+        setLoadingPlatform(null);
       }
     } catch (error: any) {
       console.error("Error initiating Google login:", error);
@@ -358,12 +358,12 @@ const Profile = () => {
           error.response?.data?.detail || "Failed to start Google connection."
         );
       }
-      setIsLoading(false);
+      setLoadingPlatform(null);
     }
   };
 
   const handleMetaLogin = async () => {
-    setIsLoading(true);
+    setLoadingPlatform("meta");
 
     try {
       console.log("Requesting Meta redirect URL from backend...");
@@ -378,7 +378,7 @@ const Profile = () => {
         setProfileError(
           "Could not initiate Meta connection. Please try again."
         );
-        setIsLoading(false);
+        setLoadingPlatform(null);
       }
     } catch (error: any) {
       console.error("Error initiating Meta login:", error);
@@ -387,7 +387,7 @@ const Profile = () => {
           error.response?.data?.detail || "Failed to start Meta connection."
         );
       }
-      setIsLoading(false);
+      setLoadingPlatform(null);
     }
   };
 
@@ -731,7 +731,7 @@ const Profile = () => {
                   key={integration.name}
                   integration={integration}
                   onConnect={handleConnect}
-                  isLoading={isLoading}
+                  loadingPlatform={loadingPlatform}
                 />
               ))}
             </div>
