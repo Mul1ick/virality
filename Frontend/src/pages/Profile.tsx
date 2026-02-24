@@ -553,17 +553,15 @@ const Profile = () => {
                   Admin Portal
                 </Button>
               )}
-              {hasAnyConnection && (
-                <Button
-                  onClick={handleGoToDashboard}
-                  size="lg"
-                  className="hidden md:flex shadow-lg shadow-primary/20"
-                >
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  View Dashboard
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              )}
+              <Button
+                onClick={handleGoToDashboard}
+                size="lg"
+                className="shadow-lg shadow-primary/20"
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                View Dashboard
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
             </div>
           </div>
         </div>
