@@ -46,7 +46,7 @@ export const DashboardSidebar = ({
   ];
 
   return (
-    <aside className="w-64 h-full bg-card/30 border-r border-border/50 backdrop-blur-xl overflow-y-auto mt-2">
+    <aside className="w-full md:w-64 h-full bg-card/30 md:border-r border-border/50 backdrop-blur-xl overflow-y-auto md:mt-2">
       {/* Main Navigation */}
       <nav className="p-4 space-y-2">
         {mainTabs.map((tab) => {
@@ -80,7 +80,7 @@ export const DashboardSidebar = ({
 
               {/* Sub-tabs for Overview */}
               {tab.id === "overview" && isActive && onSubTabChange && (
-                <div className="ml-4 mt-2 space-y-1 pl-4 border-l-2 border-primary/20">
+                <div className="ml-2 sm:ml-4 mt-2 space-y-1 pl-2 sm:pl-4 border-l-2 border-primary/20">
                   {overviewSubTabs.map((subTab) => {
                     const SubIcon = subTab.icon;
                     const isSubActive = activeSubTab === subTab.id;

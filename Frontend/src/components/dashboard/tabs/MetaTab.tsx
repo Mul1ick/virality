@@ -123,13 +123,13 @@ export const MetaTab = ({
   return (
     <div className="bg-card/50 backdrop-blur-sm rounded-lg border border-slate-700/50 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-blue-500/10 rounded-lg">
             <Facebook className="h-6 w-6 text-blue-400" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-foreground">
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground">
               Meta Campaigns & Ads
             </h2>
             <p className="text-sm text-muted-foreground">
@@ -138,10 +138,10 @@ export const MetaTab = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
           {/* Date Range Selector */}
           <Select value={dateRange} onValueChange={handleDateRangeChange}>
-            <SelectTrigger className="w-[160px] border-slate-700/50 bg-slate-800/50">
+            <SelectTrigger className="w-full sm:w-[160px] border-slate-700/50 bg-slate-800/50">
               <Calendar className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Select range" />
             </SelectTrigger>
@@ -172,8 +172,8 @@ export const MetaTab = ({
 
       {/* Custom Date Picker */}
       {showCustomPicker && (
-        <div className="mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
-          <div className="flex items-center justify-between gap-4">
+        <div className="mb-4 sm:mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex-1">
               <p className="text-sm font-medium mb-2 text-foreground">
                 Select Custom Date Range

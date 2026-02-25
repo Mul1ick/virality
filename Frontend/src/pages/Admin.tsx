@@ -105,7 +105,7 @@ const Admin = () => {
         
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl flex items-center gap-2">
+            <CardTitle className="text-xl sm:text-2xl flex items-center gap-2">
               <UserCheck className="h-6 w-6 text-primary" />
               Admin Portal - User Management
             </CardTitle>
@@ -125,55 +125,59 @@ const Admin = () => {
                 {pendingUsers.length > 0 && (
                   <div>
                     <h3 className="text-lg font-semibold mb-3">Pending Requests</h3>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {pendingUsers.map((user) => (
-                          <TableRow key={user._id}>
-                            <TableCell>{user.name}</TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell>{getStatusBadge(user.status)}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex gap-2 justify-end">
-                                <Button size="sm" onClick={() => handleUpdateStatus(user._id, 'approve')} className="bg-success hover:bg-success/90">Approve</Button>
-                                <Button size="sm" variant="destructive" onClick={() => handleUpdateStatus(user._id, 'reject')}>Reject</Button>
-                              </div>
-                            </TableCell>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {pendingUsers.map((user) => (
+                            <TableRow key={user._id}>
+                              <TableCell>{user.name}</TableCell>
+                              <TableCell>{user.email}</TableCell>
+                              <TableCell>{getStatusBadge(user.status)}</TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex gap-1 sm:gap-2 justify-end flex-nowrap">
+                                  <Button size="sm" onClick={() => handleUpdateStatus(user._id, 'approve')} className="bg-success hover:bg-success/90">Approve</Button>
+                                  <Button size="sm" variant="destructive" onClick={() => handleUpdateStatus(user._id, 'reject')}>Reject</Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                 )}
 
                 {otherUsers.length > 0 && (
                    <div>
                     <h3 className="text-lg font-semibold mb-3">All Other Users</h3>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {otherUsers.map((user) => (
-                          <TableRow key={user._id}>
-                            <TableCell>{user.name}</TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell>{getStatusBadge(user.status)}</TableCell>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Status</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {otherUsers.map((user) => (
+                            <TableRow key={user._id}>
+                              <TableCell>{user.name}</TableCell>
+                              <TableCell>{user.email}</TableCell>
+                              <TableCell>{getStatusBadge(user.status)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                 )}
               </div>

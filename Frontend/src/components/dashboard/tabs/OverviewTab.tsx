@@ -117,7 +117,7 @@ export const OverviewTab = ({
         return (
           <>
             {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
                 {[...Array(4)].map((_, i) => (
                   <MetricCard
                     key={i}
@@ -139,7 +139,7 @@ export const OverviewTab = ({
             ) : (
               <>
                 {/* Meta Metric Cards - NO DUMMY TRENDS */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
                   <MetricCard
                     title="Total Ad Spend"
                     value={formatCurrency(metaTotals.spend)}
@@ -188,7 +188,7 @@ export const OverviewTab = ({
         return (
           <>
             {googleLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
                 {[...Array(4)].map((_, i) => (
                   <MetricCard
                     key={i}
@@ -210,7 +210,7 @@ export const OverviewTab = ({
             ) : googleData ? (
               <>
                 {/* Google Metric Cards - NO DUMMY TRENDS */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
                   <MetricCard
                     title="Total Ad Spend"
                     value={formatCurrency(googleData.totalSpend)}
@@ -283,7 +283,7 @@ export const OverviewTab = ({
             {/* Animated gradient background */}
             <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 animate-pulse"></div>
 
-            <div className="relative z-10 p-12">
+            <div className="relative z-10 p-6 sm:p-8 lg:p-12">
               <div className="max-w-xl mx-auto text-center space-y-4">
                 {/* Icon */}
                 <div className="flex justify-center mb-4">
@@ -299,7 +299,7 @@ export const OverviewTab = ({
                 <div className="space-y-2">
                   <div className="flex items-center justify-center gap-2">
                     <Lock className="h-4 w-4 text-green-500" />
-                    <h3 className="text-2xl font-bold text-foreground">
+                    <h3 className="text-xl sm:text-2xl font-bold text-foreground">
                       Shopify Analytics
                     </h3>
                   </div>
@@ -317,7 +317,7 @@ export const OverviewTab = ({
                 </p>
 
                 {/* Features Preview */}
-                <div className="grid grid-cols-3 gap-3 mt-6 text-left">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 text-left">
                   <div className="p-3 bg-card/50 rounded-lg border border-border/50">
                     <DollarSign className="h-5 w-5 text-green-500 mb-2" />
                     <p className="text-xs font-semibold text-foreground">

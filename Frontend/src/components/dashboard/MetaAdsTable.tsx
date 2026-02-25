@@ -120,8 +120,8 @@ export const MetaAdsTable = ({
 
   return (
     // ✅ FIXED: Added relative positioning to prevent z-index issues
-    <Card className="bg-card/50 backdrop-blur-sm border-slate-700/50 p-6 relative">
-      <div className="space-y-4">
+    <Card className="bg-card/50 backdrop-blur-sm border-slate-700/50 p-4 sm:p-6 relative">
+      <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-foreground">Meta Ads</h3>

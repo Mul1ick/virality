@@ -69,23 +69,23 @@ const IntegrationCard = ({ integration, onConnect, loadingPlatform }) => (
       integration.comingSoon ? "opacity-75" : ""
     }`}
   >
-    <CardHeader className="pb-4">
-      <div className="flex items-start justify-between">
+    <CardHeader className="pb-4 px-4 sm:px-6">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-3">
           <div
-            className={`p-3 rounded-xl bg-gradient-to-br ${
+            className={`p-2.5 sm:p-3 rounded-xl bg-gradient-to-br shrink-0 ${
               integration.gradient
             } shadow-md group-hover:scale-105 transition-transform duration-300 ${
               integration.comingSoon ? "opacity-60" : ""
             }`}
           >
-            <integration.icon className="h-6 w-6 text-white" />
+            <integration.icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
           </div>
-          <div>
-            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <div className="min-w-0">
+            <CardTitle className="text-base sm:text-lg font-semibold text-foreground flex items-center gap-2">
               {integration.name}
               {integration.comingSoon && (
-                <Lock className="h-4 w-4 text-amber-500" />
+                <Lock className="h-4 w-4 text-amber-500 shrink-0" />
               )}
             </CardTitle>
             <CardDescription className="text-xs mt-1 text-muted-foreground">
@@ -96,7 +96,7 @@ const IntegrationCard = ({ integration, onConnect, loadingPlatform }) => (
         {getStatusBadge(integration.status, integration.comingSoon)}
       </div>
     </CardHeader>
-    <CardContent className="pb-4">
+    <CardContent className="pb-4 px-4 sm:px-6">
       <p className="text-sm text-muted-foreground leading-relaxed">
         {integration.description}
       </p>
@@ -113,7 +113,7 @@ const IntegrationCard = ({ integration, onConnect, loadingPlatform }) => (
         </div>
       )}
     </CardContent>
-    <CardFooter>
+    <CardFooter className="px-4 sm:px-6">
       <Button
         className="w-full transition-all duration-300"
         variant={
@@ -525,23 +525,23 @@ const Profile = () => {
 
       {/* Header Section */}
       <div className="bg-card/30 border-b border-border/50 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 md:px-10 py-8">
-          <div className="flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-10 py-6 sm:py-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-foreground flex items-center gap-3 mb-2">
-                <div className="relative">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                <div className="relative shrink-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-xl blur-md"></div>
-                  <div className="relative p-2 bg-gradient-to-br from-primary to-secondary rounded-xl shadow-lg">
-                    <User className="h-7 w-7 text-white" />
+                  <div className="relative p-1.5 sm:p-2 bg-gradient-to-br from-primary to-secondary rounded-xl shadow-lg">
+                    <User className="h-5 w-5 sm:h-7 sm:w-7 text-white" />
                   </div>
                 </div>
                 <span className="text-gradient">Profile & Settings</span>
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Manage your account and connect advertising platforms
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {isAdmin && (
                 <Button
                   onClick={() => navigate("/admin")}
@@ -555,7 +555,6 @@ const Profile = () => {
               )}
               <Button
                 onClick={handleGoToDashboard}
-                size="lg"
                 className="shadow-lg shadow-primary/20"
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
@@ -569,32 +568,32 @@ const Profile = () => {
 
       {/* Success Banner */}
       {hasAnyConnection && (
-        <div className="max-w-7xl mx-auto px-6 md:px-10 mt-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-10 mt-4 sm:mt-6">
           <Card className="bg-success/10 border-success/30 backdrop-blur-sm overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-r from-success/0 via-success/5 to-success/0 animate-pulse"></div>
-            <CardContent className="pt-4 pb-4 relative z-10">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-success/20 rounded-lg">
+            <CardContent className="pt-4 pb-4 px-4 sm:px-6 relative z-10">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 bg-success/20 rounded-lg shrink-0">
                     <CheckCircle className="h-5 w-5 text-success" />
                   </div>
-                  <div>
-                    <p className="font-semibold text-foreground">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground text-sm sm:text-base">
                       {connectedCount} Platform{connectedCount > 1 ? "s" : ""}{" "}
                       Connected
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Your data is syncing automatically
                     </p>
                   </div>
                 </div>
                 <Button
                   onClick={handleGoToDashboard}
-                  className="md:hidden shadow-md"
+                  className="md:hidden shadow-md shrink-0"
                   size="sm"
                 >
                   Dashboard
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
             </CardContent>
@@ -603,8 +602,8 @@ const Profile = () => {
       )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 md:px-10 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-10 py-6 sm:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
           {/* LEFT: Profile Card */}
           <div className="lg:col-span-1">
             <Card className="bg-card/50 border-border/50 backdrop-blur-sm shadow-lg">
@@ -639,7 +638,7 @@ const Profile = () => {
 
               <Separator className="bg-border/50" />
 
-              <CardContent className="space-y-5 pt-6">
+              <CardContent className="space-y-5 pt-6 px-4 sm:px-6">
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
                     <div className="p-2 bg-primary/10 rounded-lg mt-0.5">
@@ -688,11 +687,10 @@ const Profile = () => {
 
               <Separator className="bg-border/50" />
 
-              <CardFooter className="flex flex-col gap-3 pt-6">
+              <CardFooter className="flex flex-col gap-2.5 pt-6 px-4 sm:px-6">
                 <Button
                   variant="secondary"
                   className="w-full border-border/50"
-                  size="lg"
                 >
                   <Settings className="h-4 w-4 mr-2" />
                   Edit Profile
@@ -700,7 +698,6 @@ const Profile = () => {
                 <Button
                   variant="outline"
                   className="w-full border-border/50 hover:border-destructive/50 hover:text-destructive"
-                  size="lg"
                   onClick={handleSignOut}
                 >
                   <LogOut className="h-4 w-4 mr-2" />
@@ -711,19 +708,19 @@ const Profile = () => {
           </div>
 
           {/* RIGHT: Integrations */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="bg-card/50 border-border/50 backdrop-blur-sm p-6">
-              <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
-                <Link className="h-6 w-6 text-primary" />
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+            <Card className="bg-card/50 border-border/50 backdrop-blur-sm p-4 sm:p-6">
+              <h2 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 flex items-center gap-2">
+                <Link className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
                 Platform Integrations
               </h2>
-              <p className="text-muted-foreground">
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Connect your advertising platforms to start tracking performance
-                metrics. All data syncs automatically once connected.
+                metrics.
               </p>
             </Card>
 
-            <div className="space-y-5">
+            <div className="space-y-4 sm:space-y-5">
               {integrations.map((integration) => (
                 <IntegrationCard
                   key={integration.name}
@@ -737,16 +734,16 @@ const Profile = () => {
             {/* Help Card */}
             <Card className="bg-primary/10 border-primary/30 backdrop-blur-sm overflow-hidden relative">
               <div className="absolute inset-0 animated-gradient"></div>
-              <CardContent className="pt-6 relative z-10">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-primary/20 rounded-xl">
-                    <Zap className="h-6 w-6 text-primary" />
+              <CardContent className="pt-5 pb-5 px-4 sm:px-6 sm:pt-6 relative z-10">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="p-2.5 sm:p-3 bg-primary/20 rounded-xl shrink-0">
+                    <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-lg mb-1 text-foreground">
+                    <h3 className="font-semibold text-base sm:text-lg mb-1 text-foreground">
                       Need Help Connecting?
                     </h3>
-                    <p className="text-sm text-muted-foreground mb-3">
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-3">
                       Check our documentation or contact support if you're
                       having trouble connecting your accounts.
                     </p>

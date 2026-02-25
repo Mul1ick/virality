@@ -88,7 +88,7 @@ export const MetaDemographicsChart = ({
         </div>
       </div>
 
-      <div className="h-[350px] w-full">
+      <div className="h-[280px] sm:h-[350px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}

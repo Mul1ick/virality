@@ -9,6 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
 import { DateRange } from "react-day-picker";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DateRangeSelectorProps {
   date: string;
@@ -28,6 +29,7 @@ export const DateRangeSelector = ({
     customRange
   );
   const [key, setKey] = useState(0); // Force re-render of calendar
+  const isMobile = useIsMobile();
 
   // When opening the popover, clear temp range if not already on custom
   const handleOpenChange = (open: boolean) => {
@@ -89,58 +91,60 @@ export const DateRangeSelector = ({
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            className="w-[280px] justify-start text-left font-normal"
+            className="w-full sm:w-[280px] justify-start text-left font-normal"
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
+            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
             {getDisplayText()}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <div className="flex">
+        <PopoverContent className="w-[calc(100vw-2rem)] sm:w-auto p-0" align="start">
+          <div className="flex flex-col sm:flex-row">
             {/* Preset Options */}
-            <div className="border-r p-3 space-y-1 min-w-[140px]">
+            <div className="border-b sm:border-b-0 sm:border-r p-3 space-y-1 min-w-0 sm:min-w-[140px]">
               <div className="text-xs font-semibold mb-2 px-2 text-muted-foreground uppercase">
                 Quick Select
               </div>
-              <Button
-                variant={date === "today" ? "secondary" : "ghost"}
-                className="w-full justify-start text-sm h-9"
-                onClick={() => handlePresetClick("today")}
-              >
-                Today
-              </Button>
-              <Button
-                variant={date === "7days" ? "secondary" : "ghost"}
-                className="w-full justify-start text-sm h-9"
-                onClick={() => handlePresetClick("7days")}
-              >
-                Last 7 days
-              </Button>
-              <Button
-                variant={date === "30days" ? "secondary" : "ghost"}
-                className="w-full justify-start text-sm h-9"
-                onClick={() => handlePresetClick("30days")}
-              >
-                Last 30 days
-              </Button>
-              <Button
-                variant={date === "90days" ? "secondary" : "ghost"}
-                className="w-full justify-start text-sm h-9"
-                onClick={() => handlePresetClick("90days")}
-              >
-                Last 90 days
-              </Button>
-              <Button
-                variant={date === "lifetime" ? "secondary" : "ghost"}
-                className="w-full justify-start text-sm h-9"
-                onClick={() => handlePresetClick("lifetime")}
-              >
-                Lifetime
-              </Button>
+              <div className="flex flex-wrap sm:flex-col gap-1">
+                <Button
+                  variant={date === "today" ? "secondary" : "ghost"}
+                  className="justify-start text-sm h-9 flex-1 sm:flex-none sm:w-full"
+                  onClick={() => handlePresetClick("today")}
+                >
+                  Today
+                </Button>
+                <Button
+                  variant={date === "7days" ? "secondary" : "ghost"}
+                  className="justify-start text-sm h-9 flex-1 sm:flex-none sm:w-full"
+                  onClick={() => handlePresetClick("7days")}
+                >
+                  Last 7 days
+                </Button>
+                <Button
+                  variant={date === "30days" ? "secondary" : "ghost"}
+                  className="justify-start text-sm h-9 flex-1 sm:flex-none sm:w-full"
+                  onClick={() => handlePresetClick("30days")}
+                >
+                  Last 30 days
+                </Button>
+                <Button
+                  variant={date === "90days" ? "secondary" : "ghost"}
+                  className="justify-start text-sm h-9 flex-1 sm:flex-none sm:w-full"
+                  onClick={() => handlePresetClick("90days")}
+                >
+                  Last 90 days
+                </Button>
+                <Button
+                  variant={date === "lifetime" ? "secondary" : "ghost"}
+                  className="justify-start text-sm h-9 flex-1 sm:flex-none sm:w-full"
+                  onClick={() => handlePresetClick("lifetime")}
+                >
+                  Lifetime
+                </Button>
+              </div>
             </div>
 
             {/* Calendar */}
-            <div className="p-3">
+            <div className="p-3 overflow-x-auto">
               <div className="text-xs font-semibold mb-3 text-muted-foreground uppercase">
                 Custom Range
               </div>
@@ -150,7 +154,7 @@ export const DateRangeSelector = ({
                 defaultMonth={tempRange?.from || new Date()}
                 selected={tempRange}
                 onSelect={handleCustomRangeSelect}
-                numberOfMonths={2}
+                numberOfMonths={isMobile ? 1 : 2}
                 disabled={(date) => date > new Date()}
               />
             </div>

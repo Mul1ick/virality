@@ -117,12 +117,12 @@ export const ShopifyOrdersTable = ({
   }
 
   return (
-    <Card className="p-6">
+    <Card className="p-4 sm:p-6">
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-lg font-semibold">Shopify Orders</h3>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               {orders.length} total orders • Showing {startIndex + 1}-
               {Math.min(endIndex, limitedOrders.length)} of first{" "}
               {limitedOrders.length}
@@ -231,11 +231,11 @@ export const ShopifyOrdersTable = ({
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between pt-4 border-t">
-            <p className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
+          <div className="flex items-center justify-between pt-4 border-t gap-2">
+            <p className="text-xs sm:text-sm text-muted-foreground shrink-0">
+              Page {currentPage}/{totalPages}
             </p>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 sm:gap-2">
               <Button
                 variant="outline"
                 size="sm"

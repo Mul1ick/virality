@@ -213,7 +213,7 @@ function VerifyOTP() {
       </div>
 
       {/* RIGHT SIDE - OTP Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
         <Card className="w-full max-w-md bg-card/50 border-border/50 backdrop-blur-xl shadow-2xl">
           <CardHeader className="space-y-1 text-center">
             {/* Mobile Logo */}
@@ -251,7 +251,7 @@ function VerifyOTP() {
                 <label className="block text-sm font-medium text-foreground mb-4">
                   Verification Code
                 </label>
-                <div className="flex gap-2 justify-between">
+                <div className="flex gap-1.5 sm:gap-2 justify-between">
                   {otp.map((digit, index) => (
                     <input
                       key={index}
@@ -263,7 +263,7 @@ function VerifyOTP() {
                       onChange={(e) => handleChange(index, e.target.value)}
                       onKeyDown={(e) => handleKeyDown(index, e)}
                       onPaste={handlePaste}
-                      className="w-12 h-14 text-center text-2xl font-bold bg-background/50 text-foreground border-2 border-border/50 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all disabled:opacity-50"
+                      className="w-10 h-12 sm:w-12 sm:h-14 text-center text-lg sm:text-2xl font-bold bg-background/50 text-foreground border-2 border-border/50 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all disabled:opacity-50"
                       disabled={isLoading}
                     />
                   ))}

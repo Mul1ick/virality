@@ -194,7 +194,7 @@ const SignIn = () => {
       </div>
 
       {/* RIGHT SIDE - Sign In Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
         <Card className="w-full max-w-md bg-card/50 border-border/50 backdrop-blur-xl shadow-2xl">
           <CardHeader className="space-y-1 text-center">
             {/* Mobile Logo */}

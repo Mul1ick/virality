@@ -1,7 +1,7 @@
 // FILE: Frontend/src/pages/Index.tsx
 import { useState, useEffect } from "react";
 import { DateRange } from "react-day-picker";
-import { Loader2, X, AlertCircle } from "lucide-react";
+import { Loader2, X, AlertCircle, Zap } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { OverviewTab } from "@/components/dashboard/tabs/OverviewTab";
@@ -13,6 +13,8 @@ import { usePlatformStatus } from "@/hooks/usePlatformStatus";
 import { useOverviewData } from "@/hooks/useOverviewData";
 import { useGoogleOverviewData } from "@/hooks/useGoogleOverviewData";
 import { Card } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { useSidebarState } from "@/hooks/useSidebarState";
 
 const Index = () => {
   const [dateRange, setDateRange] = useState("30days");
@@ -20,6 +22,7 @@ const Index = () => {
   const [showHistoricalBanner, setShowHistoricalBanner] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [activeSubTab, setActiveSubTab] = useState("meta");
+  const { isOpen: sidebarOpen, setIsOpen: setSidebarOpen, toggle: toggleSidebar } = useSidebarState();
 
   // Get userId from URL params first, then fall back to localStorage
   const urlParams = new URLSearchParams(window.location.search);
@@ -195,12 +198,13 @@ const Index = () => {
         onDateRangeChange={handleDateRangeChange}
         customRange={customRange}
         onCustomRangeChange={handleCustomRangeChange}
+        onToggleSidebar={toggleSidebar}
       />
 
       {/* Main Layout with Sidebar */}
       <div className="flex h-[calc(100vh-73px)]">
-        {/* Sidebar - Fixed position with high z-index */}
-        <div className="fixed left-0 top-[73px] h-[calc(100vh-73px)] z-40">
+        {/* Desktop Sidebar - hidden on mobile */}
+        <div className="hidden md:block fixed left-0 top-[73px] h-[calc(100vh-73px)] z-40">
           <DashboardSidebar
             activeTab={activeTab}
             onTabChange={setActiveTab}
@@ -209,9 +213,43 @@ const Index = () => {
           />
         </div>
 
-        {/* Main Content - With left margin to account for sidebar */}
-        <main className="flex-1 ml-64 overflow-x-hidden">
-          <div className="container mx-auto px-6 py-6 max-w-[calc(100vw-16rem)]">
+        {/* Mobile Sidebar - Sheet drawer */}
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetContent side="left" className="p-0 w-[280px] bg-card/95 backdrop-blur-xl border-border/50 [&>button]:hidden">
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
+            {/* Custom branded header with close button */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-gradient-to-br from-primary to-secondary rounded-lg">
+                  <Zap className="h-4 w-4 text-white" />
+                </div>
+                <span className="font-semibold text-foreground text-sm">Navigation</span>
+              </div>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <DashboardSidebar
+              activeTab={activeTab}
+              onTabChange={(tab) => {
+                setActiveTab(tab);
+                setSidebarOpen(false);
+              }}
+              activeSubTab={activeSubTab}
+              onSubTabChange={(subTab) => {
+                setActiveSubTab(subTab);
+                setSidebarOpen(false);
+              }}
+            />
+          </SheetContent>
+        </Sheet>
+
+        {/* Main Content - With left margin to account for sidebar on desktop */}
+        <main className="flex-1 md:ml-64 overflow-x-hidden">
+          <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-6 max-w-full md:max-w-[calc(100vw-16rem)]">
             {/* Platform Error Banner */}
             {platformsError && (
               <Card className="bg-destructive/10 border-destructive/50 backdrop-blur-sm p-4 mb-6">
@@ -245,7 +283,7 @@ const Index = () => {
                   </button>
 
                   <div className="flex items-center gap-3 pr-8 relative z-10">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <Loader2 className="h-5 w-5 animate-spin text-primary shrink-0" />
                     <div>
                       <p className="font-semibold text-foreground">
                         Loading Historical Data

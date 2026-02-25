@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import axios from "axios";
 import apiClient from "@/lib/api";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ChartDataPoint {
   date: string;
@@ -31,6 +32,7 @@ const GoogleTrendChart: React.FC<GoogleTrendChartProps> = ({
   customerId,
   userId,
 }) => {
+  const isMobile = useIsMobile();
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,17 +98,17 @@ const GoogleTrendChart: React.FC<GoogleTrendChartProps> = ({
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+      <div className="bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-lg">
         <p className="font-bold">Error</p>
-        <p>{error}</p>
+        <p className="text-sm">{error}</p>
       </div>
     );
   }
 
   if (chartData.length === 0) {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded">
-        <p>No trend data available for the last 30 days.</p>
+      <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-4 py-3 rounded-lg">
+        <p className="text-sm">No trend data available for the last 30 days.</p>
       </div>
     );
   }
@@ -114,11 +116,11 @@ const GoogleTrendChart: React.FC<GoogleTrendChartProps> = ({
   return (
     <div className="w-full">
       <div className="mb-4">
-        <h3 className="text-xl font-semibold">Google Ads Performance Trends</h3>
-        <p className="text-gray-600">Last 30 days</p>
+        <h3 className="text-xl font-semibold text-foreground">Google Ads Performance Trends</h3>
+        <p className="text-muted-foreground text-sm">Last 30 days</p>
       </div>
 
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={isMobile ? 250 : 400}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis
@@ -169,33 +171,33 @@ const GoogleTrendChart: React.FC<GoogleTrendChartProps> = ({
       </ResponsiveContainer>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-4 gap-4 mt-6">
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Total Clicks</p>
-          <p className="text-2xl font-bold text-blue-600">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-6">
+        <div className="bg-blue-500/10 border border-blue-500/20 p-3 sm:p-4 rounded-lg">
+          <p className="text-xs sm:text-sm text-muted-foreground">Total Clicks</p>
+          <p className="text-lg sm:text-2xl font-bold text-blue-400">
             {chartData.reduce((sum, d) => sum + d.clicks, 0).toLocaleString()}
           </p>
         </div>
-        <div className="bg-green-50 p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Total Impressions</p>
-          <p className="text-2xl font-bold text-green-600">
+        <div className="bg-green-500/10 border border-green-500/20 p-3 sm:p-4 rounded-lg">
+          <p className="text-xs sm:text-sm text-muted-foreground">Total Impressions</p>
+          <p className="text-lg sm:text-2xl font-bold text-green-400">
             {chartData
               .reduce((sum, d) => sum + d.impressions, 0)
               .toLocaleString()}
           </p>
         </div>
-        <div className="bg-orange-50 p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Total Spend</p>
-          <p className="text-2xl font-bold text-orange-600">
+        <div className="bg-orange-500/10 border border-orange-500/20 p-3 sm:p-4 rounded-lg">
+          <p className="text-xs sm:text-sm text-muted-foreground">Total Spend</p>
+          <p className="text-lg sm:text-2xl font-bold text-orange-400">
             $
             {chartData
               .reduce((sum, d) => sum + parseFloat(d.spend), 0)
               .toFixed(2)}
           </p>
         </div>
-        <div className="bg-red-50 p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Total Conversions</p>
-          <p className="text-2xl font-bold text-red-600">
+        <div className="bg-red-500/10 border border-red-500/20 p-3 sm:p-4 rounded-lg">
+          <p className="text-xs sm:text-sm text-muted-foreground">Total Conversions</p>
+          <p className="text-lg sm:text-2xl font-bold text-red-400">
             {chartData
               .reduce((sum, d) => sum + parseFloat(d.conversions), 0)
               .toFixed(1)}

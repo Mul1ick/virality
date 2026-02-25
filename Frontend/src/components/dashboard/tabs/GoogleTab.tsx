@@ -117,7 +117,7 @@ export const GoogleTab = ({
 
   return (
     <div className="bg-card rounded-lg border p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6">
         <div className="flex items-center gap-3">
           <svg className="h-6 w-6" viewBox="0 0 24 24">
             <path
@@ -138,16 +138,16 @@ export const GoogleTab = ({
             />
           </svg>
           <div>
-            <h2 className="text-2xl font-bold">Google Ads Campaigns & Ads</h2>
+            <h2 className="text-xl sm:text-2xl font-bold">Google Ads Campaigns & Ads</h2>
             <p className="text-sm text-muted-foreground">
               {getDateRangeText()}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <Select value={dateRange} onValueChange={handleDateRangeChange}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-full sm:w-[160px]">
               <Calendar className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Select range" />
             </SelectTrigger>

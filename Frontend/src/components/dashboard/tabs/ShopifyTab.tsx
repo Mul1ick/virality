@@ -19,14 +19,14 @@ export const ShopifyTab = ({
         {/* Animated gradient background */}
         <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 animate-pulse"></div>
 
-        <div className="relative z-10 p-12">
+        <div className="relative z-10 p-6 sm:p-8 lg:p-12">
           <div className="max-w-2xl mx-auto text-center space-y-6">
             {/* Icon */}
             <div className="flex justify-center mb-6">
               <div className="relative">
                 <div className="absolute inset-0 bg-green-500/30 rounded-full blur-2xl"></div>
                 <div className="relative p-6 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-full border border-green-500/30">
-                  <ShoppingCart className="h-16 w-16 text-green-500" />
+                  <ShoppingCart className="h-12 w-12 sm:h-16 sm:w-16 text-green-500" />
                 </div>
               </div>
             </div>
@@ -35,7 +35,7 @@ export const ShopifyTab = ({
             <div className="space-y-3">
               <div className="flex items-center justify-center gap-2">
                 <Lock className="h-5 w-5 text-green-500" />
-                <h2 className="text-3xl font-bold text-foreground">
+                <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
                   Shopify Integration
                 </h2>
               </div>
@@ -46,7 +46,7 @@ export const ShopifyTab = ({
             </div>
 
             {/* Description */}
-            <p className="text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
+            <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
               We're working on bringing you comprehensive Shopify analytics
               including order tracking, revenue metrics, product performance,
               and customer insights.

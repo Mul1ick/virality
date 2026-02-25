@@ -55,7 +55,7 @@ export const ShopifyCustomersTable = ({
 
   if (isLoading) {
     return (
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading customers...</p>
@@ -66,7 +66,7 @@ export const ShopifyCustomersTable = ({
 
   if (customers.length === 0) {
     return (
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <div className="text-center py-12">
           <p className="text-muted-foreground">
             No customers found. Connect your Shopify store to view customers.
@@ -77,7 +77,7 @@ export const ShopifyCustomersTable = ({
   }
 
   return (
-    <Card className="p-6">
+    <Card className="p-4 sm:p-6">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -170,7 +170,7 @@ export const ShopifyCustomersTable = ({
         )}
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t">
           <div>
             <p className="text-xs text-muted-foreground">Total Customers</p>
             <p className="text-lg font-semibold">{customers.length}</p>

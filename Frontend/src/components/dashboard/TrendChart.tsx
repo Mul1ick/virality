@@ -13,6 +13,7 @@ import {
 import { DailyChartData } from "@/hooks/useOverviewData";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TrendChartProps {
   dateRange: string;
@@ -29,6 +30,8 @@ export const TrendChart = ({
   error,
   platform,
 }: TrendChartProps) => {
+  const isMobile = useIsMobile();
+
   // Format currency
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -175,7 +178,7 @@ export const TrendChart = ({
     <Card className="bg-card/50 backdrop-blur-sm border-slate-700/50 p-6">
       <div className="space-y-6">
         {/* Header with Legend */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-xl font-bold text-foreground">{getTitle()}</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -183,7 +186,7 @@ export const TrendChart = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-cyan-400"></div>
               <span className="text-xs text-slate-300">Spend</span>
@@ -196,7 +199,7 @@ export const TrendChart = ({
         </div>
 
         {/* Chart */}
-        <ResponsiveContainer width="100%" height={320}>
+        <ResponsiveContainer width="100%" height={isMobile ? 220 : 320}>
           <ComposedChart data={formattedData}>
             <defs>
               <linearGradient
@@ -283,9 +286,9 @@ export const TrendChart = ({
         </ResponsiveContainer>
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-700/30">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-700/30">
           <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+            <p className="text-[11px] sm:text-[10px] text-muted-foreground uppercase tracking-wide">
               Total Spend
             </p>
             <p className="text-lg font-bold text-foreground mt-1">
@@ -293,7 +296,7 @@ export const TrendChart = ({
             </p>
           </div>
           <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+            <p className="text-[11px] sm:text-[10px] text-muted-foreground uppercase tracking-wide">
               Avg Daily
             </p>
             <p className="text-lg font-bold text-foreground mt-1">
@@ -301,7 +304,7 @@ export const TrendChart = ({
             </p>
           </div>
           <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+            <p className="text-[11px] sm:text-[10px] text-muted-foreground uppercase tracking-wide">
               Impressions
             </p>
             <p className="text-lg font-bold text-foreground mt-1">
