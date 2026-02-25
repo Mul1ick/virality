@@ -26,7 +26,7 @@ export const DateRangeSelector = ({
 }: DateRangeSelectorProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [tempRange, setTempRange] = useState<DateRange | undefined>(
-    customRange
+    customRange,
   );
   const [key, setKey] = useState(0); // Force re-render of calendar
   const isMobile = useIsMobile();
@@ -64,7 +64,7 @@ export const DateRangeSelector = ({
     if (date === "custom" && customRange?.from && customRange?.to) {
       return `${format(customRange.from, "MMM d")} - ${format(
         customRange.to,
-        "MMM d, yyyy"
+        "MMM d, yyyy",
       )}`;
     }
 
@@ -97,7 +97,10 @@ export const DateRangeSelector = ({
             {getDisplayText()}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[calc(100vw-2rem)] sm:w-auto p-0" align="start">
+        <PopoverContent
+          className="w-[calc(100vw-2rem)] sm:w-auto p-0"
+          align="start"
+        >
           <div className="flex flex-col sm:flex-row">
             {/* Preset Options */}
             <div className="border-b sm:border-b-0 sm:border-r p-3 space-y-1 min-w-0 sm:min-w-[140px]">

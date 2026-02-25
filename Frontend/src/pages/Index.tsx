@@ -204,7 +204,7 @@ const Index = () => {
       {/* Main Layout with Sidebar */}
       <div className="flex h-[calc(100vh-73px)]">
         {/* Desktop Sidebar - hidden on mobile */}
-        <div className="hidden md:block fixed left-0 top-[73px] h-[calc(100vh-73px)] z-40">
+        <div className="hidden md:block fixed left-0 top-[73px] h-[calc(100vh-73px)] w-64 z-40">
           <DashboardSidebar
             activeTab={activeTab}
             onTabChange={setActiveTab}

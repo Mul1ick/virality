@@ -149,8 +149,8 @@ const SignIn = () => {
               </div>
 
               <div className="flex items-start gap-4 group">
-                <div className="p-3 bg-accent/10 rounded-xl group-hover:bg-accent/20 transition-colors">
-                  <Zap className="h-6 w-6 text-accent" />
+                <div className="p-3 bg-secondary/10 rounded-xl group-hover:bg-secondary/20 transition-colors">
+                  <Zap className="h-6 w-6 text-secondary" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-foreground mb-1">

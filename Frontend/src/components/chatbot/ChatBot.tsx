@@ -99,16 +99,54 @@ export const ChatBot = () => {
 
       if (results && results.length > 0) {
         let resultsSummary = "Here's what I found for you:\n";
-        // Format the results (simple example: list top 3)
+
+        // Helper: safely format any value to a display string
+        const formatValue = (key: string, value: any): string => {
+          if (value === null || value === undefined) return "N/A";
+          if (typeof value === 'object') {
+            // Handle nested objects (e.g., _id group keys, date objects)
+            // Try to extract meaningful string from the object
+            const vals = Object.values(value).filter(v => v !== null && v !== undefined);
+            if (vals.length === 0) return "N/A";
+            // If all values are primitives, join them
+            return vals.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join(', ');
+          }
+          if (typeof value === 'number') {
+            if (key.toLowerCase().includes('ctr')) {
+              return `${value.toFixed(2)}%`;
+            } else if (key.toLowerCase().includes('spend') || key.toLowerCase().includes('revenue') || key.toLowerCase().includes('cost') || key.toLowerCase().includes('cpc') || key.toLowerCase().includes('cpm')) {
+              return `$${value.toFixed(2)}`;
+            } else if (Number.isInteger(value)) {
+              return value.toLocaleString();
+            } else {
+              return value.toFixed(2);
+            }
+          }
+          return String(value);
+        };
+
+        // Format the results (show top 5)
         results.slice(0, 5).forEach((item: any) => {
             // 1. Find the "name" field (e.g., ad_name, campaign_name)
-            const nameKey = Object.keys(item).find(k => 
+            const nameKey = Object.keys(item).find(k =>
               k.toLowerCase().includes('name')
             );
-            const name = nameKey ? item[nameKey] : "Result";
-            
+
+            // Resolve name — could be a string or nested in _id object
+            let name = "Result";
+            if (nameKey && item[nameKey]) {
+              name = typeof item[nameKey] === 'object' ? formatValue(nameKey, item[nameKey]) : String(item[nameKey]);
+            } else if (item._id && typeof item._id === 'object') {
+              // Try to extract name from grouped _id
+              const idNameKey = Object.keys(item._id).find(k => k.toLowerCase().includes('name'));
+              if (idNameKey) name = String(item._id[idNameKey]);
+              else name = formatValue('_id', item._id);
+            } else if (item._id && typeof item._id === 'string') {
+              name = item._id;
+            }
+
             // 2. Find all *other* keys that are metrics (not the name, not an id)
-            const metricKeys = Object.keys(item).filter(k => 
+            const metricKeys = Object.keys(item).filter(k =>
               k !== nameKey && k !== 'id' && k !== '_id'
             );
 
@@ -116,23 +154,10 @@ export const ChatBot = () => {
             if (metricKeys.length > 0) {
               // 3. Loop over all found metrics and format them
               metricsString = metricKeys.map(key => {
-                let value = item[key];
-                let formattedKey = key.replace(/_/g, ' '); // e.g., overall_ctr -> overall ctr
-
-                // Basic Formatting
-                if (typeof value === 'number') {
-                  if (key.toLowerCase().includes('ctr')) {
-                    value = `${value.toFixed(2)}%`;
-                  } else if (key.toLowerCase().includes('spend') || key.toLowerCase().includes('revenue') || key.toLowerCase().includes('cost')) {
-                    value = `$${value.toFixed(2)}`; // Simple currency
-                  } else if (Number.isInteger(value)) {
-                    value = value.toLocaleString(); // Add commas to 10000
-                  } else {
-                    value = value.toFixed(2); // Default for other decimals
-                  }
-                }
-                return `${formattedKey}: ${value}`; // e.g., "overall ctr: 2.50%"
-              }).join(', '); // Join if there are multiple metrics
+                const value = item[key];
+                const formattedKey = key.replace(/_/g, ' ');
+                return `${formattedKey}: ${formatValue(key, value)}`;
+              }).join(', ');
             } else {
               metricsString = "(details in data)";
             }
@@ -151,15 +176,13 @@ export const ChatBot = () => {
     } catch (error: any) {
       console.error("Chatbot API Error:", error);
       if (error.response?.status === 401) {
-         botResponseText = "Sorry, your session seems to have expired. Please log in again.";
-         // Optional: Redirect to login
-         // window.location.href = '/signin';
-      } else if (error.response?.status === 404 && error.response.data?.detail?.includes("Unknown platform")){
-         // This case might happen if our frontend detection logic passes a platform the backend doesn't know
-         botResponseText = `Sorry, I can't query the platform '${detectedPlatform}' yet. You can ask about Meta, Google, or Shopify.`;
-      }
-      else {
-         botResponseText = `Sorry, I couldn't process that query right now. Error: ${error.response?.data?.detail || error.message}`;
+         botResponseText = "Your session has expired. Please log in again to continue.";
+      } else if (error.response?.status === 404) {
+         botResponseText = "I can't query that platform yet. Try asking about Meta, Google, or Shopify!";
+      } else if (error.response?.status === 500) {
+         botResponseText = "Something went wrong on our end. Please try again in a moment.";
+      } else {
+         botResponseText = "Oops! I couldn't process that right now. Please try again.";
       }
     }
   } else {
@@ -216,7 +239,7 @@ const handleKeyPress = (e: React.KeyboardEvent) => {
       {!isOpen && (
         <Button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl hover:shadow-primary/50 transition-all duration-300 hover:scale-110 z-50 bg-gradient-to-br from-primary to-accent"
+          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl hover:shadow-primary/50 transition-all duration-300 hover:scale-110 z-50 bg-gradient-to-br from-primary to-secondary"
           size="icon"
         >
           <MessageCircle className="h-6 w-6" />
@@ -225,9 +248,9 @@ const handleKeyPress = (e: React.KeyboardEvent) => {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 w-[380px] h-[600px] bg-card rounded-2xl shadow-2xl flex flex-col z-50 border border-border overflow-hidden">
+        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-[380px] h-full sm:h-[600px] bg-card sm:rounded-2xl shadow-2xl flex flex-col z-50 border border-border overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-primary to-accent p-4 flex items-center justify-between">
+          <div className="bg-gradient-to-r from-primary to-secondary p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
                 <MessageCircle className="h-5 w-5 text-white" />
@@ -248,7 +271,7 @@ const handleKeyPress = (e: React.KeyboardEvent) => {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background/30">
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-background/50">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -259,17 +282,17 @@ const handleKeyPress = (e: React.KeyboardEvent) => {
               >
                 <div
                   className={cn(
-                    "max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm",
+                    "max-w-[85%] rounded-2xl px-3.5 py-2.5 shadow-sm",
                     message.sender === "user"
-                      ? "bg-gradient-to-br from-primary to-accent text-white"
-                      : "bg-card border border-border"
+                      ? "bg-primary/90 text-primary-foreground"
+                      : "bg-card/80 border border-border/60"
                   )}
                 >
                   <p
                     className={cn(
-                      "text-sm whitespace-pre-wrap",
+                      "text-[13px] leading-relaxed whitespace-pre-wrap break-words",
                       message.sender === "user"
-                        ? "text-white"
+                        ? "text-primary-foreground"
                         : "text-foreground"
                     )}
                   >
@@ -277,9 +300,9 @@ const handleKeyPress = (e: React.KeyboardEvent) => {
                   </p>
                   <p
                     className={cn(
-                      "text-xs mt-1",
+                      "text-[10px] mt-1.5 opacity-60",
                       message.sender === "user"
-                        ? "text-white/70"
+                        ? "text-primary-foreground"
                         : "text-muted-foreground"
                     )}
                   >
@@ -329,7 +352,7 @@ const handleKeyPress = (e: React.KeyboardEvent) => {
                 onClick={handleSend}
                 disabled={!inputValue.trim() || isTyping}
                 size="icon"
-                className="rounded-xl bg-gradient-to-br from-primary to-accent hover:shadow-lg transition-all duration-300 hover:scale-105"
+                className="rounded-xl bg-gradient-to-br from-primary to-secondary hover:shadow-lg transition-all duration-300 hover:scale-105"
               >
                 {isTyping ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
