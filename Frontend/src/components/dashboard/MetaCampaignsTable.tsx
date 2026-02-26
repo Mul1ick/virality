@@ -1,5 +1,5 @@
 // FILE: Frontend/src/components/dashboard/MetaCampaignsTable.tsx
-import { Users } from "lucide-react";
+import { Users, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ interface MetaCampaignsTableProps {
   isLoading?: boolean;
   dateRange?: string;
   customRange?: DateRange;
+  onCampaignClick?: (campaignId: string, campaignName: string) => void;
 }
 
 export const MetaCampaignsTable = ({
@@ -28,6 +29,7 @@ export const MetaCampaignsTable = ({
   isLoading = false,
   dateRange = "30days",
   customRange,
+  onCampaignClick,
 }: MetaCampaignsTableProps) => {
   const [selectedCampaign, setSelectedCampaign] = useState<{
     id: string;
@@ -198,7 +200,17 @@ export const MetaCampaignsTable = ({
                     className="border-b border-slate-700/30 hover:bg-slate-800/30 transition-colors"
                   >
                     <TableCell className="font-medium text-foreground">
-                      {campaign.name}
+                      {onCampaignClick ? (
+                        <button
+                          onClick={() => onCampaignClick(campaign.id, campaign.name)}
+                          className="flex items-center gap-1.5 hover:text-primary transition-colors text-left group"
+                        >
+                          <span className="group-hover:underline">{campaign.name}</span>
+                          <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary shrink-0" />
+                        </button>
+                      ) : (
+                        campaign.name
+                      )}
                     </TableCell>
                     <TableCell>
                       <Button

@@ -56,6 +56,12 @@ export const MetaTab = ({
     }
   }, [headerCustomRange]);
 
+  const [activeMetaTab, setActiveMetaTab] = useState("campaigns");
+  const [selectedCampaignFilter, setSelectedCampaignFilter] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
   const { campaigns, adSets, ads, loading, error, refreshAll } = useMetaData(
     userId,
     adAccountId,
@@ -66,6 +72,30 @@ export const MetaTab = ({
   );
 
   const hasData = campaigns.length > 0 || adSets.length > 0 || ads.length > 0;
+
+  // When a campaign is clicked, switch to adsets tab filtered by that campaign
+  const handleCampaignClick = (campaignId: string, campaignName: string) => {
+    setSelectedCampaignFilter({ id: campaignId, name: campaignName });
+    setActiveMetaTab("adsets");
+  };
+
+  // Clear campaign filter (back to all adsets)
+  const handleClearCampaignFilter = () => {
+    setSelectedCampaignFilter(null);
+  };
+
+  // When switching tabs manually, clear filter if leaving adsets
+  const handleTabChange = (tab: string) => {
+    setActiveMetaTab(tab);
+    if (tab !== "adsets") {
+      setSelectedCampaignFilter(null);
+    }
+  };
+
+  // Filter adsets by selected campaign
+  const filteredAdSets = selectedCampaignFilter
+    ? adSets.filter((a) => a.campaign_id === selectedCampaignFilter.id)
+    : adSets;
 
   const getDateRangeText = () => {
     if (dateRange === "custom") {
@@ -230,7 +260,7 @@ export const MetaTab = ({
 
       {/* Data Tabs */}
       {hasData ? (
-        <Tabs defaultValue="campaigns" className="w-full">
+        <Tabs value={activeMetaTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="mb-6 bg-slate-800/50 border border-slate-700/50">
             <TabsTrigger
               value="campaigns"
@@ -242,7 +272,7 @@ export const MetaTab = ({
               value="adsets"
               className="data-[state=active]:bg-slate-700/50 data-[state=active]:text-foreground"
             >
-              Ad Sets {adSets.length > 0 && `(${adSets.length})`}
+              Ad Sets {filteredAdSets.length > 0 && `(${filteredAdSets.length})`}
             </TabsTrigger>
             <TabsTrigger
               value="ads"
@@ -258,15 +288,18 @@ export const MetaTab = ({
               isLoading={loading.campaigns}
               dateRange={dateRange}
               customRange={customRange}
+              onCampaignClick={handleCampaignClick}
             />
           </TabsContent>
 
           <TabsContent value="adsets">
             <MetaAdSetsTable
-              adsets={adSets}
+              adsets={filteredAdSets}
               isLoading={loading.adSets}
               dateRange={dateRange}
               customRange={customRange}
+              campaignFilter={selectedCampaignFilter}
+              onClearFilter={handleClearCampaignFilter}
             />
           </TabsContent>
 

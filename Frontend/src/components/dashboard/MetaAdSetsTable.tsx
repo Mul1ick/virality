@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table";
 import { MetaAdSet } from "@/hooks/useMetaData";
 import { DateRange } from "react-day-picker";
-import { Users } from "lucide-react";
+import { Users, ArrowLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { DemographicsModal } from "@/components/modals/DemographicsModal";
@@ -20,6 +20,8 @@ interface MetaAdSetsTableProps {
   isLoading?: boolean;
   dateRange?: string;
   customRange?: DateRange;
+  campaignFilter?: { id: string; name: string } | null;
+  onClearFilter?: () => void;
 }
 
 export const MetaAdSetsTable = ({
@@ -27,6 +29,8 @@ export const MetaAdSetsTable = ({
   isLoading = false,
   dateRange = "30days",
   customRange,
+  campaignFilter,
+  onClearFilter,
 }: MetaAdSetsTableProps) => {
   const [selectedAdSet, setSelectedAdSet] = useState<{
     id: string;
@@ -107,13 +111,37 @@ export const MetaAdSetsTable = ({
   return (
     <Card className="bg-card/50 backdrop-blur-sm border-slate-700/50 p-6">
       <div className="space-y-4">
+        {/* Campaign Filter Banner */}
+        {campaignFilter && (
+          <div className="flex items-center justify-between gap-3 px-3 py-2.5 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                onClick={onClearFilter}
+                className="p-1 rounded hover:bg-blue-500/20 transition-colors shrink-0"
+                title="Back to all ad sets"
+              >
+                <ArrowLeft className="h-4 w-4 text-blue-400" />
+              </button>
+              <p className="text-sm text-blue-300 truncate">
+                Showing ad sets for <span className="font-semibold text-blue-200">{campaignFilter.name}</span>
+              </p>
+            </div>
+            <button
+              onClick={onClearFilter}
+              className="p-1 rounded hover:bg-blue-500/20 transition-colors shrink-0"
+            >
+              <X className="h-3.5 w-3.5 text-blue-400" />
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-foreground">
-              Meta Ad Sets
+              {campaignFilter ? "Filtered Ad Sets" : "Meta Ad Sets"}
             </h3>
             <p className="text-sm text-muted-foreground">
-              {adsets.length} ad sets • {getDateRangeText()}
+              {adsets.length} ad set{adsets.length !== 1 ? "s" : ""} • {getDateRangeText()}
             </p>
           </div>
         </div>
