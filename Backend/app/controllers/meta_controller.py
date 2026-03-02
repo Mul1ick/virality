@@ -194,6 +194,10 @@ def select_ad_account(account: SelectedAccount, user_id: str = Depends(get_curre
     if background_tasks:
         background_tasks.add_task(run_historical_fetch, user_id, account.ad_account_id, "campaign")
         background_tasks.add_task(run_historical_demographics_fetch, user_id, account.ad_account_id, "campaign")
+        background_tasks.add_task(run_historical_fetch, user_id, account.ad_account_id, "adset")
+        background_tasks.add_task(run_historical_demographics_fetch, user_id, account.ad_account_id, "adset")
+        background_tasks.add_task(run_historical_fetch, user_id, account.ad_account_id, "ad")
+        background_tasks.add_task(run_historical_demographics_fetch, user_id, account.ad_account_id, "ad")
         # Also trigger for AdSets and Ads if needed, or rely on user to trigger full sync
             
     return {"message": "Ad account selection saved. Sync started."}
