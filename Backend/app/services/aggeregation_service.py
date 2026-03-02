@@ -23,6 +23,8 @@ class AggregationService:
                 return "meta_daily_campaign_insights"
             elif group_by == "ad":
                 return "meta_daily_ad_insights"
+            elif group_by == "adset":
+                return "meta_daily_insights"
             else:
                 # ✅ FIXED: Use campaign insights for date grouping (Overview chart)
                 return "meta_daily_campaign_insights"

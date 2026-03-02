@@ -15,6 +15,7 @@ import SelectMetaAccount from "./pages/SelectMetaAccount";
 import SelectGoogleAccount from "./pages/SelectGoogleAccount";
 import SelectShopifyAccount from "@/pages/SelectShopifyAccount";
 import Admin from "./pages/Admin";
+import Privacy from "./pages/Privacy";
 import AdminRoute from "./components/auth/AdminRoute";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
@@ -84,6 +85,9 @@ const App = () => (
               </AdminRoute>
             }
           />
+
+          {/* Public pages */}
+          <Route path="/privacy" element={<Privacy />} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
