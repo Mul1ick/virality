@@ -10,9 +10,9 @@ import {
 } from "@/components/ui/table";
 import { MetaAdSet } from "@/hooks/useMetaData";
 import { DateRange } from "react-day-picker";
-import { Users, ArrowLeft, X } from "lucide-react";
+import { Users, ArrowLeft, X, ChevronRight, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DemographicsModal } from "@/components/modals/DemographicsModal";
 
 interface MetaAdSetsTableProps {
@@ -22,6 +22,7 @@ interface MetaAdSetsTableProps {
   customRange?: DateRange;
   campaignFilter?: { id: string; name: string } | null;
   onClearFilter?: () => void;
+  onAdSetClick?: (adSetId: string, adSetName: string) => void;
 }
 
 export const MetaAdSetsTable = ({
@@ -31,11 +32,24 @@ export const MetaAdSetsTable = ({
   customRange,
   campaignFilter,
   onClearFilter,
+  onAdSetClick,
 }: MetaAdSetsTableProps) => {
   const [selectedAdSet, setSelectedAdSet] = useState<{
     id: string;
     name: string;
   } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const totalPages = Math.ceil(adsets.length / pageSize);
+  const paginatedAdSets = adsets.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // Reset to page 1 when data changes (e.g. campaign filter applied)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [adsets.length, campaignFilter?.id]);
 
   const getDateRangeText = () => {
     if (dateRange === "custom" && customRange?.from && customRange?.to) {
@@ -186,13 +200,23 @@ export const MetaAdSetsTable = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {adsets.map((adset) => (
+                {paginatedAdSets.map((adset) => (
                   <TableRow
                     key={adset.id}
                     className="border-b border-slate-700/30 hover:bg-slate-800/30 transition-colors"
                   >
                     <TableCell className="font-medium text-foreground">
-                      {adset.name}
+                      {onAdSetClick ? (
+                        <button
+                          onClick={() => onAdSetClick(adset.id, adset.name)}
+                          className="flex items-center gap-1.5 hover:text-primary transition-colors text-left group"
+                        >
+                          <span className="group-hover:underline">{adset.name}</span>
+                          <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
+                        </button>
+                      ) : (
+                        adset.name
+                      )}
                     </TableCell>
                     <TableCell>
                       <Button
@@ -265,6 +289,38 @@ export const MetaAdSetsTable = ({
             </Table>
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-sm text-muted-foreground">
+              Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, adsets.length)} of {adsets.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-700/50 bg-slate-800/50 hover:bg-slate-800"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-700/50 bg-slate-800/50 hover:bg-slate-800"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-700/50">

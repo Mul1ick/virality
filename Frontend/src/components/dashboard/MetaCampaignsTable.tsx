@@ -1,5 +1,5 @@
 // FILE: Frontend/src/components/dashboard/MetaCampaignsTable.tsx
-import { Users, ChevronRight } from "lucide-react";
+import { Users, ChevronRight, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,7 @@ import {
 import { MetaCampaign } from "@/hooks/useMetaData";
 import { DateRange } from "react-day-picker";
 import { DemographicsModal } from "@/components/modals/DemographicsModal";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface MetaCampaignsTableProps {
   campaigns: MetaCampaign[];
@@ -35,6 +35,17 @@ export const MetaCampaignsTable = ({
     id: string;
     name: string;
   } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const totalPages = Math.ceil(campaigns.length / pageSize);
+  const paginatedCampaigns = campaigns.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [campaigns.length]);
 
   const getDateRangeText = () => {
     if (dateRange === "custom" && customRange?.from && customRange?.to) {
@@ -194,7 +205,7 @@ export const MetaCampaignsTable = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {campaigns.map((campaign) => (
+                {paginatedCampaigns.map((campaign) => (
                   <TableRow
                     key={campaign.id}
                     className="border-b border-slate-700/30 hover:bg-slate-800/30 transition-colors"
@@ -291,6 +302,38 @@ export const MetaCampaignsTable = ({
             </Table>
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-sm text-muted-foreground">
+              Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, campaigns.length)} of {campaigns.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-700/50 bg-slate-800/50 hover:bg-slate-800"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-700/50 bg-slate-800/50 hover:bg-slate-800"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-700/50">

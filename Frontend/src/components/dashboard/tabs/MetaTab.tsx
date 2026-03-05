@@ -61,6 +61,10 @@ export const MetaTab = ({
     id: string;
     name: string;
   } | null>(null);
+  const [selectedAdSetFilter, setSelectedAdSetFilter] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const { campaigns, adSets, ads, loading, error, refreshAll } = useMetaData(
     userId,
@@ -84,11 +88,25 @@ export const MetaTab = ({
     setSelectedCampaignFilter(null);
   };
 
-  // When switching tabs manually, clear filter if leaving adsets
+  // When an adset is clicked, switch to ads tab filtered by that adset
+  const handleAdSetClick = (adSetId: string, adSetName: string) => {
+    setSelectedAdSetFilter({ id: adSetId, name: adSetName });
+    setActiveMetaTab("ads");
+  };
+
+  // Clear adset filter (back to all ads)
+  const handleClearAdSetFilter = () => {
+    setSelectedAdSetFilter(null);
+  };
+
+  // When switching tabs manually, clear filters if leaving the relevant tab
   const handleTabChange = (tab: string) => {
     setActiveMetaTab(tab);
     if (tab !== "adsets") {
       setSelectedCampaignFilter(null);
+    }
+    if (tab !== "ads") {
+      setSelectedAdSetFilter(null);
     }
   };
 
@@ -96,6 +114,11 @@ export const MetaTab = ({
   const filteredAdSets = selectedCampaignFilter
     ? adSets.filter((a) => a.campaign_id === selectedCampaignFilter.id)
     : adSets;
+
+  // Filter ads by selected adset
+  const filteredAds = selectedAdSetFilter
+    ? ads.filter((a) => a.adset_id === selectedAdSetFilter.id)
+    : ads;
 
   const getDateRangeText = () => {
     if (dateRange === "custom") {
@@ -278,7 +301,7 @@ export const MetaTab = ({
               value="ads"
               className="data-[state=active]:bg-slate-700/50 data-[state=active]:text-foreground"
             >
-              Ads {ads.length > 0 && `(${ads.length})`}
+              Ads {filteredAds.length > 0 && `(${filteredAds.length})`}
             </TabsTrigger>
           </TabsList>
 
@@ -300,15 +323,18 @@ export const MetaTab = ({
               customRange={customRange}
               campaignFilter={selectedCampaignFilter}
               onClearFilter={handleClearCampaignFilter}
+              onAdSetClick={handleAdSetClick}
             />
           </TabsContent>
 
           <TabsContent value="ads">
             <MetaAdsTable
-              ads={ads}
+              ads={filteredAds}
               isLoading={loading.ads}
               dateRange={dateRange}
               customRange={customRange}
+              adSetFilter={selectedAdSetFilter}
+              onClearFilter={handleClearAdSetFilter}
             />
           </TabsContent>
         </Tabs>

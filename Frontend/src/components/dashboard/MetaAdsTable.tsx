@@ -9,11 +9,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Image, Video, FileText, Users } from "lucide-react";
+import { Image, Video, FileText, Users, ArrowLeft, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { MetaAd } from "@/hooks/useMetaData";
 import { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DemographicsModal } from "@/components/modals/DemographicsModal";
 
 interface MetaAdsTableProps {
@@ -21,6 +21,8 @@ interface MetaAdsTableProps {
   isLoading?: boolean;
   dateRange?: string;
   customRange?: DateRange;
+  adSetFilter?: { id: string; name: string } | null;
+  onClearFilter?: () => void;
 }
 
 export const MetaAdsTable = ({
@@ -28,11 +30,25 @@ export const MetaAdsTable = ({
   isLoading = false,
   dateRange = "30days",
   customRange,
+  adSetFilter,
+  onClearFilter,
 }: MetaAdsTableProps) => {
   const [selectedAd, setSelectedAd] = useState<{
     id: string;
     name: string;
   } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const totalPages = Math.ceil(ads.length / pageSize);
+  const paginatedAds = ads.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // Reset to page 1 when data changes (e.g. adset filter applied)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [ads.length, adSetFilter?.id]);
 
   const getDateRangeText = () => {
     if (dateRange === "custom" && customRange?.from && customRange?.to) {
@@ -122,11 +138,37 @@ export const MetaAdsTable = ({
     // ✅ FIXED: Added relative positioning to prevent z-index issues
     <Card className="bg-card/50 backdrop-blur-sm border-slate-700/50 p-4 sm:p-6 relative">
       <div className="space-y-3 sm:space-y-4">
+        {/* Ad Set Filter Banner */}
+        {adSetFilter && (
+          <div className="flex items-center justify-between gap-3 px-3 py-2.5 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                onClick={onClearFilter}
+                className="p-1 rounded hover:bg-blue-500/20 transition-colors shrink-0"
+                title="Back to all ads"
+              >
+                <ArrowLeft className="h-4 w-4 text-blue-400" />
+              </button>
+              <p className="text-sm text-blue-300 truncate">
+                Showing ads for <span className="font-semibold text-blue-200">{adSetFilter.name}</span>
+              </p>
+            </div>
+            <button
+              onClick={onClearFilter}
+              className="p-1 rounded hover:bg-blue-500/20 transition-colors shrink-0"
+            >
+              <X className="h-3.5 w-3.5 text-blue-400" />
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-foreground">Meta Ads</h3>
+            <h3 className="text-lg font-semibold text-foreground">
+              {adSetFilter ? "Filtered Ads" : "Meta Ads"}
+            </h3>
             <p className="text-sm text-muted-foreground">
-              {ads.length} ads • {getDateRangeText()}
+              {ads.length} ad{ads.length !== 1 ? "s" : ""} • {getDateRangeText()}
             </p>
           </div>
         </div>
@@ -171,7 +213,7 @@ export const MetaAdsTable = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {ads.map((ad) => {
+                {paginatedAds.map((ad) => {
                   const creativeType = getCreativeType(ad);
                   const CreativeIcon = creativeType.icon;
 
@@ -274,6 +316,38 @@ export const MetaAdsTable = ({
             </Table>
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-sm text-muted-foreground">
+              Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, ads.length)} of {ads.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-700/50 bg-slate-800/50 hover:bg-slate-800"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-700/50 bg-slate-800/50 hover:bg-slate-800"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-700/50">
