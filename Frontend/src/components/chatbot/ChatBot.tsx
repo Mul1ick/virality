@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MessageCircle, X, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import apiClient from "@/lib/api"
+import apiClient from "@/lib/api";
 
 interface Message {
   id: string;
@@ -18,7 +18,7 @@ export const ChatBot = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Hey there! 👋 I'm your Virality Media assistant. How can I help you today?",
+      text: "Hey there! 👋 I'm your Virality Media assistant. Ask me about your Meta, Google, or Shopify analytics!",
       sender: "bot",
       timestamp: new Date(),
     },
@@ -28,209 +28,245 @@ export const ChatBot = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Focus input when chat opens
   useEffect(() => {
     if (isOpen) {
       inputRef.current?.focus();
     }
   }, [isOpen]);
 
+  const detectPlatform = (input: string): string | null => {
+    const lower = input.toLowerCase();
+
+    if (
+      lower.includes("meta") ||
+      lower.includes("facebook") ||
+      lower.includes("instagram")
+    ) {
+      if (lower.includes("ad set") || lower.includes("adset")) {
+        return "meta_adsets";
+      } else if (lower.includes("ad") && !lower.includes("ad set")) {
+        return "meta_ads";
+      }
+      return "meta";
+    }
+
+    if (lower.includes("google")) {
+      if (lower.includes("ad group") || lower.includes("adset")) {
+        return "google_adsets";
+      } else if (lower.includes("ad") && !lower.includes("ad group")) {
+        return "google_ads";
+      }
+      return "google_campaigns";
+    }
+
+    if (lower.includes("shopify")) {
+      return "shopify";
+    }
+
+    return null;
+  };
+
+  const getLocalResponse = (input: string): string | null => {
+    const lower = input.toLowerCase().trim();
+
+    if (lower === "hi" || lower === "hey" || lower === "hello" || lower === "yo") {
+      return "Hey! 👋 How can I help you today? Ask me about your Meta, Google, or Shopify data!";
+    }
+    if (lower.includes("help") || lower.includes("support")) {
+      return "I can help with:\n• Meta campaigns, ad sets & ads\n• Google Ads performance\n• Shopify orders & revenue\n\nJust mention the platform in your question! For example: \"How much did I spend on Meta?\"";
+    }
+    if (lower.includes("connect") || lower.includes("integration")) {
+      return "To connect platforms, go to your Profile & Settings page. You can link Meta, Google Ads, and Shopify accounts there!";
+    }
+    if (lower.includes("thank")) {
+      return "You're welcome! Let me know if you need anything else. 😊";
+    }
+
+    return null;
+  };
+
+  const formatValue = (key: string, value: any): string => {
+    if (value === null || value === undefined) return "N/A";
+    if (typeof value === "object") {
+      const vals = Object.values(value).filter(
+        (v) => v !== null && v !== undefined
+      );
+      if (vals.length === 0) return "N/A";
+      return vals
+        .map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v)))
+        .join(", ");
+    }
+    if (typeof value === "number") {
+      const k = key.toLowerCase();
+      if (k.includes("ctr")) return `${value.toFixed(2)}%`;
+      if (
+        k.includes("spend") ||
+        k.includes("revenue") ||
+        k.includes("cost") ||
+        k.includes("cpc") ||
+        k.includes("cpm")
+      )
+        return `$${value.toFixed(2)}`;
+      if (Number.isInteger(value)) return value.toLocaleString();
+      return value.toFixed(2);
+    }
+    return String(value);
+  };
+
+  const formatResults = (results: any[]): string => {
+    let summary = "";
+
+    results.slice(0, 5).forEach((item: any) => {
+      const nameKey = Object.keys(item).find((k) =>
+        k.toLowerCase().includes("name")
+      );
+
+      let name = "Result";
+      if (nameKey && item[nameKey]) {
+        name =
+          typeof item[nameKey] === "object"
+            ? formatValue(nameKey, item[nameKey])
+            : String(item[nameKey]);
+      } else if (item._id && typeof item._id === "object") {
+        const idNameKey = Object.keys(item._id).find((k) =>
+          k.toLowerCase().includes("name")
+        );
+        if (idNameKey) name = String(item._id[idNameKey]);
+        else name = formatValue("_id", item._id);
+      } else if (item._id && typeof item._id === "string") {
+        name = item._id;
+      }
+
+      const metricKeys = Object.keys(item).filter(
+        (k) => k !== nameKey && k !== "id" && k !== "_id"
+      );
+
+      let metricsString =
+        metricKeys.length > 0
+          ? metricKeys
+              .map((key) => {
+                const formattedKey = key.replace(/_/g, " ");
+                return `${formattedKey}: ${formatValue(key, item[key])}`;
+              })
+              .join(", ")
+          : "(details in data)";
+
+      summary += `• ${name}: ${metricsString}\n`;
+    });
+
+    if (results.length > 5) {
+      summary += `\n...and ${results.length - 5} more results.`;
+    }
+
+    return summary;
+  };
+
   const handleSend = async () => {
-  if (!inputValue.trim()) return;
+    if (!inputValue.trim()) return;
 
-  const userMessage: Message = {
-    id: Date.now().toString(),
-    text: inputValue,
-    sender: "user",
-    timestamp: new Date(),
-  };
-  setMessages((prev) => [...prev, userMessage]);
-  const currentInput = inputValue; // Capture input before clearing
-  setInputValue("");
-  setIsTyping(true);
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      text: inputValue,
+      sender: "user",
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    const currentInput = inputValue;
+    setInputValue("");
+    setIsTyping(true);
 
-  // --- NEW LOGIC ---
-  let detectedPlatform: string | null = null;
-  const lowerInput = currentInput.toLowerCase();
+    let botResponseText = "";
 
-  // Simple Platform Detection (enhance as needed)
-  if (lowerInput.includes("meta") || lowerInput.includes("facebook") || lowerInput.includes("instagram")) {
-      if (lowerInput.includes("ad set") || lowerInput.includes("adset")) {
-         detectedPlatform = "meta_adsets"; // <-- NEW
-      } else if (lowerInput.includes("ad") && !lowerInput.includes("ad set")) {
-         detectedPlatform = "meta_ads"; // <-- NEW
-      } else {
-         detectedPlatform = "meta"; // Default to campaigns
-      }
-      }
-      else if (lowerInput.includes("google")) {
-    // Decide which Google collection is most likely, or enhance detection.
-    // Let's default to campaigns for now if just "google" is mentioned.
-    if (lowerInput.includes("ad group") || lowerInput.includes("adset")) {
-       detectedPlatform = "google_adsets"; // Match schema key [cite: 283]
-    } else if (lowerInput.includes("ad") && !lowerInput.includes("ad group")) { // Avoid matching "ad group"
-       detectedPlatform = "google_ads"; // Match schema key [cite: 284]
+    // Check for local responses first (greetings, help, etc.)
+    const localResponse = getLocalResponse(currentInput);
+    if (localResponse) {
+      botResponseText = localResponse;
     } else {
-       detectedPlatform = "google_campaigns"; // Default Google match [cite: 281]
-    }
-  } else if (lowerInput.includes("shopify")) {
-    detectedPlatform = "shopify"; // Match schema key [cite: 285]
-  }
-  // Add more keywords/logic as needed
+      const detectedPlatform = detectPlatform(currentInput);
 
-  let botResponseText = "";
+      if (detectedPlatform) {
+        try {
+          const response = await apiClient.post(
+            `/analytics/${detectedPlatform}`,
+            { question: currentInput }
+          );
 
-  if (detectedPlatform) {
-    try {
-      console.log(`Chatbot: Querying backend for platform: ${detectedPlatform}, question: ${currentInput}`);
-      // Make API call using apiClient (handles auth automatically)
-      const response = await apiClient.post(`/analytics/${detectedPlatform}`, {
-        question: currentInput,
-      });
+          const { answer, explanation, results } = response.data;
 
-      console.log("Chatbot: Received response:", response.data);
-
-      const { explanation, results } = response.data;
-
-      if (results && results.length > 0) {
-        let resultsSummary = "Here's what I found for you:\n";
-
-        // Helper: safely format any value to a display string
-        const formatValue = (key: string, value: any): string => {
-          if (value === null || value === undefined) return "N/A";
-          if (typeof value === 'object') {
-            // Handle nested objects (e.g., _id group keys, date objects)
-            // Try to extract meaningful string from the object
-            const vals = Object.values(value).filter(v => v !== null && v !== undefined);
-            if (vals.length === 0) return "N/A";
-            // If all values are primitives, join them
-            return vals.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join(', ');
+          // Prefer the AI-generated answer, then fall back to formatted results
+          if (answer && !answer.includes("I can only answer")) {
+            botResponseText = answer;
+            if (results && results.length > 0) {
+              botResponseText +=
+                "\n\n📊 Data breakdown:\n" + formatResults(results);
+            }
+          } else if (results && results.length > 0) {
+            botResponseText =
+              "Here's what I found:\n\n" + formatResults(results);
+          } else if (explanation) {
+            botResponseText = `I looked for: "${explanation}"\n\nBut couldn't find any matching data. Try rephrasing your question or check if data exists for that time period.`;
+          } else {
+            botResponseText =
+              "I understood the question, but couldn't find any matching data.";
           }
-          if (typeof value === 'number') {
-            if (key.toLowerCase().includes('ctr')) {
-              return `${value.toFixed(2)}%`;
-            } else if (key.toLowerCase().includes('spend') || key.toLowerCase().includes('revenue') || key.toLowerCase().includes('cost') || key.toLowerCase().includes('cpc') || key.toLowerCase().includes('cpm')) {
-              return `$${value.toFixed(2)}`;
-            } else if (Number.isInteger(value)) {
-              return value.toLocaleString();
+        } catch (error: any) {
+          console.error("Chatbot API Error:", error);
+
+          if (!error.response) {
+            // Network error - server unreachable
+            botResponseText =
+              "Can't reach the server right now. Please check your connection and try again.";
+          } else if (error.response.status === 401) {
+            botResponseText =
+              "Your session has expired. Please log in again to continue.";
+          } else if (error.response.status === 404) {
+            botResponseText =
+              "I can't query that platform yet. Try asking about Meta, Google, or Shopify!";
+          } else if (error.response.status === 429) {
+            botResponseText =
+              "You've hit the query limit (50/hour). Please wait a bit and try again.";
+          } else if (error.response.status === 500) {
+            const detail = error.response.data?.detail || "";
+            if (detail.toLowerCase().includes("gemini")) {
+              botResponseText =
+                "The AI service is temporarily unavailable. Please try again in a moment.";
+            } else if (detail.toLowerCase().includes("mongo")) {
+              botResponseText =
+                "There was a database issue. Please try again.";
             } else {
-              return value.toFixed(2);
+              botResponseText =
+                "Something went wrong processing your request. Please try again shortly.";
             }
+          } else {
+            botResponseText =
+              "Something unexpected happened. Please try again.";
           }
-          return String(value);
-        };
-
-        // Format the results (show top 5)
-        results.slice(0, 5).forEach((item: any) => {
-            // 1. Find the "name" field (e.g., ad_name, campaign_name)
-            const nameKey = Object.keys(item).find(k =>
-              k.toLowerCase().includes('name')
-            );
-
-            // Resolve name — could be a string or nested in _id object
-            let name = "Result";
-            if (nameKey && item[nameKey]) {
-              name = typeof item[nameKey] === 'object' ? formatValue(nameKey, item[nameKey]) : String(item[nameKey]);
-            } else if (item._id && typeof item._id === 'object') {
-              // Try to extract name from grouped _id
-              const idNameKey = Object.keys(item._id).find(k => k.toLowerCase().includes('name'));
-              if (idNameKey) name = String(item._id[idNameKey]);
-              else name = formatValue('_id', item._id);
-            } else if (item._id && typeof item._id === 'string') {
-              name = item._id;
-            }
-
-            // 2. Find all *other* keys that are metrics (not the name, not an id)
-            const metricKeys = Object.keys(item).filter(k =>
-              k !== nameKey && k !== 'id' && k !== '_id'
-            );
-
-            let metricsString = "";
-            if (metricKeys.length > 0) {
-              // 3. Loop over all found metrics and format them
-              metricsString = metricKeys.map(key => {
-                const value = item[key];
-                const formattedKey = key.replace(/_/g, ' ');
-                return `${formattedKey}: ${formatValue(key, value)}`;
-              }).join(', ');
-            } else {
-              metricsString = "(details in data)";
-            }
-
-            resultsSummary += `- ${name}: ${metricsString}\n`;
-          });
-          botResponseText = resultsSummary
-
-      } else if (explanation) {
-         botResponseText = `I understood you were asking about: "${explanation}"\n\nHowever, I couldn't find any specific data matching your question.`;
-      }
-       else {
-        botResponseText = "I understood the question, but I couldn't find any specific data for that.";
-      }
-
-    } catch (error: any) {
-      console.error("Chatbot API Error:", error);
-      if (error.response?.status === 401) {
-         botResponseText = "Your session has expired. Please log in again to continue.";
-      } else if (error.response?.status === 404) {
-         botResponseText = "I can't query that platform yet. Try asking about Meta, Google, or Shopify!";
-      } else if (error.response?.status === 500) {
-         botResponseText = "Something went wrong on our end. Please try again in a moment.";
+        }
       } else {
-         botResponseText = "Oops! I couldn't process that right now. Please try again.";
+        botResponseText =
+          "Please mention a platform (Meta, Google, or Shopify) in your question so I can look up the right data.";
       }
     }
-  } else {
-    // Fallback if no platform detected
-    botResponseText = "Which platform are you asking about (Meta, Google, Shopify)? Or maybe I can help with general dashboard features?";
-  }
-  // --- END NEW LOGIC ---
 
-  // Add bot response message
-  const botMessage: Message = {
-    id: (Date.now() + 1).toString(),
-    text: botResponseText, // Use the generated or fallback text
-    sender: "bot",
-    timestamp: new Date(),
+    const botMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      text: botResponseText,
+      sender: "bot",
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, botMessage]);
+    setIsTyping(false);
   };
-  setMessages((prev) => [...prev, botMessage]);
-  setIsTyping(false);
-};
 
-// Keep handleKeyPress as it is [cite: 410-411]
-const handleKeyPress = (e: React.KeyboardEvent) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    handleSend();
-  }
-};
-
-  // Simple bot responses (replace with actual AI/API integration)
-  const getBotResponse = (userInput: string): string => {
-    const input = userInput.toLowerCase();
-
-    if (input.includes("meta") || input.includes("facebook")) {
-      return "I can help you with Meta campaigns! Check out the Meta tab in your dashboard to view all your campaigns, ad sets, and ads. Need help with something specific?";
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
-    if (input.includes("google")) {
-      return "For Google Ads, head to the Google tab in your dashboard. You can view all your campaigns and their performance metrics there!";
-    }
-    if (input.includes("shopify")) {
-      return "Your Shopify orders are available in the Shopify tab. You can see all order details, amounts, and statuses there!";
-    }
-    if (input.includes("connect") || input.includes("integration")) {
-      return "To connect new platforms, go to your Profile & Settings page. You can link Meta, Google Ads, and Shopify accounts there!";
-    }
-    if (input.includes("help") || input.includes("support")) {
-      return "I'm here to help! You can ask me about:\n• Meta campaigns and ads\n• Google Ads performance\n• Shopify orders\n• Platform connections\n• Dashboard features\n\nWhat would you like to know?";
-    }
-
-    return "I'm here to help with your analytics dashboard! You can ask me about Meta campaigns, Google Ads, Shopify orders, or how to connect platforms. What would you like to know?";
   };
 
   return (
@@ -256,7 +292,9 @@ const handleKeyPress = (e: React.KeyboardEvent) => {
                 <MessageCircle className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h3 className="font-semibold text-white">Virality Assistant</h3>
+                <h3 className="font-semibold text-white">
+                  Virality Assistant
+                </h3>
                 <p className="text-xs text-white/80">Always here to help</p>
               </div>
             </div>
@@ -344,7 +382,7 @@ const handleKeyPress = (e: React.KeyboardEvent) => {
                 ref={inputRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyDown}
                 placeholder="Ask me anything..."
                 className="flex-1 rounded-xl border-border focus-visible:ring-primary"
               />
