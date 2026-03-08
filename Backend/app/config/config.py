@@ -52,6 +52,7 @@ class Settings:
     META_APP_ID: str = os.getenv("META_APP_ID")
     META_APP_SECRET: str = os.getenv("META_APP_SECRET")
     META_REDIRECT_URI: str = os.getenv("META_REDIRECT_URI", "http://localhost:8000/meta/callback")
+    META_CONFIG_ID: str = os.getenv("META_CONFIG_ID") # <--- Add this line
 
     # --- Shopify OAuth ---
     SHOPIFY_CLIENT_ID: str = os.getenv("SHOPIFY_CLIENT_ID")

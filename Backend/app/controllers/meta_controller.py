@@ -52,7 +52,8 @@ async def meta_login(user_id: str = Depends(get_current_user_id)):
         f"https://www.facebook.com/{API_VERSION}/dialog/oauth?"
         f"client_id={config.settings.META_APP_ID}"
         f"&redirect_uri={config.settings.META_REDIRECT_URI}"
-        f"&scope={SCOPES}"
+        f"&config_id={config.settings.META_CONFIG_ID}"  # <--- HERE IS THE FIX
+        # f"&scope={SCOPES}"
         f"&response_type=code"
         f"&state={state_token}"
     )
