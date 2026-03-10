@@ -23,7 +23,7 @@ logger = get_logger()
 
 API_VERSION = "v20.0"
 # SCOPES = "ads_read,read_insights,ads_management,business_management"
-SCOPES = "ads_read, public_profile"
+SCOPES = "ads_read,public_profile"
 PLATFORM_NAME = "meta"
 
 def _get_data_from_db(collection_name: str, ad_account_id: str) -> List[Dict]:
