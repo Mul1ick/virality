@@ -223,6 +223,7 @@ export const GoogleAccountSelectionModal = ({
 
           {/* Step 1: Manager Accounts */}
           {!loading && step === 1 && managerAccounts.length > 0 && (
+            <div className="max-h-64 overflow-y-auto pr-1">
             <RadioGroup
               value={selectedManagerId}
               onValueChange={setSelectedManagerId}
@@ -267,6 +268,7 @@ export const GoogleAccountSelectionModal = ({
                 </div>
               ))}
             </RadioGroup>
+            </div>
           )}
 
           {/* Step 2: Client Accounts */}
@@ -278,6 +280,7 @@ export const GoogleAccountSelectionModal = ({
                 </p>
               </div>
 
+              <div className="max-h-64 overflow-y-auto pr-1">
               <RadioGroup
                 value={selectedClientId}
                 onValueChange={setSelectedClientId}
@@ -312,6 +315,7 @@ export const GoogleAccountSelectionModal = ({
                   </div>
                 ))}
               </RadioGroup>
+              </div>
             </div>
           )}
 

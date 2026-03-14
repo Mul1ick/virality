@@ -197,6 +197,7 @@ export const AccountSelectionModal = ({
 
           {/* Account List */}
           {!loading && !error && accounts.length > 0 && (
+            <div className="max-h-64 overflow-y-auto pr-1">
             <RadioGroup
               value={selectedAccountId}
               onValueChange={setSelectedAccountId}
@@ -254,6 +255,7 @@ export const AccountSelectionModal = ({
                 </div>
               ))}
             </RadioGroup>
+            </div>
           )}
         </div>
 
