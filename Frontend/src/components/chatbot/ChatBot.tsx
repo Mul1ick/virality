@@ -5,6 +5,13 @@ import { Input } from "@/components/ui/input";
 import { MessageCircle, X, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import apiClient from "@/lib/api";
+import {
+  buildDebugJson,
+  buildMarketingSummary,
+  buildReadableBreakdown,
+  normalizeAnalyticsResults,
+  safeParseJsonDeep,
+} from "@/lib/analytics-formatters";
 
 interface Message {
   id: string;
@@ -89,81 +96,8 @@ export const ChatBot = () => {
     return null;
   };
 
-  const formatValue = (key: string, value: any): string => {
-    if (value === null || value === undefined) return "N/A";
-    if (typeof value === "object") {
-      const vals = Object.values(value).filter(
-        (v) => v !== null && v !== undefined
-      );
-      if (vals.length === 0) return "N/A";
-      return vals
-        .map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v)))
-        .join(", ");
-    }
-    if (typeof value === "number") {
-      const k = key.toLowerCase();
-      if (k.includes("ctr")) return `${value.toFixed(2)}%`;
-      if (
-        k.includes("spend") ||
-        k.includes("revenue") ||
-        k.includes("cost") ||
-        k.includes("cpc") ||
-        k.includes("cpm")
-      )
-        return `$${value.toFixed(2)}`;
-      if (Number.isInteger(value)) return value.toLocaleString();
-      return value.toFixed(2);
-    }
-    return String(value);
-  };
-
-  const formatResults = (results: any[]): string => {
-    let summary = "";
-
-    results.slice(0, 5).forEach((item: any) => {
-      const nameKey = Object.keys(item).find((k) =>
-        k.toLowerCase().includes("name")
-      );
-
-      let name = "Result";
-      if (nameKey && item[nameKey]) {
-        name =
-          typeof item[nameKey] === "object"
-            ? formatValue(nameKey, item[nameKey])
-            : String(item[nameKey]);
-      } else if (item._id && typeof item._id === "object") {
-        const idNameKey = Object.keys(item._id).find((k) =>
-          k.toLowerCase().includes("name")
-        );
-        if (idNameKey) name = String(item._id[idNameKey]);
-        else name = formatValue("_id", item._id);
-      } else if (item._id && typeof item._id === "string") {
-        name = item._id;
-      }
-
-      const metricKeys = Object.keys(item).filter(
-        (k) => k !== nameKey && k !== "id" && k !== "_id"
-      );
-
-      let metricsString =
-        metricKeys.length > 0
-          ? metricKeys
-              .map((key) => {
-                const formattedKey = key.replace(/_/g, " ");
-                return `${formattedKey}: ${formatValue(key, item[key])}`;
-              })
-              .join(", ")
-          : "(details in data)";
-
-      summary += `• ${name}: ${metricsString}\n`;
-    });
-
-    if (results.length > 5) {
-      summary += `\n...and ${results.length - 5} more results.`;
-    }
-
-    return summary;
-  };
+  const isDebugRequest = (input: string) =>
+    /\b(debug|raw data|raw json|json|payload)\b/i.test(input);
 
   const handleSend = async () => {
     if (!inputValue.trim()) return;
@@ -195,18 +129,40 @@ export const ChatBot = () => {
             { question: currentInput }
           );
 
-          const { answer, explanation, results } = response.data;
+          const payload = safeParseJsonDeep(response.data) as Record<string, any>;
+          const answer = typeof payload.answer === "string" ? payload.answer.trim() : "";
+          const explanation =
+            typeof payload.explanation === "string" ? payload.explanation.trim() : "";
+          const platform =
+            typeof payload.platform === "string"
+              ? payload.platform
+              : detectedPlatform;
+          const results = normalizeAnalyticsResults(payload.results);
+          const marketingSummary =
+            typeof payload.marketing_summary === "string"
+              ? payload.marketing_summary.trim()
+              : "";
+          const readableBreakdown = buildReadableBreakdown(results);
+          const fallbackSummary = buildMarketingSummary(platform, results);
+          const debugRequested = isDebugRequest(currentInput);
 
-          // Prefer the AI-generated answer, then fall back to formatted results
-          if (answer && !answer.includes("I can only answer")) {
-            botResponseText = answer;
-            if (results && results.length > 0) {
-              botResponseText +=
-                "\n\n📊 Data breakdown:\n" + formatResults(results);
+          if (debugRequested && results.length > 0) {
+            botResponseText = `Debug view:\n\`\`\`json\n${buildDebugJson(
+              results
+            )}\n\`\`\``;
+          } else if (marketingSummary || (answer && !answer.includes("I can only answer"))) {
+            botResponseText = marketingSummary || answer;
+            if (!marketingSummary && fallbackSummary) {
+              botResponseText = fallbackSummary;
             }
-          } else if (results && results.length > 0) {
-            botResponseText =
-              "Here's what I found:\n\n" + formatResults(results);
+            if (readableBreakdown) {
+              botResponseText += `\n\nBreakdown:\n${readableBreakdown}`;
+            }
+          } else if (results.length > 0) {
+            botResponseText = fallbackSummary || "Here's what I found:";
+            if (readableBreakdown) {
+              botResponseText += `\n\nBreakdown:\n${readableBreakdown}`;
+            }
           } else if (explanation) {
             botResponseText = `I looked for: "${explanation}"\n\nBut couldn't find any matching data. Try rephrasing your question or check if data exists for that time period.`;
           } else {

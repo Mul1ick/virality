@@ -2,6 +2,7 @@
 
 import json
 import re
+from datetime import datetime
 from difflib import get_close_matches
 from pymongo import MongoClient
 from bson import ObjectId
@@ -13,6 +14,30 @@ from app.utils.data_schema_registry import DATA_SCHEMAS
 from app.utils.logger import get_logger
 
 logger = get_logger()
+
+ACTION_TYPE_LABELS = {
+    "add_payment_info": "Add payment info",
+    "add_to_cart": "Add to cart",
+    "app_install": "App installs",
+    "begin_checkout": "Checkout starts",
+    "checkout_initiated": "Checkout starts",
+    "complete_registration": "Registrations",
+    "initiate_checkout": "Checkout starts",
+    "landing_page_view": "Landing page views",
+    "lead": "Leads",
+    "link_click": "Link clicks",
+    "onsite_conversion.post_save": "Saves",
+    "page_engagement": "Page engagements",
+    "page_view": "Page views",
+    "post_engagement": "Post engagements",
+    "purchase": "Purchases",
+    "purchase_roas": "Purchase ROAS",
+    "search": "Searches",
+    "subscribe": "Subscriptions",
+    "view_content": "Product views",
+}
+
+EMPTY_VALUES = (None, "", [], {})
 
 
 class AnalyticsService:
@@ -168,6 +193,331 @@ USER QUESTION:
             if op not in self._allowed_readonly_stages:
                 raise HTTPException(status_code=400, detail=f"Disallowed aggregation stage '{op}' detected.")
 
+    def _safe_parse_json_deep(self, value, depth_limit: int = 5, _depth: int = 0):
+        """Recursively parse JSON-looking strings without failing the request."""
+        if _depth >= depth_limit:
+            return value
+
+        if isinstance(value, str):
+            candidate = value.strip()
+            if not candidate:
+                return value
+
+            looks_like_json = (
+                (candidate.startswith("{") and candidate.endswith("}"))
+                or (candidate.startswith("[") and candidate.endswith("]"))
+            )
+            if not looks_like_json:
+                return value
+
+            try:
+                parsed = json.loads(candidate)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                return value
+
+            if parsed == value:
+                return value
+            return self._safe_parse_json_deep(parsed, depth_limit, _depth + 1)
+
+        if isinstance(value, list):
+            return [self._safe_parse_json_deep(item, depth_limit, _depth + 1) for item in value]
+
+        if isinstance(value, dict):
+            return {
+                key: self._safe_parse_json_deep(item, depth_limit, _depth + 1)
+                for key, item in value.items()
+            }
+
+        return value
+
+    def _coerce_number(self, value):
+        if isinstance(value, bool) or value in EMPTY_VALUES:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            cleaned = value.strip().replace(",", "")
+            if not cleaned:
+                return None
+            try:
+                return float(cleaned)
+            except ValueError:
+                return None
+        return None
+
+    def _get_nested_value(self, row: dict, keys: list[str]):
+        for key in keys:
+            if key in row:
+                return row[key]
+
+        row_id = row.get("_id")
+        if isinstance(row_id, dict):
+            for key in keys:
+                if key in row_id:
+                    return row_id[key]
+
+        return None
+
+    def _format_action_type_label(self, action_type: str) -> str:
+        if not action_type:
+            return "Unknown action"
+        return ACTION_TYPE_LABELS.get(
+            action_type,
+            action_type.replace(".", " ").replace("_", " ").strip().title(),
+        )
+
+    def _extract_actions(self, row: dict) -> dict:
+        action_totals = {}
+
+        for field in ("actions", "action_breakdown", "action_breakdowns"):
+            actions = row.get(field)
+            if not actions:
+                continue
+
+            if isinstance(actions, dict):
+                iterable = [
+                    {"action_type": action_key, "value": action_value}
+                    for action_key, action_value in actions.items()
+                ]
+            elif isinstance(actions, list):
+                iterable = actions
+            else:
+                continue
+
+            for action in iterable:
+                if not isinstance(action, dict):
+                    continue
+                action_type = action.get("action_type") or action.get("type") or action.get("name")
+                action_value = self._coerce_number(action.get("value"))
+                if not action_type or action_value is None:
+                    continue
+                action_totals[action_type] = action_totals.get(action_type, 0) + action_value
+
+        return action_totals
+
+    def _format_indian_number(self, value: float, decimals: int = 0) -> str:
+        rounded = f"{abs(value):.{decimals}f}"
+        integer_part, _, decimal_part = rounded.partition(".")
+
+        if len(integer_part) > 3:
+            last_three = integer_part[-3:]
+            leading = integer_part[:-3]
+            parts = []
+            while len(leading) > 2:
+                parts.insert(0, leading[-2:])
+                leading = leading[:-2]
+            if leading:
+                parts.insert(0, leading)
+            integer_part = ",".join(parts + [last_three])
+
+        sign = "-" if value < 0 else ""
+        if decimals <= 0:
+            return f"{sign}{integer_part}"
+        return f"{sign}{integer_part}.{decimal_part}"
+
+    def _format_currency_inr(self, value: float) -> str:
+        decimals = 0 if float(value).is_integer() else 2
+        return f"₹{self._format_indian_number(value, decimals=decimals)}"
+
+    def _format_compact_metric(self, value: float) -> str:
+        absolute = abs(value)
+        if absolute >= 1e7:
+            return f"{value / 1e7:.1f}".rstrip("0").rstrip(".") + " crore"
+        if absolute >= 1e5:
+            return f"{value / 1e5:.1f}".rstrip("0").rstrip(".") + " lakh"
+        if absolute >= 1e3:
+            return f"{value / 1e3:.1f}".rstrip("0").rstrip(".") + " thousand"
+        return self._format_indian_number(value, decimals=0)
+
+    def _format_date_label(self, value) -> str | None:
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            return value.strftime("%d %b")
+        if isinstance(value, str):
+            candidate = value.strip().replace("Z", "+00:00")
+            try:
+                parsed = datetime.fromisoformat(candidate)
+            except ValueError:
+                try:
+                    parsed = datetime.strptime(value[:10], "%Y-%m-%d")
+                except ValueError:
+                    return None
+            return parsed.strftime("%d %b")
+        return None
+
+    def _get_row_name(self, row: dict) -> str | None:
+        name_keys = [
+            "campaign_name",
+            "adset_name",
+            "ad_name",
+            "name",
+            "product_name",
+            "title",
+            "order_name",
+        ]
+        for key in name_keys:
+            value = self._get_nested_value(row, [key])
+            if value not in EMPTY_VALUES:
+                return str(value)
+
+        row_id = row.get("_id")
+        if isinstance(row_id, str) and row_id:
+            return row_id
+
+        return None
+
+    def _build_marketing_summary(self, platform: str, results: list, question: str) -> str:
+        if not results:
+            return ""
+
+        subject_map = {
+            "meta": "Meta campaigns",
+            "meta_adsets": "Meta ad sets",
+            "meta_ads": "Meta ads",
+            "google_campaigns": "Google campaigns",
+            "google_adsets": "Google ad groups",
+            "google_ads": "Google ads",
+            "shopify": "Shopify data",
+        }
+        subject = subject_map.get(platform, "Selected data")
+
+        totals = {
+            "spend": 0.0,
+            "impressions": 0.0,
+            "clicks": 0.0,
+            "reach": 0.0,
+            "revenue": 0.0,
+            "conversions": 0.0,
+            "orders": 0.0,
+        }
+        action_totals = {}
+        best_row = None
+        best_score = None
+
+        for row in results:
+            spend = self._coerce_number(self._get_nested_value(row, ["spend", "total_spend", "totalSpend", "cost"]))
+            impressions = self._coerce_number(
+                self._get_nested_value(row, ["impressions", "total_impressions", "totalImpressions"])
+            )
+            clicks = self._coerce_number(self._get_nested_value(row, ["clicks", "total_clicks", "totalClicks"]))
+            reach = self._coerce_number(self._get_nested_value(row, ["reach", "total_reach", "totalReach"]))
+            revenue = self._coerce_number(
+                self._get_nested_value(row, ["revenue", "total_revenue", "totalRevenue", "sales"])
+            )
+            conversions = self._coerce_number(
+                self._get_nested_value(
+                    row,
+                    ["conversions", "total_conversions", "totalConversions", "purchases", "purchase"],
+                )
+            )
+            orders = self._coerce_number(self._get_nested_value(row, ["orders", "order_count", "orderCount"]))
+
+            totals["spend"] += spend or 0
+            totals["impressions"] += impressions or 0
+            totals["clicks"] += clicks or 0
+            totals["reach"] += reach or 0
+            totals["revenue"] += revenue or 0
+            totals["conversions"] += conversions or 0
+            totals["orders"] += orders or 0
+
+            row_actions = self._extract_actions(row)
+            for action_type, action_value in row_actions.items():
+                action_totals[action_type] = action_totals.get(action_type, 0) + action_value
+
+            score = (
+                row_actions.get("purchase", 0),
+                conversions or 0,
+                row_actions.get("add_to_cart", 0),
+                clicks or 0,
+                impressions or 0,
+                spend or 0,
+            )
+            if best_score is None or score > best_score:
+                best_score = score
+                best_row = row
+
+        purchases = action_totals.get("purchase", 0) or totals["conversions"]
+        add_to_cart = action_totals.get("add_to_cart", 0)
+        link_clicks = action_totals.get("link_click", 0)
+
+        summary_sentences = []
+
+        primary_fragments = []
+        if totals["spend"] > 0:
+            primary_fragments.append(f"spent {self._format_currency_inr(totals['spend'])}")
+        if totals["revenue"] > 0:
+            primary_fragments.append(f"generated {self._format_currency_inr(totals['revenue'])} in revenue")
+        if totals["impressions"] > 0:
+            primary_fragments.append(
+                f"delivered {self._format_compact_metric(totals['impressions'])} impressions"
+            )
+        elif totals["reach"] > 0:
+            primary_fragments.append(f"reached {self._format_compact_metric(totals['reach'])} people")
+        if totals["clicks"] > 0:
+            primary_fragments.append(f"drove {self._format_indian_number(totals['clicks'])} clicks")
+        elif link_clicks > 0:
+            primary_fragments.append(f"drove {self._format_indian_number(link_clicks)} link clicks")
+
+        if primary_fragments:
+            if len(primary_fragments) == 1:
+                summary_sentences.append(f"{subject} {primary_fragments[0]}.")
+            else:
+                summary_sentences.append(
+                    f"{subject} {', '.join(primary_fragments[:-1])} and {primary_fragments[-1]}."
+                )
+
+        outcome_fragments = []
+        if purchases > 0:
+            outcome_fragments.append(f"{self._format_indian_number(purchases)} purchases")
+        if add_to_cart > 0:
+            outcome_fragments.append(f"{self._format_indian_number(add_to_cart)} add-to-cart actions")
+        if totals["orders"] > 0:
+            outcome_fragments.append(f"{self._format_indian_number(totals['orders'])} orders")
+        if totals["conversions"] > 0 and purchases == 0:
+            outcome_fragments.append(f"{self._format_indian_number(totals['conversions'])} conversions")
+
+        if outcome_fragments:
+            summary_sentences.append(
+                "There were " + " and ".join(outcome_fragments[:2]) + "."
+            )
+
+        if best_row:
+            best_name = self._get_row_name(best_row)
+            best_date = self._format_date_label(
+                self._get_nested_value(best_row, ["date_start", "date", "created_at"])
+            )
+            best_clicks = self._coerce_number(self._get_nested_value(best_row, ["clicks", "totalClicks"])) or 0
+            best_purchases = self._extract_actions(best_row).get("purchase", 0)
+
+            if best_name:
+                highlight_metric = None
+                if best_purchases > 0:
+                    highlight_metric = f"{self._format_indian_number(best_purchases)} purchases"
+                elif best_clicks > 0:
+                    highlight_metric = f"{self._format_indian_number(best_clicks)} clicks"
+
+                if highlight_metric:
+                    date_suffix = f" on {best_date}" if best_date else ""
+                    summary_sentences.append(
+                        f"The strongest row was {best_name}{date_suffix}, with {highlight_metric}."
+                    )
+
+        if (totals["clicks"] > 0 or link_clicks > 0) and purchases == 0:
+            summary_sentences.append(
+                "Traffic is coming through, but it is not turning into purchases yet, which points to a landing-page or audience-quality gap."
+            )
+        elif add_to_cart > 0 and purchases > 0 and add_to_cart > purchases:
+            summary_sentences.append(
+                "Add-to-cart volume is ahead of purchases, so the main drop-off appears closer to checkout than to ad engagement."
+            )
+
+        if not summary_sentences:
+            parsed_question = question.strip().rstrip("?")
+            return f"I found matching {subject.lower()} data for \"{parsed_question}\", but there was not enough numeric detail to produce a reliable business summary."
+
+        return " ".join(summary_sentences[:4])
+
     # ------------------------------------------------------------
     # Pipeline Generation
     # ------------------------------------------------------------
@@ -269,10 +619,14 @@ Your Input: {json.dumps(pipeline)}
 
         data_preview = json.dumps(results[:10])
         answer_prompt = f"""
-You are a data analyst for the Virality platform. Using ONLY the provided data rows, answer the user's question with clear, factual insight.
+You are a marketing analyst for the Virality platform. Using ONLY the provided data rows, answer the user's question for a non-technical marketing professional.
 - Never invent data, fields, or counts; rely solely on the rows provided.
 - If the question is unrelated to Virality analytics data or cannot be answered from these rows, reply exactly: "I can only answer questions about Virality analytics data."
 - Do not provide instructions or attempt any data changes—this is read-only analysis.
+- Summarize the business takeaway first, then mention the important supporting metrics.
+- Never dump raw JSON, field keys, arrays, or object literals into the answer.
+- Translate technical action names such as link_click, add_to_cart, and purchase into plain English.
+- Use the ₹ symbol for spend, revenue, CPC, CPM, or cost values. Do not do any currency conversion.
 
 Platform: {platform}
 User question: "{question}"
@@ -304,8 +658,10 @@ Write 2-4 concise sentences highlighting what the data shows, notable patterns, 
 
         pipeline = self._generate_pipeline(platform, question)
         results = self._execute_query(platform, pipeline, user_id)
+        normalized_results = [self._safe_parse_json_deep(row) for row in results]
         explanation = self._generate_explanation(pipeline)
-        answer = self._generate_answer(platform, question, results)
+        answer = self._generate_answer(platform, question, normalized_results)
+        marketing_summary = self._build_marketing_summary(platform, normalized_results, question)
 
         return {
             "user_id": user_id,
@@ -313,6 +669,7 @@ Write 2-4 concise sentences highlighting what the data shows, notable patterns, 
             "question": question,
             "explanation": explanation,
             "pipeline_executed": pipeline,
-            "results": results[:20],
+            "results": normalized_results[:20],
             "answer": answer,
+            "marketing_summary": marketing_summary,
         }

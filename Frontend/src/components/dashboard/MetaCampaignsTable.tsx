@@ -15,6 +15,11 @@ import { MetaCampaign } from "@/hooks/useMetaData";
 import { DateRange } from "react-day-picker";
 import { DemographicsModal } from "@/components/modals/DemographicsModal";
 import { useState, useEffect } from "react";
+import {
+  formatCurrencyINR,
+  formatNumberIN,
+  formatPercentage,
+} from "@/lib/analytics-formatters";
 
 interface MetaCampaignsTableProps {
   campaigns: MetaCampaign[];
@@ -60,25 +65,14 @@ export const MetaCampaignsTable = ({
     return labels[dateRange] || "Last 30 days";
   };
 
-  const formatCurrency = (value: number | undefined) => {
-    if (value === undefined || value === null || isNaN(value)) return "₹0.00";
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  };
+  const formatCurrency = (value: number | undefined) =>
+    formatCurrencyINR(value ?? 0);
 
-  const formatNumber = (value: number | undefined) => {
-    if (value === undefined || value === null || isNaN(value)) return "0";
-    return new Intl.NumberFormat("en-US").format(value);
-  };
+  const formatNumber = (value: number | undefined) =>
+    formatNumberIN(value ?? 0, { maximumFractionDigits: 0 });
 
-  const formatPercentage = (value: number | undefined) => {
-    if (value === undefined || value === null || isNaN(value)) return "0.00%";
-    return `${value.toFixed(2)}%`;
-  };
+  const formatMetricPercentage = (value: number | undefined) =>
+    formatPercentage(value ?? 0);
 
   const getStatusStyle = (status: string) => {
     const statusUpper = status.toUpperCase();
@@ -278,7 +272,7 @@ export const MetaCampaignsTable = ({
                                 : "text-muted-foreground"
                             }
                           >
-                            {formatPercentage(campaign.insights.ctr)}
+                          {formatMetricPercentage(campaign.insights.ctr)}
                           </span>
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
@@ -358,7 +352,7 @@ export const MetaCampaignsTable = ({
           <div>
             <p className="text-xs text-muted-foreground">Avg. CTR</p>
             <p className="text-lg font-semibold text-foreground">
-              {formatPercentage(avgCTR)}
+              {formatMetricPercentage(avgCTR)}
             </p>
           </div>
         </div>

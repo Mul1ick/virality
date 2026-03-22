@@ -10,6 +10,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { GoogleCampaign } from "@/hooks/useGoogleData";
+import {
+  formatCurrencyINR,
+  formatNumberIN,
+  formatPercentage,
+} from "@/lib/analytics-formatters";
 
 interface GoogleCampaignsTableProps {
   campaigns: GoogleCampaign[];
@@ -20,23 +25,6 @@ export const GoogleCampaignsTable = ({
   campaigns,
   isLoading = false,
 }: GoogleCampaignsTableProps) => {
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  };
-
-  const formatNumber = (value: number) => {
-    return new Intl.NumberFormat("en-US").format(value);
-  };
-
-  const formatPercentage = (value: number) => {
-    return `${value.toFixed(2)}%`;
-  };
-
   const getStatusStyle = (status: string) => {
     const statusUpper = status.toUpperCase();
     if (statusUpper === "ENABLED" || statusUpper === "ACTIVE") {
@@ -145,13 +133,17 @@ export const GoogleCampaignsTable = ({
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right font-semibold">
-                    {formatCurrency(campaign.spend || 0)}
+                    {formatCurrencyINR(campaign.spend || 0)}
                   </TableCell>
                   <TableCell className="text-right">
-                    {formatNumber(campaign.impressions || 0)}
+                    {formatNumberIN(campaign.impressions || 0, {
+                      maximumFractionDigits: 0,
+                    })}
                   </TableCell>
                   <TableCell className="text-right">
-                    {formatNumber(campaign.clicks || 0)}
+                    {formatNumberIN(campaign.clicks || 0, {
+                      maximumFractionDigits: 0,
+                    })}
                   </TableCell>
                   <TableCell className="text-right">
                     <span
@@ -165,10 +157,10 @@ export const GoogleCampaignsTable = ({
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    {formatCurrency(campaign.cpc || 0)}
+                    {formatCurrencyINR(campaign.cpc || 0)}
                   </TableCell>
                   <TableCell className="text-right">
-                    {formatCurrency(campaign.cpm || 0)}
+                    {formatCurrencyINR(campaign.cpm || 0)}
                   </TableCell>
                   <TableCell className="text-right">
                     {(campaign.conversions || 0).toFixed(1)}
@@ -183,7 +175,7 @@ export const GoogleCampaignsTable = ({
           <div>
             <p className="text-xs text-muted-foreground">Total Spend</p>
             <p className="text-lg font-semibold">
-              {formatCurrency(
+              {formatCurrencyINR(
                 campaigns.reduce((sum, c) => sum + (c.spend || 0), 0)
               )}
             </p>
@@ -191,8 +183,9 @@ export const GoogleCampaignsTable = ({
           <div>
             <p className="text-xs text-muted-foreground">Total Clicks</p>
             <p className="text-lg font-semibold">
-              {formatNumber(
+              {formatNumberIN(
                 campaigns.reduce((sum, c) => sum + (c.clicks || 0), 0)
+                , { maximumFractionDigits: 0 }
               )}
             </p>
           </div>

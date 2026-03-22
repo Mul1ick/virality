@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ShopifyCustomer } from "@/hooks/useShopifyData";
+import { formatCurrencyINR } from "@/lib/analytics-formatters";
 
 interface ShopifyCustomersTableProps {
   customers: ShopifyCustomer[];
@@ -34,15 +35,6 @@ export const ShopifyCustomersTable = ({
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const currentCustomers = limitedCustomers.slice(startIndex, endIndex);
-
-  // Format currency
-  const formatCurrency = (value: string) => {
-    const num = parseFloat(value);
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(num);
-  };
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -126,8 +118,8 @@ export const ShopifyCustomersTable = ({
                   </TableCell>
                   <TableCell className="text-right font-semibold text-green-600">
                     {customer.total_spent
-                      ? formatCurrency(customer.total_spent)
-                      : "$0.00"}
+                      ? formatCurrencyINR(customer.total_spent)
+                      : formatCurrencyINR(0)}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDate(customer.created_at)}
@@ -184,10 +176,9 @@ export const ShopifyCustomersTable = ({
           <div>
             <p className="text-xs text-muted-foreground">Total Revenue</p>
             <p className="text-lg font-semibold text-green-600">
-              {formatCurrency(
+              {formatCurrencyINR(
                 customers
                   .reduce((sum, c) => sum + parseFloat(c.total_spent || "0"), 0)
-                  .toString()
               )}
             </p>
           </div>

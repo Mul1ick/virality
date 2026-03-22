@@ -14,6 +14,10 @@ import { DailyChartData } from "@/hooks/useOverviewData";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  formatCompactNumberIN,
+  formatCurrencyINR,
+} from "@/lib/analytics-formatters";
 
 interface TrendChartProps {
   dateRange: string;
@@ -32,26 +36,13 @@ export const TrendChart = ({
 }: TrendChartProps) => {
   const isMobile = useIsMobile();
 
-  // Format currency
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
+  const formatCurrency = (value: number) =>
+    formatCurrencyINR(value, {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(value);
-  };
+    });
 
-  // Format number
-  const formatNumber = (value: number) => {
-    if (value >= 1000000) {
-      return `${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `${(value / 1000).toFixed(1)}K`;
-    }
-    return Math.round(value).toString();
-  };
+  const formatNumber = (value: number) => formatCompactNumberIN(value);
 
   // Format date
   const formatDate = (dateStr: string) => {

@@ -18,6 +18,10 @@ import { DailyChartData } from "@/hooks/useOverviewData";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { Card } from "@/components/ui/card";
+import {
+  formatCompactNumberIN,
+  formatCurrencyINR,
+} from "@/lib/analytics-formatters";
 
 interface OverviewTabProps {
   dateRange: string;
@@ -92,24 +96,6 @@ export const OverviewTab = ({
       ? (metaTotals.clicks / metaTotals.impressions) * 100
       : 0;
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatNumber = (value: number) => {
-    if (value >= 1000000) {
-      return (value / 1000000).toFixed(1) + "M";
-    } else if (value >= 1000) {
-      return (value / 1000).toFixed(1) + "K";
-    }
-    return value.toFixed(0);
-  };
-
   // Render content based on active sub-tab
   const renderContent = () => {
     switch (activeSubTab) {
@@ -142,21 +128,24 @@ export const OverviewTab = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
                   <MetricCard
                     title="Total Ad Spend"
-                    value={formatCurrency(metaTotals.spend)}
+                    value={formatCurrencyINR(metaTotals.spend, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    })}
                     icon={DollarSign}
                     iconColor="cyan"
                     subtitle="vs. last period"
                   />
                   <MetricCard
                     title="Total Impressions"
-                    value={formatNumber(metaTotals.impressions)}
+                    value={formatCompactNumberIN(metaTotals.impressions)}
                     icon={Eye}
                     iconColor="teal"
                     subtitle="vs. last period"
                   />
                   <MetricCard
                     title="Total Clicks"
-                    value={formatNumber(metaTotals.clicks)}
+                    value={formatCompactNumberIN(metaTotals.clicks)}
                     icon={MousePointer}
                     iconColor="purple"
                     subtitle="vs. last period"
@@ -213,21 +202,24 @@ export const OverviewTab = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
                   <MetricCard
                     title="Total Ad Spend"
-                    value={formatCurrency(googleData.totalSpend)}
+                    value={formatCurrencyINR(googleData.totalSpend, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    })}
                     icon={DollarSign}
                     iconColor="cyan"
                     subtitle="vs. last period"
                   />
                   <MetricCard
                     title="Total Impressions"
-                    value={formatNumber(googleData.totalImpressions)}
+                    value={formatCompactNumberIN(googleData.totalImpressions)}
                     icon={Eye}
                     iconColor="teal"
                     subtitle="vs. last period"
                   />
                   <MetricCard
                     title="Total Clicks"
-                    value={formatNumber(googleData.totalClicks)}
+                    value={formatCompactNumberIN(googleData.totalClicks)}
                     icon={MousePointer}
                     iconColor="purple"
                     subtitle="vs. last period"

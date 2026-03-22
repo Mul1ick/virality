@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ShopifyOrder } from "@/hooks/useShopifyData";
+import { formatCurrencyINR } from "@/lib/analytics-formatters";
 
 interface ShopifyOrdersTableProps {
   orders: ShopifyOrder[];
@@ -35,16 +36,6 @@ export const ShopifyOrdersTable = ({
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const currentOrders = limitedOrders.slice(startIndex, endIndex);
-
-  // Format currency
-  const formatCurrency = (value: string) => {
-    const num = parseFloat(value);
-    if (isNaN(num)) return "$0.00";
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(num);
-  };
 
   // Format date
   const formatDate = (dateString: string | undefined) => {
@@ -199,7 +190,7 @@ export const ShopifyOrdersTable = ({
                       {customerEmail}
                     </TableCell>
                     <TableCell className="text-right font-semibold">
-                      {formatCurrency(totalPrice)}
+                      {formatCurrencyINR(totalPrice)}
                     </TableCell>
                     <TableCell>
                       <span
@@ -269,7 +260,7 @@ export const ShopifyOrdersTable = ({
           <div>
             <p className="text-xs text-muted-foreground">Total Revenue</p>
             <p className="text-lg font-semibold text-green-600">
-              {formatCurrency(
+              {formatCurrencyINR(
                 orders
                   .reduce((sum, o) => {
                     const price =
@@ -282,7 +273,6 @@ export const ShopifyOrdersTable = ({
                       "0";
                     return sum + parseFloat(price);
                   }, 0)
-                  .toString()
               )}
             </p>
           </div>

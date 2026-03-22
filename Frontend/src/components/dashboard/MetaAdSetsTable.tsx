@@ -14,6 +14,11 @@ import { Users, ArrowLeft, X, ChevronRight, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { DemographicsModal } from "@/components/modals/DemographicsModal";
+import {
+  formatCurrencyINR,
+  formatNumberIN,
+  formatPercentage,
+} from "@/lib/analytics-formatters";
 
 interface MetaAdSetsTableProps {
   adsets: MetaAdSet[];
@@ -64,26 +69,20 @@ export const MetaAdSetsTable = ({
     return labels[dateRange] || "Last 30 days";
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
+  const formatCurrency = (value: number) =>
+    formatCurrencyINR(value, {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(value);
-  };
+    });
 
   const formatBudget = (budgetCents: string) => {
     return formatCurrency(parseInt(budgetCents) / 100);
   };
 
-  const formatNumber = (value: number) => {
-    return new Intl.NumberFormat("en-US").format(value);
-  };
+  const formatNumber = (value: number) =>
+    formatNumberIN(value, { maximumFractionDigits: 0 });
 
-  const formatPercentage = (value: number) => {
-    return `${value.toFixed(2)}%`;
-  };
+  const formatMetricPercentage = (value: number) => formatPercentage(value);
 
   const getStatusStyle = (status: string) => {
     const statusUpper = status.toUpperCase();
@@ -265,7 +264,7 @@ export const MetaAdSetsTable = ({
                                 : "text-muted-foreground"
                             }
                           >
-                            {formatPercentage(adset.insights.ctr)}
+                            {formatMetricPercentage(adset.insights.ctr)}
                           </span>
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
@@ -355,7 +354,7 @@ export const MetaAdSetsTable = ({
           <div>
             <p className="text-xs text-muted-foreground">Avg. CTR</p>
             <p className="text-lg font-semibold text-foreground">
-              {formatPercentage(
+              {formatMetricPercentage(
                 adsets.reduce((sum, a) => sum + (a.insights?.ctr || 0), 0) /
                   adsets.filter((a) => a.insights).length || 0
               )}

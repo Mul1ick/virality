@@ -9,9 +9,12 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import axios from "axios";
 import apiClient from "@/lib/api";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  formatCurrencyINR,
+  formatNumberIN,
+} from "@/lib/analytics-formatters";
 
 interface ChartDataPoint {
   date: string;
@@ -132,7 +135,22 @@ const GoogleTrendChart: React.FC<GoogleTrendChartProps> = ({
           />
           <YAxis yAxisId="left" />
           <YAxis yAxisId="right" orientation="right" />
-          <Tooltip />
+          <Tooltip
+            formatter={(value: number | string, name: string) => {
+              const numericValue =
+                typeof value === "number" ? value : Number.parseFloat(value);
+
+              if (name === "Spend (₹)") {
+                return [formatCurrencyINR(numericValue), name];
+              }
+
+              if (name === "Conversions") {
+                return [formatNumberIN(numericValue, { maximumFractionDigits: 1 }), name];
+              }
+
+              return [formatNumberIN(numericValue, { maximumFractionDigits: 0 }), name];
+            }}
+          />
           <Legend />
 
           <Line
@@ -156,7 +174,7 @@ const GoogleTrendChart: React.FC<GoogleTrendChartProps> = ({
             type="monotone"
             dataKey="spend"
             stroke="#ff7300"
-            name="Spend ($)"
+            name="Spend (₹)"
             strokeWidth={2}
           />
           <Line
@@ -175,24 +193,26 @@ const GoogleTrendChart: React.FC<GoogleTrendChartProps> = ({
         <div className="bg-blue-500/10 border border-blue-500/20 p-3 sm:p-4 rounded-lg">
           <p className="text-xs sm:text-sm text-muted-foreground">Total Clicks</p>
           <p className="text-lg sm:text-2xl font-bold text-blue-400">
-            {chartData.reduce((sum, d) => sum + d.clicks, 0).toLocaleString()}
+            {formatNumberIN(chartData.reduce((sum, d) => sum + d.clicks, 0), {
+              maximumFractionDigits: 0,
+            })}
           </p>
         </div>
         <div className="bg-green-500/10 border border-green-500/20 p-3 sm:p-4 rounded-lg">
           <p className="text-xs sm:text-sm text-muted-foreground">Total Impressions</p>
           <p className="text-lg sm:text-2xl font-bold text-green-400">
-            {chartData
-              .reduce((sum, d) => sum + d.impressions, 0)
-              .toLocaleString()}
+            {formatNumberIN(
+              chartData.reduce((sum, d) => sum + d.impressions, 0),
+              { maximumFractionDigits: 0 }
+            )}
           </p>
         </div>
         <div className="bg-orange-500/10 border border-orange-500/20 p-3 sm:p-4 rounded-lg">
           <p className="text-xs sm:text-sm text-muted-foreground">Total Spend</p>
           <p className="text-lg sm:text-2xl font-bold text-orange-400">
-            $
-            {chartData
-              .reduce((sum, d) => sum + parseFloat(d.spend), 0)
-              .toFixed(2)}
+            {formatCurrencyINR(
+              chartData.reduce((sum, d) => sum + parseFloat(d.spend), 0)
+            )}
           </p>
         </div>
         <div className="bg-red-500/10 border border-red-500/20 p-3 sm:p-4 rounded-lg">

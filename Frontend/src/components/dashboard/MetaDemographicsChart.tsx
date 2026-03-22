@@ -11,6 +11,10 @@ import {
 } from "recharts";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import {
+  formatCurrencyINR,
+  formatNumberIN,
+} from "@/lib/analytics-formatters";
 
 export interface DemographicData {
   age: string;
@@ -54,12 +58,12 @@ export const MetaDemographicsChart = ({
     );
   }, [data, metric]);
 
-  const formatNumber = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
+  const formatNumber = (value: number) =>
+    formatNumberIN(value, {
       notation: "compact",
       compactDisplay: "short",
-    }).format(value);
-  };
+      maximumFractionDigits: 1,
+    });
 
   if (isLoading) {
     return (
@@ -100,7 +104,15 @@ export const MetaDemographicsChart = ({
             <Tooltip 
               cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
               contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }}
-              formatter={(value: number) => [new Intl.NumberFormat("en-US").format(value), ""]}
+              formatter={(value: number) => [
+                metric === "spend"
+                  ? formatCurrencyINR(value, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    })
+                  : formatNumberIN(value, { maximumFractionDigits: 0 }),
+                "",
+              ]}
             />
             <Legend />
             
