@@ -41,6 +41,25 @@ async def get_user_platforms(
     return UserService.get_platform_connections(user_id)
 
 
+@router.delete("/{user_id}/platforms/{platform}", response_model=dict)
+async def disconnect_platform(
+    user_id: str,
+    platform: str,
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """
+    Disconnects a specific platform (google, meta, shopify) for the given user.
+    Removes tokens and connection data from the database.
+    """
+    logger.info(f"[UserController] DELETE /user/{user_id}/platforms/{platform} requested by {current_user_id}")
+
+    if user_id != current_user_id:
+        logger.warning(f"[UserController] Unauthorized disconnect: {current_user_id} → {user_id}")
+        raise HTTPException(status_code=403, detail="Not authorized to modify this user's data")
+
+    return UserService.disconnect_platform(user_id, platform)
+
+
 @router.get("/{user_id}/profile", response_model=UserProfile)
 async def get_user_profile(
     user_id: str,

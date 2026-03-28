@@ -19,6 +19,7 @@ import {
   CheckCircle,
   AlertCircle,
   Link,
+  Link2Off,
   ArrowRight,
   BarChart3,
   LogOut,
@@ -63,7 +64,13 @@ const getStatusBadge = (status, comingSoon = false) => {
   );
 };
 
-const IntegrationCard = ({ integration, onConnect, loadingPlatform }) => (
+const IntegrationCard = ({
+  integration,
+  onConnect,
+  onDisconnect,
+  loadingPlatform,
+  disconnectingPlatform,
+}) => (
   <Card
     className={`bg-card/50 border-border/50 backdrop-blur-sm hover:border-primary/30 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 group ${
       integration.comingSoon ? "opacity-75" : ""
@@ -114,45 +121,66 @@ const IntegrationCard = ({ integration, onConnect, loadingPlatform }) => (
       )}
     </CardContent>
     <CardFooter className="px-4 sm:px-6">
-      <Button
-        className="w-full transition-all duration-300"
-        variant={
-          integration.status === "Connected" || integration.comingSoon
-            ? "secondary"
-            : "default"
-        }
-        onClick={() =>
-          !integration.comingSoon && onConnect(integration.connectHandler)
-        }
-        disabled={
-          !!loadingPlatform ||
-          integration.status === "Connected" ||
-          integration.comingSoon
-        }
-      >
-        {integration.comingSoon ? (
-          <>
-            <Lock className="h-4 w-4 mr-2" />
-            Coming Soon
-          </>
-        ) : integration.status === "Connected" ? (
-          <>
-            <CheckCircle className="h-4 w-4 mr-2" />
-            Connected
-          </>
-        ) : (
-          <>
-            <Link className="h-4 w-4 mr-2" />
-            {loadingPlatform === integration.connectHandler ? "Connecting..." : "Connect Now"}
-          </>
+      <div className="w-full flex flex-col gap-2">
+        <Button
+          className="w-full transition-all duration-300"
+          variant={
+            integration.status === "Connected" || integration.comingSoon
+              ? "secondary"
+              : "default"
+          }
+          onClick={() =>
+            !integration.comingSoon && onConnect(integration.connectHandler)
+          }
+          disabled={
+            !!loadingPlatform ||
+            !!disconnectingPlatform ||
+            integration.status === "Connected" ||
+            integration.comingSoon
+          }
+        >
+          {integration.comingSoon ? (
+            <>
+              <Lock className="h-4 w-4 mr-2" />
+              Coming Soon
+            </>
+          ) : integration.status === "Connected" ? (
+            <>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Connected
+            </>
+          ) : (
+            <>
+              <Link className="h-4 w-4 mr-2" />
+              {loadingPlatform === integration.connectHandler
+                ? "Connecting..."
+                : "Connect Now"}
+            </>
+          )}
+        </Button>
+        {integration.status === "Connected" && !integration.comingSoon && (
+          <Button
+            className="w-full transition-all duration-300"
+            variant="outline"
+            onClick={() => onDisconnect(integration.connectHandler)}
+            disabled={!!loadingPlatform || !!disconnectingPlatform}
+          >
+            <Link2Off className="h-4 w-4 mr-2" />
+            {disconnectingPlatform === integration.connectHandler
+              ? "Disconnecting..."
+              : "Disconnect"}
+          </Button>
         )}
-      </Button>
+      </div>
     </CardFooter>
   </Card>
 );
 
 const Profile = () => {
   const [loadingPlatform, setLoadingPlatform] = useState<string | null>(null);
+  const [disconnectingPlatform, setDisconnectingPlatform] = useState<
+    string | null
+  >(null);
   const [connectedAccounts, setConnectedAccounts] = useState({
     meta: false,
     google: false,
@@ -166,7 +194,7 @@ const Profile = () => {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [platformStatusLoading, setPlatformStatusLoading] = useState(true);
   const [platformStatusError, setPlatformStatusError] = useState<string | null>(
-    null
+    null,
   );
 
   // Effect 1: Fetch User Profile
@@ -190,7 +218,7 @@ const Profile = () => {
         // 401 is handled globally by apiClient interceptor
         if (err.response?.status !== 401) {
           setProfileError(
-            err.response?.data?.detail || "Could not load profile."
+            err.response?.data?.detail || "Could not load profile.",
           );
         }
       } finally {
@@ -234,7 +262,7 @@ const Profile = () => {
         // 401 is handled globally by apiClient interceptor
         if (err.response?.status !== 401) {
           setPlatformStatusError(
-            err.response?.data?.detail || "Could not load connection status."
+            err.response?.data?.detail || "Could not load connection status.",
           );
         }
       } finally {
@@ -278,7 +306,7 @@ const Profile = () => {
 
     if (platformUserId && platform) {
       console.log(
-        `OAuth redirect detected for ${platform}, user ID ${platformUserId}`
+        `OAuth redirect detected for ${platform}, user ID ${platformUserId}`,
       );
 
       if (!localStorage.getItem("user_id")) {
@@ -288,7 +316,7 @@ const Profile = () => {
         const storedUserId = localStorage.getItem("user_id");
         if (platformUserId !== storedUserId) {
           console.warn(
-            `OAuth redirect user ID (${platformUserId}) doesn't match stored user ID (${storedUserId}).`
+            `OAuth redirect user ID (${platformUserId}) doesn't match stored user ID (${storedUserId}).`,
           );
         }
       }
@@ -347,7 +375,7 @@ const Profile = () => {
       } else {
         console.error("Backend did not provide a redirect URL.");
         setProfileError(
-          "Could not initiate Google connection. Please try again."
+          "Could not initiate Google connection. Please try again.",
         );
         setLoadingPlatform(null);
       }
@@ -355,7 +383,7 @@ const Profile = () => {
       console.error("Error initiating Google login:", error);
       if (error.response?.status !== 401) {
         setProfileError(
-          error.response?.data?.detail || "Failed to start Google connection."
+          error.response?.data?.detail || "Failed to start Google connection.",
         );
       }
       setLoadingPlatform(null);
@@ -376,7 +404,7 @@ const Profile = () => {
       } else {
         console.error("Backend did not provide a redirect URL.");
         setProfileError(
-          "Could not initiate Meta connection. Please try again."
+          "Could not initiate Meta connection. Please try again.",
         );
         setLoadingPlatform(null);
       }
@@ -384,7 +412,7 @@ const Profile = () => {
       console.error("Error initiating Meta login:", error);
       if (error.response?.status !== 401) {
         setProfileError(
-          error.response?.data?.detail || "Failed to start Meta connection."
+          error.response?.data?.detail || "Failed to start Meta connection.",
         );
       }
       setLoadingPlatform(null);
@@ -471,6 +499,37 @@ const Profile = () => {
     }
   };
 
+  const handleDisconnect = async (platform: string) => {
+    const platformNames = {
+      meta: "Meta Ads",
+      google: "Google Ads",
+      shopify: "Shopify",
+    };
+    const confirmed = window.confirm(
+      `Are you sure you want to disconnect ${platformNames[platform] || platform}? This will remove the connection and you will need to reconnect to access data from this platform.`,
+    );
+    if (!confirmed) return;
+
+    const userId = localStorage.getItem("user_id");
+    if (!userId) return;
+
+    setDisconnectingPlatform(platform);
+    try {
+      await apiClient.delete(`/user/${userId}/platforms/${platform}`);
+      setConnectedAccounts((prev) => ({ ...prev, [platform]: false }));
+    } catch (error: any) {
+      console.error(`Error disconnecting ${platform}:`, error);
+      if (error.response?.status !== 401) {
+        setProfileError(
+          error.response?.data?.detail ||
+            `Failed to disconnect ${platformNames[platform] || platform}.`,
+        );
+      }
+    } finally {
+      setDisconnectingPlatform(null);
+    }
+  };
+
   const handleGoToDashboard = () => {
     navigate("/dashboard");
   };
@@ -482,7 +541,7 @@ const Profile = () => {
 
   const hasAnyConnection = Object.values(connectedAccounts).some((v) => v);
   const connectedCount = Object.values(connectedAccounts).filter(
-    (v) => v
+    (v) => v,
   ).length;
 
   if (profileLoading || platformStatusLoading) {
@@ -688,10 +747,7 @@ const Profile = () => {
               <Separator className="bg-border/50" />
 
               <CardFooter className="flex flex-col gap-2.5 pt-6 px-4 sm:px-6">
-                <Button
-                  variant="secondary"
-                  className="w-full border-border/50"
-                >
+                <Button variant="secondary" className="w-full border-border/50">
                   <Settings className="h-4 w-4 mr-2" />
                   Edit Profile
                 </Button>
@@ -726,7 +782,9 @@ const Profile = () => {
                   key={integration.name}
                   integration={integration}
                   onConnect={handleConnect}
+                  onDisconnect={handleDisconnect}
                   loadingPlatform={loadingPlatform}
+                  disconnectingPlatform={disconnectingPlatform}
                 />
               ))}
             </div>

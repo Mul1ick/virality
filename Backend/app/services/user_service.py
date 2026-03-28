@@ -1,7 +1,7 @@
 # FILE: app/services/user_service.py
 
 from fastapi import HTTPException
-from app.database.mongo_client import get_user_connection_status, get_user_by_id
+from app.database.mongo_client import get_user_connection_status, get_user_by_id, disconnect_platform as db_disconnect_platform
 from app.utils.logger import get_logger
 
 logger = get_logger()
@@ -30,6 +30,27 @@ class UserService:
         except Exception as e:
             logger.error(f"[UserService] Error fetching platform connections: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Internal error retrieving platform connections: {e}")
+
+    @staticmethod
+    def disconnect_platform(user_id: str, platform: str) -> dict:
+        """
+        Disconnects a platform for the given user.
+        """
+        allowed_platforms = {"meta", "google", "shopify"}
+        if platform not in allowed_platforms:
+            raise HTTPException(status_code=400, detail=f"Invalid platform: {platform}")
+
+        try:
+            success = db_disconnect_platform(user_id, platform)
+            if not success:
+                raise HTTPException(status_code=404, detail="User not found")
+            logger.info(f"[UserService] Disconnected {platform} for user_id={user_id}")
+            return {"message": f"{platform} disconnected successfully"}
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[UserService] Error disconnecting {platform}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Internal error disconnecting platform: {e}")
 
     @staticmethod
     def get_profile(user_id: str) -> dict:

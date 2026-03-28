@@ -149,6 +149,24 @@ def save_or_update_platform_connection(user_id: str, platform: str, platform_dat
         logger.error(f"[DB][Platform] save_or_update_platform_connection failed: {e}", exc_info=True)
 
 
+def disconnect_platform(user_id: str, platform: str):
+    """Remove a platform connection and its tokens from the user document."""
+    query = _resolve_user_query(user_id)
+    try:
+        result = users_collection.update_one(
+            query,
+            {"$unset": {
+                f"connected_platforms.{platform}": "",
+                f"platform_ids.{platform}": "",
+            }}
+        )
+        logger.info(f"[DB][Platform] Disconnected {platform} for {user_id} (matched={result.matched_count})")
+        return result.matched_count > 0
+    except Exception as e:
+        logger.error(f"[DB][Platform] disconnect_platform failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database error disconnecting platform.")
+
+
 def get_platform_connection_details(user_id: str, platform: str):
     """Retrieve specific platform connection details."""
     query = _resolve_user_query(user_id)
